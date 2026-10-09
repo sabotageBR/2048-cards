@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2048 Cards · laboratório visual</title>
+<link rel="stylesheet" href="../src/ui/estilo.css">
+<style>
+  html, body { overflow: auto; touch-action: auto; user-select: text; background: #1b1626; color: #fff; height: auto; }
+  #cena { display: none; }
+  main { padding: 16px; max-width: 1700px; margin: 0 auto; }
+  h1 { margin: 0 0 8px; font-size: 22px; }
+  .painel { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 10px 0 16px; font-size: 14px; }
+  .painel label { display: inline-flex; gap: 6px; align-items: center; }
+  .painel select, .painel button { font: inherit; font-size: 14px; border-radius: 10px; border: 2px solid #fff3; background: #2a2340; color: #fff; padding: 4px 8px; cursor: pointer; }
+  table { border-collapse: separate; border-spacing: 6px; }
+  th { font-size: 13px; font-weight: 600; opacity: 0.85; padding: 2px 4px; }
+  th.linha { text-align: right; white-space: nowrap; }
+  td { padding: 0; vertical-align: top; }
+  .celula { position: relative; width: 190px; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 2px 0 #0008; }
+  .celula canvas { display: block; width: 100%; height: auto; }
+  .celula .acoes { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 4px; padding: 4px; background: linear-gradient(transparent, rgba(0,0,0,0.75)); opacity: 0; transition: opacity 0.15s; }
+  .celula:hover .acoes { opacity: 1; }
+  .celula .acoes a, .celula .acoes button { flex: 1; font: inherit; font-size: 12px; text-align: center; color: #fff; background: #ff4fd8; border: 0; border-radius: 8px; padding: 5px 0; text-decoration: none; cursor: pointer; }
+  .celula .acoes button { background: #4de8ff; color: #1b1626; }
+  .celula.escolhida { outline: 4px solid #ffd84a; }
+  #saida { font-family: monospace; font-size: 13px; background: #0e0b16; border-radius: 10px; padding: 10px; white-space: pre-wrap; margin-top: 16px; min-height: 40px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>2048 Cards · laboratório visual</h1>
+  <div class="painel">
+    <label>Colocação <select id="colocacao"><option value="estrita">estrita (menor sob maior)</option><option value="permissiva">permissiva (qualquer)</option></select></label>
+    <label>Mão <select id="filaLivre"><option value="0">fila: só a frente joga</option><option value="1">livre: qualquer das 3</option></select></label>
+    <label><input type="checkbox" id="naipes"> naipes (valor + cor)</label>
+    <label>Colunas <select id="colunas"><option>3</option><option selected>4</option><option>5</option></select></label>
+    <label>Pilha <select id="pilhaMax"><option>4</option><option selected>5</option><option>6</option></select></label>
+    <label><input type="checkbox" id="especiais" checked> cartas especiais</label>
+    <label>Ritmo do bot <select id="ritmo"><option value="500">rápido</option><option value="900" selected>normal</option><option value="1600">lento</option><option value="0">parado</option></select></label>
+    <button id="reiniciar">Reiniciar mesas</button>
+  </div>
+  <table id="grade"></table>
+  <div id="saida">Passe o mouse numa célula: “Jogar” abre o jogo com esse par; “Escolher” marca a célula e escreve aqui o JSON para o docs/autoria.md.</div>
+</main>
+<script type="module" src="laboratorio.js"></script>
+</body>
+</html>

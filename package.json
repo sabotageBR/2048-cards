@@ -1,0 +1,14 @@
+{
+  "name": "2048-cards",
+  "version": "0.1.0",
+  "private": true,
+  "description": "2048 Cards: paciencia de fusao com cartas, para a Poki (HTML + JavaScript puro).",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "servir": "node tools/servir.mjs",
+    "simular": "node tools/simular.mjs",
+    "sdkcheck": "node tools/sdkcheck.mjs",
+    "poki": "node --test test/*.test.js && node tools/simular.mjs && node tools/thumb.mjs --final && node tools/empacotar.mjs && node tools/sdkcheck.mjs dist/ && node tools/prints-build.mjs"
+  }
+}

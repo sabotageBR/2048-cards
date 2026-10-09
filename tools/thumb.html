@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>thumb</title>
+<style>html,body{margin:0;overflow:hidden;background:#000}canvas{display:block}</style></head>
+<body><canvas id="c"></canvas><pre id="medidas"></pre>
+<script type="module">
+// Thumb da Poki desenhada com a arte do proprio jogo: o fundo e o cenario
+// (cenarios.js) e as cartas sao as skins (cartas.js), no momento da cascata
+// que vira 2048. Regras (developers.poki.com/guide/game-thumbnail):
+//   - quadrado 1:1 de no minimo 628 px, sangrado: sem borda, margem, tarja nem
+//     faixa lisa encostada na beirada; a Poki arredonda os cantos;
+//   - sem texto (os numeros das cartas sao o proprio jogo);
+//   - um assunto principal (a carta 2048 nascendo da cascata), fundo limpo;
+//   - contraste alto e nenhuma cor perto do #83FFE7 do site;
+//   - legivel nos tiles pequenos (ver ?grade).
+//   ?opcao=a|b|c&s=1256   a thumb no tamanho s (a janela deve ter s x s)
+//   ?opcao=a&grade        folha de conferencia: tiles de 314 a 94 px sobre o #83FFE7
+//   ?opcao=a&medir        mede a thumb de 628 px e escreve o JSON em #medidas
+import { CENARIOS } from '../src/render/cenarios.js';
+import { desenharCarta, corDoValor, retanguloArredondado } from '../src/render/cartas.js';
+
+const q = new URLSearchParams(location.search);
+const opcao = q.get('opcao') || 'a';
+const S = Math.max(64, parseInt(q.get('s') || '1256', 10));
+const POKI = '#83FFE7';
+const TILES = [314, 204, 140, 94];
+
+/** Opcoes: par cenario + skin (os finalistas do laboratorio). */
+const OPCOES = {
+  a: { cenario: 'neon', skin: 'neon' },
+  b: { cenario: 'espaco', skin: 'gemas' },
+  c: { cenario: 'doce', skin: 'blocos' },
+  d: { cenario: 'taverna', skin: 'papel' },
+};
+const O = OPCOES[opcao] || OPCOES.a;
+if (q.get('cenario')) O.cenario = q.get('cenario');
+if (q.get('skin')) O.skin = q.get('skin');
+const cen = CENARIOS[O.cenario] || CENARIOS.neon;
+const pal = cen.paleta;
+
+let ctx = null;
+let k = 1; // tudo num quadrado virtual de 600
+
+function carta(v, x, y, w, rot, esc = 1, alpha = 1, extra = {}) {
+  ctx.save();
+  ctx.scale(k, k);
+  desenharCarta(ctx, O.skin, { id: v, tipo: 'normal', v, cor: 0, ...extra }, { x, y, w, h: w / 0.72, pal, esc, alpha, rot, dpr: k });
+  ctx.restore();
+}
+
+function raios(cx, cy, cor) {
+  ctx.save();
+  ctx.scale(k, k);
+  ctx.translate(cx, cy);
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2 + 0.12;
+    const g = ctx.createLinearGradient(0, 0, Math.cos(a) * 420, Math.sin(a) * 420);
+    g.addColorStop(0, cor.replace(')', ',0.55)').replace('rgb(', 'rgba(').replace('#', '#'));
+    ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.10)' : 'rgba(255,216,74,0.16)';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a - 0.09) * 520, Math.sin(a - 0.09) * 520);
+    ctx.lineTo(Math.cos(a + 0.09) * 520, Math.sin(a + 0.09) * 520);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function faiscas(cx, cy) {
+  ctx.save();
+  ctx.scale(k, k);
+  let s = 7;
+  const r = () => { s = (s * 1103515245 + 12345) >>> 0; return s / 4294967296; };
+  for (let i = 0; i < 46; i++) {
+    const a = r() * Math.PI * 2, d = 120 + r() * 200, t = 4 + r() * 9;
+    ctx.fillStyle = ['#ffd84a', '#ffffff', '#ff5fa2', '#4de8ff'][i % 4];
+    ctx.globalAlpha = 0.5 + r() * 0.5;
+    ctx.save();
+    ctx.translate(cx + Math.cos(a) * d, cy + Math.sin(a) * d);
+    ctx.rotate(a);
+    ctx.fillRect(-t / 2, -t / 2, t, t * (0.6 + r() * 0.6));
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function desenhar(s) {
+  k = s / 600;
+  ctx.save(); ctx.scale(k, k);
+  ctx.fillStyle = pal.fundo; ctx.fillRect(0, 0, 600, 600);
+  cen.parado(ctx, 600, 600);
+  // vinheta leve, o olho vai ao centro
+  const v = ctx.createRadialGradient(300, 310, 140, 300, 310, 520);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.42)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, 600, 600);
+  ctx.restore();
+  raios(300, 300, corDoValor(2048, pal));
+  // a cascata: cartas menores subindo em arco, cada uma um pouco maior
+  const trilha = [[90, 470, 92, -0.35, 128], [165, 392, 104, -0.22, 256], [250, 326, 118, -0.1, 512], [350, 272, 134, 0.06, 1024]];
+  for (const [x, y, w, rot, val] of trilha) carta(val, x, y, w, rot, 1, 0.95);
+  faiscas(330, 330);
+  // a carta 2048, grande, com brilho
+  ctx.save(); ctx.scale(k, k);
+  ctx.shadowColor = corDoValor(2048, pal); ctx.shadowBlur = 60;
+  retanguloArredondado(ctx, 196, 150, 232, 322, 26);
+  ctx.fillStyle = 'rgba(255,216,74,0.25)'; ctx.fill();
+  ctx.restore();
+  carta(2048, 190, 142, 236, 0.04, 1, 1);
+}
+
+function thumb(cv, s) {
+  cv.width = s; cv.height = s;
+  ctx = cv.getContext('2d');
+  desenhar(s);
+}
+
+// ------------------------------------------------------------ medidas
+function lab(r, g, b) {
+  const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const R = lin(r), G = lin(g), B = lin(b);
+  const f = (t) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
+  const x = f((R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047);
+  const y = f(R * 0.2126 + G * 0.7152 + B * 0.0722);
+  const z = f((R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+function lum(r, g, b) {
+  const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+/** Contraste WCAG entre a carta 2048 (sua cor) e a media do fundo nos cantos. */
+function contrasteCarta(d, s) {
+  const amostra = (x0, y0) => { let r = 0, g = 0, b = 0, n = 0; for (let y = y0; y < y0 + 20; y++) for (let x = x0; x < x0 + 20; x++) { const i = (y * s + x) * 4; r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } return [r / n, g / n, b / n]; };
+  const cantos = [amostra(10, 10), amostra(s - 30, 10), amostra(10, s - 30), amostra(s - 30, s - 30)];
+  const fundo = cantos.reduce((a, c) => a + lum(...c), 0) / 4;
+  const n = parseInt(corDoValor(2048, pal).slice(1), 16);
+  const carta2048 = lum((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  return +((Math.max(fundo, carta2048) + 0.05) / (Math.min(fundo, carta2048) + 0.05)).toFixed(2);
+}
+function medir(cv) {
+  const s = cv.width;
+  const d = cv.getContext('2d').getImageData(0, 0, s, s).data;
+  const n = parseInt(POKI.slice(1), 16);
+  const P = lab((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  const dist = (L, M) => Math.hypot(L[0] - M[0], L[1] - M[1], L[2] - M[2]);
+  const cor = (x, y) => { const i = (y * s + x) * 4; return lab(d[i], d[i + 1], d[i + 2]); };
+  let perto = 0, opaca = true, somaB = 0, nB = 0;
+  const anel = Math.round(s * 0.02);
+  for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+    if (d[(y * s + x) * 4 + 3] < 255) opaca = false;
+    const e = dist(cor(x, y), P);
+    if (e < 25) perto++;
+    if (x < anel || y < anel || x >= s - anel || y >= s - anel) { somaB += e; nB++; }
+  }
+  const f = Math.round(s * 0.04);
+  const faixa = (x0, y0, w, h) => {
+    const labs = [];
+    for (let y = y0; y < y0 + h; y += 2) for (let x = x0; x < x0 + w; x += 2) labs.push(cor(x, y));
+    const m = [0, 1, 2].map((c) => labs.reduce((a, L) => a + L[c], 0) / labs.length);
+    return { m, lisa: labs.filter((L) => dist(L, m) < 3).length / labs.length };
+  };
+  const lados = { topo: [[0, 0, s, f], [0, f, s, f]], base: [[0, s - f, s, f], [0, s - 2 * f, s, f]], esq: [[0, 0, f, s], [f, 0, f, s]], dir: [[s - f, 0, f, s], [s - 2 * f, 0, f, s]] };
+  const tarja = [];
+  for (const [lado, [b, i]] of Object.entries(lados)) { const B = faixa(...b), I = faixa(...i); if (B.lisa > 0.9 && dist(B.m, I.m) > 8) tarja.push(lado); }
+  return { lado: s, pertoPoki: +(perto / (s * s)).toFixed(4), bordaPoki: +(somaB / nB).toFixed(1), tarja, contraste: { carta: contrasteCarta(d, s) }, opaca };
+}
+
+const cv = document.getElementById('c');
+const pronto = () => {
+  if (q.has('grade')) {
+    const big = document.createElement('canvas');
+    thumb(big, 1256);
+    const m = 28;
+    cv.width = TILES.reduce((a, t) => a + t + m, m);
+    cv.height = TILES[0] + 2 * m;
+    const g = cv.getContext('2d');
+    g.fillStyle = POKI; g.fillRect(0, 0, cv.width, cv.height);
+    g.imageSmoothingQuality = 'high';
+    let x = m;
+    for (const t of TILES) {
+      const y = m + TILES[0] - t;
+      g.save(); g.beginPath(); g.roundRect(x, y, t, t, Math.max(8, t * 0.08)); g.clip();
+      g.drawImage(big, x, y, t, t); g.restore();
+      x += t + m;
+    }
+  } else if (q.has('medir')) {
+    thumb(cv, 628);
+    document.getElementById('medidas').textContent = JSON.stringify(medir(cv));
+  } else thumb(cv, S);
+  document.title = 'PRONTO';
+};
+if (document.fonts && document.fonts.load) document.fonts.load('700 40px Fredoka').then(pronto, pronto); else pronto();
+</script></body></html>
