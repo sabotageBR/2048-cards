@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Paciência de fusão com cartas para a Poki: arraste a carta da frente da fila para uma coluna; cartas iguais fundem e dobram; uma menor pode descer sob uma maior e sobe em cascata até virar 2048 e sair da mesa. É feito **só com HTML + JavaScript**: ES modules nativos, canvas 2D e WebAudio, no mesmo padrão do `../stringcut`. Nada de bundler, framework ou TypeScript. O jogo publicado não tem dependência nenhuma (não há `npm install`). As ferramentas usam o Node 18+ e chamam os binários `google-chrome`, `zip` e `unzip`.
 
 - **Plano aprovado:** `~/.claude/plans/quero-criar-um-jogo-humming-steele.md` (2026-10-09).
-- **Referência visual:** as 3 capturas do WhatsApp na raiz (jogo de referência, neon). Concorrente direto na Poki: *Merge Solitaire* (Adgard). O diferencial precisa aparecer na tela: Aventura com obstáculos e chefes, cartas especiais no baralho, cascata com febre, sem moeda.
+- **Referência visual:** as 3 capturas em `docs/referencia/` (jogo de referência, neon). Concorrente direto na Poki: *Merge Solitaire* (Adgard). O diferencial precisa aparecer na tela: Aventura com obstáculos e chefes, cartas especiais no baralho, cascata com febre, sem moeda.
 - **Escolhas de identidade** (cenário, skin, regras padrão) são do usuário, no checkpoint do laboratório (`modelos/`), e ficam registradas em `docs/autoria.md`.
 
 ## Regra do jogo
