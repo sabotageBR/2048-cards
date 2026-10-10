@@ -110,7 +110,8 @@ export function criarLinha() {
         case 'completar': {
           const g = porId.get(ev.id);
           const pos = g ? g.pos : L.carta(ev.c, 0);
-          if (g) g.saida = { tipo: 'sair', ini: t, fim: t + DUR.sair, em: pos };
+          // o fantasma guarda a carta de antes da cascata; quem sai e o valor completado
+          if (g) { g.carta = { ...g.carta, v: ev.valor }; g.saida = { tipo: 'sair', ini: t, fim: t + DUR.sair, em: pos }; }
           efeitos.push({ t: t + 60, tipo: 'completar', ...centro(pos), valor: ev.valor });
           t += DUR.sair * 0.6;
           break;
