@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2048 Cards · ideias</title>
+<style>
+  @font-face { font-family: Fredoka; font-weight: 600; font-display: swap; src: url('../../src/ui/fontes/fredoka-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: Fredoka; font-weight: 700; font-display: swap; src: url('../../src/ui/fontes/fredoka-latin-700-normal.woff2') format('woff2'); }
+  :root { --fundo: #17151c; --cartao: #221f2a; --texto: #f3f1f7; --suave: #b9b3c6; --linha: #ffffff1f; --acento: #ffd84a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--fundo); color: var(--texto); font: 15px/1.45 system-ui, sans-serif; }
+  main { padding: 20px 16px 40px; max-width: 1760px; margin: 0 auto; }
+  header h1 { font: 700 26px Fredoka, system-ui, sans-serif; margin: 0 0 4px; }
+  header p { margin: 0 0 6px; color: var(--suave); max-width: 980px; }
+  .painel { display: flex; gap: 10px; align-items: center; margin: 12px 0 18px; flex-wrap: wrap; }
+  .painel a, .painel button { font: 600 14px Fredoka, system-ui, sans-serif; color: var(--texto); background: var(--cartao); border: 1px solid var(--linha); border-radius: 10px; padding: 6px 12px; cursor: pointer; text-decoration: none; }
+  .cartoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; align-items: start; }
+  h2.rodada { font: 700 22px Fredoka, system-ui, sans-serif; margin: 26px 0 12px; color: var(--suave); }
+  .ideia { background: var(--cartao); border: 1px solid var(--linha); border-radius: 16px; padding: 14px; }
+  .ideia h2 { font: 700 20px Fredoka, system-ui, sans-serif; margin: 0; display: flex; gap: 8px; align-items: center; }
+  .ideia h2 .n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--acento); color: #1b1626; font-size: 15px; }
+  .cat { display: inline-block; margin-top: 6px; font: 600 12px Fredoka, system-ui, sans-serif; letter-spacing: 0.02em; color: #1b1626; background: #b9b3c6; border-radius: 999px; padding: 2px 10px; }
+  .gancho { margin: 4px 0 10px; color: var(--acento); font-weight: 600; min-height: 2.9em; }
+  .celular { border-radius: 26px; overflow: hidden; border: 6px solid #0b0a0e; box-shadow: 0 10px 30px #0008; max-width: 320px; margin: 0 auto; background: #000; }
+  .celular canvas { display: block; width: 100%; aspect-ratio: 390 / 844; touch-action: none; cursor: pointer; }
+  .acoes { text-align: center; margin: 8px 0 4px; }
+  .acoes a { color: var(--acento); font-weight: 600; text-decoration: none; }
+  dl { margin: 8px 0 0; font-size: 13.5px; }
+  dt { font-weight: 700; margin-top: 8px; color: var(--texto); }
+  dd { margin: 2px 0 0; color: var(--suave); }
+  body.unica { overflow: hidden; }
+  body.unica main { display: none; }
+  #tela { position: fixed; inset: 0; width: 100vw; height: 100vh; touch-action: none; display: block; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>2048 Cards · ideias de identidade</h1>
+    <p>Cada celular é um protótipo jogável com o motor de verdade (as mesmas regras, cascata, pedra, gelo e especiais das 40 fases). Só muda a pele e a história. O bot joga até você tocar: depois é com você. Toque numa coluna para jogar a carta da frente da fila e toque no slot vazio para descartar.</p>
+  </header>
+  <div class="painel">
+    <button id="reiniciar" type="button">Reiniciar mesas</button>
+    <a href="?vitrine">Mesa de vitrine (1 toque fecha uma cascata até 4096)</a>
+    <a href="?">Mesa normal</a>
+    <a href="?rodada=3">Só a rodada 3</a>
+    <a href="?rodada=2">Só a rodada 2</a>
+    <a href="?rodada=1">Só a rodada 1</a>
+  </div>
+  <section id="grade"></section>
+</main>
+<script type="module" src="ideias.js"></script>
+</body>
+</html>
