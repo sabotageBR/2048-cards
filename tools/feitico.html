@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<title>Feitico do monstro</title>
+<style>
+  html, body { margin: 0; background: #1b1424; color: #f4ecff; font: 600 14px Fredoka, system-ui, sans-serif; }
+  .tira { display: flex; gap: 10px; padding: 10px; flex-wrap: wrap; }
+  .q { display: flex; flex-direction: column; gap: 4px; }
+</style>
+</head>
+<body>
+<!-- Quadros fixos de um ataque do monstro, para conferir a animacao sem
+     depender do relogio do headless: o bot joga a fase ate a jogada em que o
+     monstro lanca um feitico com alvo e cada quadro refaz essa jogada na cena
+     ate `ms` depois dela.
+     ?fase=4&sem=1&larg=360&alt=640&ms=100,450,700,900,1300&lang=pt&furia=1
+     furia=1: escolhe a primeira jogada com a furia em vez do feitico;
+     feitico=corrente: a primeira jogada com esse feitico;
+     rel=1: `ms` conta do inicio do ataque (o monstro se preparando), nao da jogada;
+     rotulos=a,b,c: legenda de cada quadro;
+     fase=classico|diario (cadeia) e derrota=1: a jogada em que o monstro da cadeia cai (rel conta dela). -->
+<div class="tira" id="tira"></div>
+<script type="module">
+import { criarCena } from '../src/render/cena.js';
+import { criarLinha } from '../src/render/linha.js';
+import { criarPartida, jogar } from '../src/jogo/partida.js';
+import { melhorJogada } from '../src/jogo/bot.js';
+import { faseDe, CLASSICO } from '../src/jogo/fases.js';
+import { faseDiaria } from '../src/jogo/diario.js';
+import { monstroDaFase, monstroDaCadeia } from '../src/render/monstros.js';
+import { textos } from '../src/i18n/textos.js';
+
+const q = new URLSearchParams(location.search);
+const qf = q.get('fase') || '4';
+const fase = qf === 'classico' ? CLASSICO : qf === 'diario' ? faseDiaria(q.get('data') || '2026-10-10') : faseDe(Number(qf));
+const querDerrota = q.get('derrota') === '1';
+const W = Number(q.get('larg') || 360), H = Number(q.get('alt') || 640);
+const quadros = (q.get('ms') || '100,450,700,900,1300').split(',').map(Number);
+const T = textos(q.get('lang') || 'pt');
+const querFuria = q.get('furia') === '1';
+const querFeitico = q.get('feitico') || '';
+const rotulos = q.get('rotulos') ? q.get('rotulos').split(',') : null;
+
+let e = criarPartida({}, fase, fase.semente + Number(q.get('sem') || 1));
+let r = null;
+for (let i = 0, t = 0; i < 400 && !e.fim; i++, t += 900) {
+  const a = melhorJogada(e, t);
+  if (!a) break;
+  const x = jogar(e, { ...a, t });
+  const alvo = querDerrota ? x.eventos.some((ev) => ev.tipo === 'derrotado') : querFuria ? x.eventos.some((ev) => ev.tipo === 'furia') : x.eventos.some((ev) => ev.tipo === 'monstro' && ev.alvos.length && (!querFeitico || ev.feitico === querFeitico));
+  if (alvo) { r = { antes: e, ...x }; break; }
+  e = x.estado;
+}
+const tira = document.getElementById('tira');
+if (!r) { tira.textContent = 'nenhum feitico'; document.title = 'PRONTO'; }
+else {
+  const ev = r.eventos.find((x) => x.tipo === 'monstro');
+  const t0 = 1000;
+  // inicio do ataque (ou da furia), para ?rel=1
+  let base = 0;
+  if (q.get('rel') === '1') {
+    const cv0 = document.createElement('canvas');
+    const c0 = criarCena(cv0);
+    c0.redimensionar(W, H, 1, H >= W ? 100 : 70, 0);
+    c0.definirRegras(r.antes.regras);
+    const ln = criarLinha();
+    ln.montar(r.eventos, c0.L, t0, { antes: r.antes, depois: r.estado, meio: r.meio });
+    const fx = ln.drenarEfeitos(1e9).find((x) => x.tipo === (querFuria ? 'furia' : 'feitico'));
+    base = fx && !querDerrota ? fx.t - t0 : 0;
+  }
+  quadros.forEach((ms, k) => {
+    const caixa = document.createElement('div'); caixa.className = 'q';
+    const rot = document.createElement('div');
+    rot.textContent = rotulos ? rotulos[k] || '' : `${ms} ms · ${ev ? ev.feitico + ' → ' + ev.alvos.map((a) => 'col ' + a.c).join(', ') : 'furia'}`;
+    const cv = document.createElement('canvas');
+    caixa.append(rot, cv); tira.append(caixa);
+    const cena = criarCena(cv);
+    cena.definirTextos(T);
+    const def = r.antes.monstro && r.antes.monstro.cadeia ? monstroDaCadeia(r.antes.monstro) : monstroDaFase(fase);
+    cena.definirReino(def.reino);
+    cena.redimensionar(W, H, 2, H >= W ? 100 : 70, 0);
+    cena.definirRegras(r.antes.regras);
+    cena.novaBatalha(def, r.antes);
+    cena.tocar(r.eventos, t0, { antes: r.antes, depois: r.estado, meio: r.meio, origem: cena.L.filaPos(0), carta: r.antes.fila[0] });
+    const fim = t0 + base + ms;
+    for (let t = t0; t <= fim; t += 16) cena.atualizar(0.016, t, r.estado);
+    cena.desenhar({ estado: r.estado, agora: fim, tEntrada: -1e9 });
+  });
+  document.title = 'PRONTO';
+}
+</script>
+</body>
+</html>

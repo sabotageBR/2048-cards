@@ -1,7 +1,5 @@
 // Menu de pausa (continuar, recomecar, som, modos, fases) e tela de fim.
 import { POR_MUNDO } from '../jogo/fases.js';
-import { desenharCarta } from '../render/cartas.js';
-import { CENARIOS } from '../render/cenarios.js';
 
 /**
  * @param {{ T: any, $: (id: string) => HTMLElement, acoes: any, onFechar?: () => void }} p
@@ -19,7 +17,6 @@ export function criarMenus({ T, $, acoes }) {
   $('bFimContinuar').textContent = `${T.continuar} · ${T.gratis}`;
   $('txtFimVideo').textContent = T.continuarVideo;
   $('bFimDeNovo').textContent = T.jogarDeNovo;
-  $('colecaoTitulo').firstChild.textContent = T.colecao + ' ';
 
   function somIcone() {
     $('bSom').classList.toggle('mudo', acoes.mudo());
@@ -58,59 +55,9 @@ export function criarMenus({ T, $, acoes }) {
     }
   }
 
-  /** Previa de uma skin (carta 64) ou de um cenario (fundo + carta). */
-  function previa(canvas, tipo, id) {
-    const dpr = Math.min(2, devicePixelRatio || 1);
-    const w = 64, h = 80;
-    canvas.width = w * dpr; canvas.height = h * dpr;
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-    if (tipo === 'cenario' && id === 'auto') {
-      ctx.fillStyle = '#2a2340'; ctx.fillRect(0, 0, w, h);
-      ctx.font = '700 28px Fredoka, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff';
-      ctx.fillText('🌍', w / 2, h / 2);
-      return;
-    }
-    if (tipo === 'cenario') {
-      const cen = CENARIOS[id];
-      cen.parado(ctx, w, h);
-      desenharCarta(ctx, 'blocos', { id: 1, tipo: 'normal', v: 64, cor: 0 }, { x: 14, y: 14, w: 36, h: 50, pal: cen.paleta, dpr });
-    } else {
-      ctx.fillStyle = '#2a2340'; ctx.fillRect(0, 0, w, h);
-      desenharCarta(ctx, id, { id: 1, tipo: 'normal', v: 64, cor: 0 }, { x: 10, y: 8, w: 44, h: 61, pal: CENARIOS.neon.paleta, dpr });
-    }
-  }
-
-  function montarColecao() {
-    $('colecaoEstrelas').textContent = `${acoes.estrelasTotal()}★`;
-    for (const [idGrade, tipo, lista] of [['gradeSkins', 'skin', acoes.skins()], ['gradeCenarios', 'cenario', acoes.cenarios()]]) {
-      const g = $(idGrade);
-      g.innerHTML = '';
-      for (const p of lista) {
-        const b = document.createElement('button');
-        b.className = 'peca';
-        b.disabled = !p.livre;
-        b.setAttribute('aria-pressed', String(p.atual));
-        b.title = p.id;
-        const c = document.createElement('canvas');
-        b.appendChild(c);
-        previa(c, tipo, p.id);
-        if (!p.livre) {
-          const custo = document.createElement('span');
-          custo.className = 'custo';
-          custo.textContent = tipo === 'skin' ? T.estrelasPara.replace('{n}', String(p.custo)) : `${T.mundo} ${p.custo}`;
-          b.appendChild(custo);
-        }
-        b.addEventListener('click', () => { if (p.livre) { acoes.vestir(tipo, p.id); montarColecao(); } });
-        g.appendChild(b);
-      }
-    }
-  }
-
   function abrir() {
     aberto = true;
     montarFases();
-    montarColecao();
     somIcone();
     menu.hidden = false;
     acoes.aoAbrir && acoes.aoAbrir();
@@ -129,10 +76,12 @@ export function criarMenus({ T, $, acoes }) {
   $('bClassico').addEventListener('click', () => { fechar(); acoes.modoClassico(); });
   $('bDiario').addEventListener('click', () => { fechar(); acoes.modoDiario(); });
 
-  /** Tela de fim: { pontos, recorde, novo, gratis, video } */
+  /** Tela de fim: { pontos, recorde, novo, gratis, video, derrotados? } */
   function mostrarFim(info) {
     $('fimTitulo').textContent = info.titulo || T.semJogadas;
     $('fimPontos').textContent = String(info.pontos);
+    $('fimMonstros').hidden = info.derrotados === undefined;
+    if (info.derrotados !== undefined) $('fimMonstros').textContent = T.fimDerrotados.replace('{n}', String(info.derrotados));
     $('fimRecorde').textContent = info.novo ? T.novoRecorde : (info.recorde ? `${T.recorde} ${info.recorde}` : '');
     $('bFimContinuar').hidden = !info.gratis;
     $('bFimVideo').hidden = !info.video;

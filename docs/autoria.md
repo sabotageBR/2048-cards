@@ -14,7 +14,7 @@ Registro das escolhas feitas pelo usuário (não pela ferramenta), com data, o q
 | Mão de cartas | fila (só a frente joga) · livre (qualquer das 3) · as duas como toggle | **Fila** |
 | Escopo | completo em etapas · só MVP | **Completo em etapas** |
 
-## Checkpoint do laboratório (pendente)
+## Checkpoint do laboratório (recusado em 2026-10-10, ver abaixo)
 
 Ver `modelos/README.md` e `modelos/prints/`. Preencher após a escolha:
 
@@ -28,3 +28,52 @@ Ver `modelos/README.md` e `modelos/prints/`. Preencher após a escolha:
 | O que vira mundo / coleção | | |
 
 Riscos anotados: sobreposição com Merge Solitaire (a diferença precisa aparecer na thumb e nos primeiros 15 s); régua de playtime de puzzle (~8:52).
+
+## 2026-10-10 · identidade: Duelo contra Monstros
+
+Vistos: os 36 pares cenário × skin do laboratório (recusados) e as 27 ideias jogáveis de `modelos/ideias/` em três rodadas (prints em `modelos/ideias/prints/`). Escolhida a ideia `duelo` da rodada 1 ("abre possibilidade de fazer várias coisas").
+
+| Pergunta | Opções vistas | Escolha |
+|---|---|---|
+| Visual | como o protótipo · arena do duelo com cartas limpas · nova rodada só do duelo | **Como o protótipo** (cartoon), variando desenhos e cores de mundo a mundo |
+| Combate | monstro ataca · só tema · RPG leve | **Monstro ataca**: a cada N jogadas, com contagem visível, lança um feitiço com obstáculo já ensinado |
+| Extras | bestiário · chefões especiais · Clássico/Diário em duelo · nada além | **Chefões especiais** (fúria) e **Clássico/Diário em duelo**; sem bestiário |
+| Arte dos monstros | canvas procedural · imagens prontas | **Canvas procedural** |
+| Reinos | 5 reinos com espécie por mundo · outros · monstros variados | **1 Campos do castelo (Gosmo, lodo) · 2 Pedreira (Golem, pedra) · 3 Reino gelado (Yeti, gelo) · 4 Masmorra (Espectro, corrente) · 5 Vulcão (Dragão, tudo)**; chefe na posição 8 de cada mundo |
+| Coleção (skins e cenários) | remover · molduras do duelo · manter | **Remover**: o reino define a arena e as cartas são sempre as do duelo |
+| Ataque no mundo 1 | lodo a partir da fase 4 · só no mundo 2 · lodo desde a fase 1 | **Lodo a partir da fase 4** (fases 1–3 sem ataque) |
+
+## 2026-10-10 · pilha maior
+
+Pedido do usuário: cada coluna cabe 1 carta a mais. `pilhaMax` padrão passou de 5 para 6, e a fase 34 de 6 para 7. A menor carta medida com a faixa do monstro fica em 52 px (360×640, 5 colunas × 7), acima do piso de 44.
+
+## 2026-10-10 · etapas 2 e 3: o monstro ataca, os 5 reinos e os chefões
+
+Pedido do usuário: "pode seguir para a etapa 2 e 3" (visual da etapa 1 aprovado). Ajustes feitos dentro do que foi decidido, para o usuário conferir nos prints de `docs/duelo/etapa2-*.png` e `etapa3-*.png`:
+
+- **Lodo:** o plano previa "um 2 em cima da pilha". Na colocação estrita isso trava a coluna (só aceitaria 2) e derrubava as fases de monte para menos de 30% no simulador. Virou **uma carta da metade do topo** (topos de 8 a 256): a coluna passa a aceitar só cartas menores até alguém fundir a gosma.
+- **Gelo** congela topos de 8 a 128; **pedra** entra no fundo da coluna (as cartas sobem) e não conta para "quebre as pedras"; **corrente** tranca uma coluna por 3 jogadas, com o número no cadeado. Sem alvo justo, o feitiço erra ("ERROU!").
+- **Selo da contagem:** ao lado da cabeça do monstro, com o ícone do próximo feitiço e as jogadas que faltam (pulsa em vermelho quando falta 1). Até o feitiço cair, a mesa mostra o estado de antes; um toque adianta a animação.
+- **Primeira vez de cada feitiço** (fases 4, 10, 18, 28) e do chefão furioso (fase 8): aviso curto com a dica, uma vez só.
+- **Coringa:** saiu da fase 4 (que agora ensina o ataque) e foi para a 6.
+- **Monstros:** a espécie pelo reino; a variante pela posição no mundo (cor, chifres, acessório: bandana, brinco, tapa-olho, cicatriz) e um apelido ("Gosmo Guloso", "Dragão Ranzinza"); o chefão da posição 8 é maior, tem coroa e aura e se chama "Rei". Na fúria: olhos vermelhos, corpo avermelhado, vapor, aura pulsando e "ENFURECIDO!". O "FÚRIA ×2" da febre do jogador continua com esse nome, por isso a fúria do chefão é "ENFURECIDO!".
+- **Arenas:** pedreira (penhascos, andaime, marcos de pedra), reino gelado (aurora, pinheiros, neve caindo, pista de gelo), masmorra (tijolos, grades, tochas, círculo mágico) e vulcão (lava, brasas, pilares de obsidiana). A paleta do reino tinge a mesa e o painel.
+
+## 2026-10-10 · etapas 4 e 5: Clássico e Diário em cadeia, limpeza e thumb
+
+Pedido do usuário: "pode seguir para a etapa 4 e 5".
+
+- **Cadeia de monstros** no Clássico e no Diário: a vida de cada monstro é de pontos (400 no primeiro, ×1,5 a cada um), ao cair ele afunda, some numa nuvem e o próximo entra. A cada 5 monstros a cadeia muda de reino (a arena troca junto) e o 5º é o "Rei" com fúria; os feitiços são os dos reinos já visitados. No Clássico o bot derruba a mediana de 11 monstros e perde por mesa cheia por volta da jogada 490 (antes jogava sem fim); no Diário derruba 4 ou 5 nas 120 cartas, chegando ao Rei do dia. O Diário sorteia a ordem dos reinos pela data: o primeiro é o "monstro do dia", o mesmo para todo mundo.
+- **Limpeza:** as 6 skins, os 6 cenários e a mesa antiga foram para `modelos/legado/` (o laboratório continua abrindo); a build leva só o duelo. Saíram os parâmetros `?cenario=` e `?skin=`.
+- **Thumb nova** (`tools/thumb.html`): a arena de um reino, o monstro gigante levando o raio do 2048 que nasce da coluna da cascata e o número do dano. Quatro opções em `marketing/thumb/comparar.png` (e `docs/duelo/etapa5-thumb.png`): **a** Gosmo nos campos, **b** Rei Dragão enfurecido no vulcão, **c** Rei Yeti no gelo, **d** Espectro na masmorra. Pela regra de contraste da Poki que medimos (carta 2048 contra o fundo ≥ 3:1), b (5,1:1) e d (4,4:1) passam; a (1,6:1) e c (1,8:1) não. **Escolha pendente do usuário**; a `b` ficou como provisória para o `npm run poki`.
+
+## 2026-10-11 · curva de dificuldade gradual
+
+Pedido do usuário: "To preso na fase 7, está impossível de matar o monstro, refaça as fases de modo que a dificuldade vai crescendo gradativamente." Plano aprovado: uma régua nova, o **jogador casual** (bot que erra 1 em 5 jogadas, não prevê o feitiço e usa o "Continuar" grátis), e uma curva alvo para as vitórias dele.
+
+- **A curva:** começa em 100% e cai em linha reta até 55% na fase 40. A fase que ensina algo novo fica um pouco acima da linha e o chefão um pouco abaixo. Nenhuma fase pode ter mais de 12 pontos a menos que a anterior. O plano dizia 50% no fim; ficou em 55% porque, abaixo disso, o bot bom também perderia mais que o piso. O gráfico antes/depois está em `docs/duelo/curva.png` e a mesa inicial das fases mais mexidas em `docs/duelo/curva-fases.png`.
+- **A ordem das novidades não mudou:** lodo na 4, pedra na 10, gelo na 18, corrente na 28 e chefão com fúria na posição 8.
+- **Fase 7:** de "dois montes" passou para "um monte sem a escada pronta" (falta um 256), com coringa no baralho e 2 descartes. O casual vence 88%; antes vencia 43%. Os dois montes estreiam na fase 15.
+- **Chefões** com um degrau a mais na mesa inicial. As fases fáceis demais para a posição (9–11, 13, 14, 25, 26, 33) ficaram mais apertadas.
+- **Fase 33:** o Dragão estreia atacando a cada 3 jogadas (lodo, pedra e gelo) e a meta passou a ser as pedras e um 512. Foi o único jeito de deixá-la difícil sem mudar o tamanho da pilha.
+- **Partidas salvas:** as antigas são descartadas (`VERSAO_ESTADO` 4) para que a fase em andamento recomece já na versão nova. Progresso e estrelas ficam.

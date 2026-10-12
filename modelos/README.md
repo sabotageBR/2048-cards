@@ -1,5 +1,7 @@
 # 2048 Cards · laboratório visual (checkpoint da Etapa 2)
 
+> **Legado (2026-10-10):** os 36 pares cenário × skin foram recusados e o jogo virou o Duelo contra Monstros (`docs/autoria.md`). As skins, os cenários e a mesa antiga ficam em `modelos/legado/`, só para este laboratório; o botão **Jogar** abre o jogo de hoje (que ignora `?cenario=` e `?skin=`).
+
 Abra `modelos/laboratorio.html` servido pela rede (`npm run servir` e depois `http://127.0.0.1:5360/modelos/laboratorio.html`; os módulos ES não carregam por `file://`). A grade mostra **6 cenários × 6 skins**, cada célula com uma mesa de exemplo jogada pelo bot (cascatas, especiais, descarte). Nada daqui entra na build: o laboratório importa `src/` direto e `tools/empacotar.mjs` só copia `src/`.
 
 - **Toggles de regra** (recriam todas as mesas): colocação estrita ou permissiva · mão em fila ou livre · naipes · 3–5 colunas · pilha 4–6 · cartas especiais · ritmo do bot.

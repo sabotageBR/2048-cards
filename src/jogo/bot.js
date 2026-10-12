@@ -1,9 +1,15 @@
 // Jogador automatico: avalia cada acao legal com uma jogada de antecedencia
 // e uma heuristica simples. Serve aos testes de fase, ao simulador de
-// dificuldade, ao laboratorio e a mao de ajuda.
+// dificuldade, ao laboratorio e a mao de ajuda. O perfil casual (op.erro)
+// imita uma pessoa: erra a coluna de vez em quando, nao ve o feitico chegando
+// e usa o "Continuar" gratis uma vez; e a regua da curva de dificuldade.
 import { criarPartida, jogar, acoesLegais, jogadasLegais } from './partida.js';
 import { fundeCom, topo, ehPedra } from './regras.js';
 import { estrelas as calcEstrelas } from './metas.js';
+import { rngPasso } from './baralho.js';
+
+/** Jogador casual: 1 em 5 jogadas vai para uma coluna qualquer. */
+export const PERFIL_CASUAL = { erro: 0.2 };
 
 /** Quanto a mesa esta "boa" (maior e melhor). */
 export function avaliarMesa(e) {
@@ -40,14 +46,17 @@ export function avaliarMesa(e) {
   return s;
 }
 
-/** Melhor acao agora (ou null). */
-export function melhorJogada(e, t = 0) {
+/**
+ * Melhor acao agora (ou null). Com `cego` a nota sai da mesa antes do
+ * feitico (quem joga nao sabe onde o monstro vai acertar).
+ */
+export function melhorJogada(e, t = 0, cego = false) {
   const acoes = acoesLegais(e);
   if (!acoes.length) return null;
   let melhor = null, melhorNota = -Infinity;
   for (const a of acoes) {
     const r = jogar(e, { ...a, t });
-    let nota = avaliarMesa(r.estado);
+    let nota = avaliarMesa(cego && r.meio ? { ...r.meio, fim: r.estado.fim } : r.estado);
     if (a.tipo === 'descartar') nota -= 120;
     if (a.tipo === 'item') nota -= a.item === 'martelo' ? 220 : 160;
     if (nota > melhorNota) { melhorNota = nota; melhor = a; }
@@ -56,23 +65,47 @@ export function melhorJogada(e, t = 0) {
 }
 
 /**
- * Joga uma fase ate o fim. Devolve { venceu, fim, estrelas, jogadas, pontos, estado }.
+ * Joga uma fase ate o fim. Devolve { venceu, fim, estrelas, jogadas, pontos, estado,
+ * ataques (feiticos lancados), aposFeitico (perdeu ate 2 jogadas depois de um feitico) }.
+ * Com `erro` (perfil casual) a fracao `erro` das jogadas vai para uma coluna
+ * sorteada (RNG proprio, derivado da semente), a nota nao ve o feitico e a
+ * mesa cheia ganha um "Continuar".
  * @param {object} fase
  * @param {object} regras
  * @param {number} semente
- * @param {{ maxJogadas?: number, passoMs?: number }} [op]
+ * @param {{ maxJogadas?: number, passoMs?: number, erro?: number }} [op]
  */
 export function jogarSozinho(fase, regras, semente, op = {}) {
   const max = op.maxJogadas || 800;
   const passo = op.passoMs || 900;
+  const erro = op.erro || 0;
+  let rng = ((semente ^ 0x85ebca6b) >>> 0) || 1;
+  const sortear = () => { const [u, r] = rngPasso(rng); rng = r; return u; };
   let e = criarPartida(regras, fase, semente);
-  let t = 0, jogadas = 0;
-  while (!e.fim && jogadas < max) {
-    const a = melhorJogada(e, t);
+  let t = 0, jogadas = 0, ultimoFeitico = -99, continuou = false;
+  while (jogadas < max) {
+    if (e.fim === 'mesaCheia' && erro && !continuou) {
+      continuou = true;
+      e = jogar(e, { tipo: 'retomar', t }).estado;
+    }
+    if (e.fim) break;
+    let a = null;
+    if (erro && sortear() < erro) {
+      const soltas = acoesLegais(e).filter((x) => x.tipo === 'colocar');
+      if (soltas.length) a = soltas[Math.floor(sortear() * soltas.length)];
+    }
+    if (!a) a = melhorJogada(e, t, erro > 0);
     if (!a) break;
-    e = jogar(e, { ...a, t }).estado;
+    const r = jogar(e, { ...a, t });
+    if (r.estado === e) break; // acao recusada: nada mudaria nas proximas
+    e = r.estado;
     t += passo;
     jogadas++;
+    if (r.eventos.some((ev) => ev.tipo === 'monstro' && ev.alvos.length)) ultimoFeitico = jogadas;
   }
-  return { venceu: e.fim === 'venceu', fim: e.fim, estrelas: e.fim === 'venceu' ? calcEstrelas(e) : 0, jogadas, pontos: e.pontos, estado: e };
+  const venceu = e.fim === 'venceu';
+  return {
+    venceu, fim: e.fim, estrelas: venceu ? calcEstrelas(e) : 0, jogadas, pontos: e.pontos, estado: e,
+    ataques: e.monstro ? e.monstro.lancados : 0, aposFeitico: !venceu && jogadas - ultimoFeitico <= 2,
+  };
 }

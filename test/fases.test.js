@@ -1,10 +1,12 @@
 // Toda fase tem esquema valido e e passavel pelo bot guloso (>= 82%, >= 78%
 // na ultima do mundo). Nenhuma fase e trivial (menos de 5 jogadas na media).
+// A dificuldade cresce aos poucos: o jogador casual fica perto da curva
+// (alvoCasual) e nenhuma fase cai de repente em relacao a anterior.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FASES, CLASSICO, POR_MUNDO, faseDe, mundoDe, posNoMundo } from '../src/jogo/fases.js';
+import { FASES, CLASSICO, POR_MUNDO, faseDe, mundoDe, posNoMundo, alvoCasual, FAIXA_CASUAL, QUEDA_MAX } from '../src/jogo/fases.js';
 import { TIPOS } from '../src/jogo/metas.js';
-import { jogarSozinho } from '../src/jogo/bot.js';
+import { jogarSozinho, PERFIL_CASUAL } from '../src/jogo/bot.js';
 
 const SEMENTES = 25;
 
@@ -37,6 +39,25 @@ test('bot passa cada fase do mundo 1', () => {
   }
 });
 
+test('curva gradual: o jogador casual segue alvoCasual', () => {
+  // metade das partidas do simulador (40 por serie): a folga e maior porque a
+  // amostra e menor; a regua fina e `npm run simular`
+  const N = 40, folga = 4;
+  let ant = null;
+  for (const f of FASES) {
+    let v = 0;
+    for (let s = 0; s < N; s++) {
+      if (jogarSozinho(f, {}, f.semente + s * 7919, PERFIL_CASUAL).venceu) v++;
+      if (jogarSozinho(f, {}, f.semente + s + 1, PERFIL_CASUAL).venceu) v++;
+    }
+    const casual = Math.round((v / (2 * N)) * 100);
+    const alvo = alvoCasual(f.id);
+    assert.ok(Math.abs(casual - alvo) <= FAIXA_CASUAL + folga, `fase ${f.id}: casual ${casual}% (alvo ${alvo}%)`);
+    if (ant !== null) assert.ok(ant - casual <= QUEDA_MAX + folga, `fase ${f.id}: caiu de ${ant}% para ${casual}%`);
+    ant = casual;
+  }
+});
+
 test('classico roda 300 jogadas sem excecao', () => {
   const r = jogarSozinho(CLASSICO, {}, 11, { maxJogadas: 300 });
   assert.ok(r.jogadas >= 100);
@@ -44,7 +65,7 @@ test('classico roda 300 jogadas sem excecao', () => {
 });
 
 test('variantes de regra rodam no classico', () => {
-  for (const regras of [{ colocacao: 'permissiva' }, { naipes: true }, { filaLivre: true }, { colunas: 3 }, { colunas: 5, pilhaMax: 6 }]) {
+  for (const regras of [{ colocacao: 'permissiva' }, { naipes: true }, { filaLivre: true }, { colunas: 3 }, { colunas: 5, pilhaMax: 7 }]) {
     const r = jogarSozinho(CLASSICO, regras, 3, { maxJogadas: 120 });
     assert.ok(r.jogadas >= 20, JSON.stringify(regras) + ' ' + r.fim);
   }

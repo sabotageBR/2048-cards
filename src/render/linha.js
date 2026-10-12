@@ -4,8 +4,17 @@
 // desenha sempre o estado NOVO e consulta aqui a pose de cada carta.
 // Uma acao nova no meio da cascata chama acelerar(): tudo o que falta
 // termina em ate 80 ms. Funcoes puras do tempo: ?quadro=ms congela.
+//
+// Ataque do monstro: depois que a cascata do jogador termina e o ultimo golpe
+// chega, o monstro se prepara (feitico), o projetil voa ate o alvo e, no
+// impacto, a mesa mostrada troca de `meio` (antes do feitico) para o estado
+// novo: visivel(estado, agora). Cartas que mudam de altura deslizam (a pedra
+// do monstro entra por baixo; a pedra que quebra no meio da cascata desce a pilha).
 
-export const DUR = { voo: 180, squash: 90, degrau: 140, sair: 350, fila: 160, explodir: 220, tremor: 220, volta: 160 };
+export const DUR = {
+  voo: 180, squash: 90, degrau: 140, sair: 350, fila: 160, explodir: 220, tremor: 220, volta: 160,
+  golpe: 320, pausa: 120, feitico: 260, projetil: 300, reflow: 180,
+};
 
 const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const easeOut = (u) => 1 - Math.pow(1 - clamp(u), 3);
@@ -22,6 +31,7 @@ export function criarLinha() {
   /** @type {any[]} */ let tremores = [];  // { c, ini, fim }
   /** @type {any[]} */ let entradas = [];  // { id, ini, fim }
   /** @type {any[]} */ let efeitos = [];   // { t, tipo, x, y, cor, ... } (consumidos pela cena)
+  /** @type {{ em: number, meio: any, depois: any }|null} */ let troca = null; // mesa antes do feitico, ate o impacto
   let ultimoFim = 0;
 
   function posAntes(antes, L, id) {
@@ -42,12 +52,17 @@ export function criarLinha() {
    * @param {any[]} eventos
    * @param {any} L layout
    * @param {number} agora
-   * @param {{ antes: any, depois: any, origem?: any, carta?: any }} info
+   * @param {{ antes: any, depois: any, meio?: any, origem?: any, carta?: any }} info
    *   origem: retangulo de onde a carta jogada saiu (fila ou arrasto)
+   *   meio: a mesa depois da jogada e antes do feitico do monstro
    */
   function montar(eventos, L, agora, info) {
     const { antes, depois } = info;
+    const meio = info.meio || null;
     const t0 = agora;
+    troca = null;
+    let tGolpe = 0;            // quando o ultimo golpe chega no monstro
+    const tPedra = new Map();  // coluna -> instante em que a pedra do fundo quebrou
     const presentes = new Set();
     for (const col of depois.colunas) for (const k of col) presentes.add(k.id);
     for (const k of depois.fila) presentes.add(k.id);
@@ -91,7 +106,8 @@ export function criarLinha() {
             }
             g.saida = { tipo: 'encolher', ini: tk, fim: tk + DUR.degrau, em: alvo };
           }
-          efeitos.push({ t: tk + DUR.degrau * 0.4, tipo: 'fusao', ...centro(alvo), valor: ev.valor, degrau: ev.degrau });
+          efeitos.push({ t: tk + DUR.degrau * 0.4, tipo: 'fusao', ...centro(alvo), valor: ev.valor, degrau: ev.degrau, dano: ev.dano });
+          tGolpe = Math.max(tGolpe, tk + DUR.degrau * 0.4 + DUR.golpe);
           t = tk + DUR.degrau;
           break;
         }
@@ -103,7 +119,8 @@ export function criarLinha() {
           if (g) { g.pos = origem; g.voo = { ini: t0, fim: t0 + DUR.voo, de: origem, para: alvo }; g.saida = { tipo: 'encolher', ini: t0 + DUR.voo, fim: t0 + DUR.voo + DUR.degrau, em: alvo }; }
           valores.push({ id: ev.id, ate: t0 + DUR.voo + DUR.degrau * 0.45, valor: ev.valor / 2 });
           pulsos.push({ id: ev.id, ini: t0 + DUR.voo, fim: t0 + DUR.voo + DUR.degrau });
-          efeitos.push({ t: t0 + DUR.voo + DUR.degrau * 0.4, tipo: 'fusao', ...centro(alvo), valor: ev.valor, degrau: 1 });
+          efeitos.push({ t: t0 + DUR.voo + DUR.degrau * 0.4, tipo: 'fusao', ...centro(alvo), valor: ev.valor, degrau: 1, dano: ev.dano });
+          tGolpe = Math.max(tGolpe, t0 + DUR.voo + DUR.degrau * 0.4 + DUR.golpe);
           t = t0 + DUR.voo + DUR.degrau;
           break;
         }
@@ -112,7 +129,8 @@ export function criarLinha() {
           const pos = g ? g.pos : L.carta(ev.c, 0);
           // o fantasma guarda a carta de antes da cascata; quem sai e o valor completado
           if (g) { g.carta = { ...g.carta, v: ev.valor }; g.saida = { tipo: 'sair', ini: t, fim: t + DUR.sair, em: pos }; }
-          efeitos.push({ t: t + 60, tipo: 'completar', ...centro(pos), valor: ev.valor });
+          efeitos.push({ t: t + 60, tipo: 'completar', ...centro(pos), valor: ev.valor, dano: ev.dano });
+          tGolpe = Math.max(tGolpe, t + 60 + 140);
           t += DUR.sair * 0.6;
           break;
         }
@@ -135,8 +153,10 @@ export function criarLinha() {
           tremores.push({ c: ev.c, ini: t, fim: t + DUR.tremor * 0.7 });
           if (ev.quebrou) {
             const g = porId.get(ev.id);
-            if (g) g.saida = { tipo: 'explodir', ini: t, fim: t + DUR.explodir, em: pos };
+            // a pedra e o fundo da pilha: explode por baixo das cartas que ela segurava
+            if (g) { g.saida = { tipo: 'explodir', ini: t, fim: t + DUR.explodir, em: pos }; g.baixo = true; }
             efeitos.push({ t, tipo: 'pedra', ...centro(pos) });
+            if (!tPedra.has(ev.c)) tPedra.set(ev.c, t);
           } else efeitos.push({ t, tipo: 'racha', ...centro(pos) });
           break;
         }
@@ -166,6 +186,36 @@ export function criarLinha() {
           break;
         }
         case 'combo': efeitos.push({ t, tipo: 'combo', n: ev.n, ...centro(L.carta(cAtual >= 0 ? cAtual : 0, Math.max(0, nA - degraus))) }); break;
+        case 'furia': efeitos.push({ t: Math.max(t, tGolpe) + 60, tipo: 'furia' }); break;
+        case 'monstro': {
+          // o monstro ataca depois da cascata e do ultimo golpe
+          const tM = Math.max(t, tGolpe) + DUR.pausa;
+          const tP = tM + DUR.feitico;
+          const tImp = tP + DUR.projetil;
+          const m = L.monstro || { x: L.W / 2, y: L.mesa.y, R: 40 };
+          const boca = { x: m.x, y: m.y - m.R * 0.7 };
+          efeitos.push({ t: tM, tipo: 'feitico', feitico: ev.feitico, ...boca });
+          if (!ev.alvos.length) {
+            efeitos.push({ t: tP, tipo: 'projetil', feitico: ev.feitico, de: boca, para: { x: L.mesa.x + L.mesa.w / 2, y: L.mesa.y - L.ch * 0.2 }, dur: DUR.projetil, erro: true });
+            efeitos.push({ t: tImp, tipo: 'erro', feitico: ev.feitico, x: L.mesa.x + L.mesa.w / 2, y: L.mesa.y - L.ch * 0.2 });
+          }
+          for (const a of ev.alvos) {
+            const col = depois.colunas[a.c] || [];
+            const i = Math.max(0, col.findIndex((k) => k.id === a.id));
+            const r = a.id !== undefined ? L.carta(a.c, i) : L.coluna(a.c);
+            const para = a.id !== undefined ? centro(r) : { x: r.x + r.w / 2, y: r.y + Math.min(r.h, L.ch * 1.5) / 2 };
+            efeitos.push({ t: tP, tipo: 'projetil', feitico: ev.feitico, de: boca, para, dur: DUR.projetil });
+            efeitos.push({ t: tImp, tipo: 'impacto', feitico: ev.feitico, ...para, c: a.c });
+            if (ev.feitico === 'lodo' || ev.feitico === 'pedra') {
+              entradas.push({ id: a.id, ini: tImp, fim: tImp + DUR.reflow });
+              squashes.push({ id: a.id, ini: tImp, fim: tImp + DUR.squash * 1.5 });
+            } else if (ev.feitico === 'gelo') pulsos.push({ id: a.id, ini: tImp, fim: tImp + DUR.degrau });
+            tremores.push({ c: a.c, ini: tImp, fim: tImp + DUR.tremor });
+          }
+          if (meio) troca = { em: tImp, meio, depois };
+          t = tImp + DUR.reflow;
+          break;
+        }
         case 'item': {
           if (ev.item === 'coringa' && info.origem) { /* a carta coringa do item e um fantasma registrado abaixo */ }
           break;
@@ -182,6 +232,10 @@ export function criarLinha() {
       const g = { id: itemCoringa.id, carta: { id: itemCoringa.id, tipo: 'coringa', v: 0, cor: 0 }, pos: origem, voo: { ini: t0, fim: t0 + DUR.voo, de: origem, para: alvo }, saida: { tipo: 'encolher', ini: t0 + DUR.voo, fim: t0 + DUR.voo + DUR.degrau, em: alvo }, ini: t0 };
       if (f) { fantasmas.push(g); porId.set(g.id, g); }
     }
+    // cartas que mudaram de altura na coluna: a jogada (pedra que quebra) e o feitico (pedra que entra)
+    const depoisJogada = meio || depois;
+    deslizar(antes, depoisJogada, L, (c) => (tPedra.has(c) ? tPedra.get(c) : t0), t0);
+    if (troca) deslizar(meio, depois, L, () => troca.em, troca.em);
     // fila: quem deslizou e quem entrou
     const idxAntes = new Map(antes.fila.map((k, i) => [k.id, i]));
     depois.fila.forEach((k, i) => {
@@ -191,6 +245,21 @@ export function criarLinha() {
       } else entradas.push({ id: k.id, ini: t0 + 40, fim: t0 + 40 + DUR.fila });
     });
     ultimoFim = Math.max(ultimoFim, t + DUR.sair);
+  }
+
+  /**
+   * Desliza as cartas que continuam na mesma coluna em outra altura. Ate `mov`
+   * a carta fica na altura antiga; depois desce (ou sobe) em DUR.reflow.
+   */
+  function deslizar(de, para, L, movDe, ini) {
+    for (let c = 0; c < para.colunas.length; c++) {
+      const antes = new Map((de.colunas[c] || []).map((k, i) => [k.id, i]));
+      para.colunas[c].forEach((k, i) => {
+        if (!antes.has(k.id) || antes.get(k.id) === i) return;
+        const mov = movDe(c);
+        tweens.push({ id: k.id, tipo: 'desliza', ini, mov, fim: mov + DUR.reflow, de: L.carta(c, antes.get(k.id)), para: L.carta(c, i), arco: 0 });
+      });
+    }
   }
 
   /** Carta arrastada e solta fora: volta para a fila. */
@@ -203,7 +272,8 @@ export function criarLinha() {
     let r = null;
     for (const tw of tweens) {
       if (tw.id !== id || agora < tw.ini || agora > tw.fim) continue;
-      const u = easeOut((agora - tw.ini) / Math.max(1, tw.fim - tw.ini));
+      const comeco = tw.mov !== undefined ? tw.mov : tw.ini;
+      const u = easeOut((agora - comeco) / Math.max(1, tw.fim - comeco));
       r = { ...lerpRect(tw.de, tw.para, u), esc: 1, escY: 1, alpha: 1, voando: tw.tipo === 'voo' };
       if (tw.arco) r.y -= Math.sin(u * Math.PI) * tw.para.h * 0.25 * tw.arco;
       if (tw.tipo === 'voo') r.esc = 1 + Math.sin(u * Math.PI) * 0.08;
@@ -238,7 +308,7 @@ export function criarLinha() {
     return v;
   }
 
-  /** Fantasmas vivos agora: { carta, x, y, w, h, esc, alpha }. */
+  /** Fantasmas vivos agora: { carta, x, y, w, h, esc, alpha, rot, baixo } (baixo: vai sob as cartas da coluna). */
   function listarFantasmas(agora) {
     const out = [];
     for (const g of fantasmas) {
@@ -258,7 +328,7 @@ export function criarLinha() {
         else if (g.saida.tipo === 'explodir') { rect = { ...em }; esc = 1 + u * 0.3; alpha = 1 - easeOut(u); }
       }
       const carta = { ...g.carta, v: valor(g.id, agora, g.carta.v) };
-      out.push({ carta, x: rect.x, y: rect.y, w: rect.w, h: rect.h, esc, alpha, rot });
+      out.push({ carta, x: rect.x, y: rect.y, w: rect.w, h: rect.h, esc, alpha, rot, baixo: !!g.baixo });
     }
     return out;
   }
@@ -274,6 +344,13 @@ export function criarLinha() {
     return dx;
   }
 
+  /** Golpes agendados que ainda nao sairam (fusao e monte completo viram golpe no monstro). */
+  function golpesPorVir() {
+    let n = 0;
+    for (const e of efeitos) if (e.tipo === 'fusao' || e.tipo === 'completar') n++;
+    return n;
+  }
+
   /** Efeitos cujo instante chegou (removidos da fila). */
   function drenarEfeitos(agora) {
     const prontos = efeitos.filter((e) => e.t <= agora);
@@ -281,9 +358,21 @@ export function criarLinha() {
     return prontos;
   }
 
+  /**
+   * Mesa a desenhar agora: a de antes do feitico ate o impacto (so se o estado
+   * ainda e o daquela jogada; desfazer ou jogada nova descartam a troca).
+   */
+  function visivel(estado, agora) {
+    return troca && agora < troca.em && estado && troca.depois.colunas === estado.colunas ? troca.meio : estado;
+  }
+  /** O feitico da ultima jogada ainda nao caiu? */
+  function feiticoPendente(agora) { return !!troca && agora < troca.em; }
+
   function acelerar(agora) {
     const limite = agora + 80;
-    const corta = (x) => { if (x.fim > limite) { x.ini = Math.min(x.ini, agora); x.fim = limite; } };
+    const corta = (x) => { if (x.fim > limite) { x.ini = Math.min(x.ini, agora); if (x.mov !== undefined) x.mov = Math.min(x.mov, agora); x.fim = limite; } };
+    // o feitico cai na hora: a mesa nova ja vale para a proxima jogada
+    if (troca) troca.em = Math.min(troca.em, agora);
     tweens.forEach(corta); squashes.forEach(corta); pulsos.forEach(corta); tremores.forEach(corta); entradas.forEach(corta);
     for (const v of valores) v.ate = Math.min(v.ate, limite);
     for (const g of fantasmas) { if (g.voo) corta(g.voo); corta(g.saida); }
@@ -300,7 +389,7 @@ export function criarLinha() {
     fantasmas = fantasmas.filter((g) => g.saida.fim > agora);
   }
 
-  function limpar() { tweens = []; squashes = []; pulsos = []; fantasmas = []; valores = []; tremores = []; entradas = []; efeitos = []; ultimoFim = 0; }
+  function limpar() { tweens = []; squashes = []; pulsos = []; fantasmas = []; valores = []; tremores = []; entradas = []; efeitos = []; troca = null; ultimoFim = 0; }
 
-  return { montar, voltar, pose, valor, fantasmas: listarFantasmas, tremor, drenarEfeitos, acelerar, ocupada, podar, limpar, get fim() { return ultimoFim; } };
+  return { montar, voltar, pose, valor, fantasmas: listarFantasmas, tremor, drenarEfeitos, golpesPorVir, acelerar, ocupada, podar, limpar, visivel, feiticoPendente, get fim() { return ultimoFim; } };
 }

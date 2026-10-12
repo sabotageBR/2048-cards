@@ -1,29 +1,29 @@
-// Simulador de dificuldade: o bot guloso joga cada fase N vezes com sementes
-// distintas e o relatorio mostra vitorias, jogadas e pontos (mediana e
-// quartis). Falha se alguma fase ficar abaixo do piso (82%, 78% na ultima
-// do mundo) ou for trivial. Uso: node tools/simular.mjs [sementes=25] [fase]
-import { FASES, POR_MUNDO, posNoMundo } from '../src/jogo/fases.js';
-import { jogarSozinho } from '../src/jogo/bot.js';
+// Simulador de dificuldade (medir.mjs): o bot guloso joga cada fase 25 vezes
+// e o casual 40. O relatorio mostra vitorias, jogadas, pontos (mediana e
+// quartis), feiticos do monstro por partida (mediana), derrotas que vieram
+// ate 2 jogadas depois de um feitico e, do casual, vitorias contra o alvo da
+// curva e jogadas. Falha se alguma fase ficar abaixo do piso do guloso (82%,
+// 78% na ultima do mundo), for trivial, sair da faixa do casual (PAREDE ou
+// FACIL) ou cair mais que QUEDA_MAX em relacao a anterior (QUEDA).
+// Uso: node tools/simular.mjs [fase...]
+import { FASES } from '../src/jogo/fases.js';
+import { medirFase, problemas } from './medir.mjs';
 
-const N = Number(process.argv[2]) || 25;
-const so = Number(process.argv[3]) || 0;
-const q = (a, p) => { const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
+const so = process.argv.slice(2).map(Number).filter(Boolean);
+const p = (x, n) => String(x).padStart(n);
 let ok = true;
-process.stdout.write('fase  mundo  vit%   jogadas(med)  pontos(q25/med/q75)   estrelas[2,3]   nota\n');
+process.stdout.write('fase  mundo  vit%  jogadas  pontos(q25/med/q75)    estrelas[2,3]  ataques  apos  casual alvo  jog.c   nota\n');
+let ant = null;
 for (const f of FASES) {
-  if (so && f.id !== so) continue;
-  let v = 0;
-  const jog = [], pts = [];
-  for (let s = 1; s <= N; s++) {
-    const r = jogarSozinho(f, {}, f.semente + s * 7919);
-    if (r.venceu) v++;
-    jog.push(r.jogadas); pts.push(r.pontos);
+  const quer = !so.length || so.includes(f.id);
+  // a queda compara com a fase anterior, entao ela e medida mesmo fora da lista
+  if (!quer && !so.includes(f.id + 1)) { ant = null; continue; }
+  const m = medirFase(f);
+  if (quer) {
+    const nota = problemas(m, ant);
+    if (nota.length) ok = false;
+    process.stdout.write(`${p(f.id, 4)}  ${p(f.mundo, 5)}  ${p(Math.round(m.vitorias * 100), 4)}  ${p(m.jogadas, 7)}  ${p(m.pontos[0], 7)}/${p(m.pontos[1], 6)}/${p(m.pontos[2], 6)}   ${p(f.estrelas[1], 6)},${p(f.estrelas[2], 6)}  ${p(m.ataques, 7)}  ${p(m.apos, 4)}  ${p(m.casual, 5)}% ${p(m.alvo, 3)}  ${p(m.jogadasCasual, 5)}   ${nota.join(' ')}${nota.length ? ' ' + JSON.stringify(m.fins) : ''}\n`);
   }
-  const piso = posNoMundo(f.id) === POR_MUNDO ? 0.78 : 0.82;
-  const taxa = v / N;
-  const trivial = q(jog, 0.5) < 5;
-  const nota = taxa < piso ? 'ABAIXO DO PISO' : trivial ? 'TRIVIAL' : '';
-  if (nota) ok = false;
-  process.stdout.write(`${String(f.id).padStart(4)}  ${String(f.mundo).padStart(5)}  ${String(Math.round(taxa * 100)).padStart(4)}  ${String(q(jog, 0.5)).padStart(12)}  ${String(q(pts, 0.25)).padStart(7)}/${String(q(pts, 0.5)).padStart(6)}/${String(q(pts, 0.75)).padStart(6)}   ${String(f.estrelas[1]).padStart(6)},${String(f.estrelas[2]).padStart(6)}   ${nota}\n`);
+  ant = m;
 }
 process.exit(ok ? 0 : 1);

@@ -12,27 +12,37 @@
 <body>
 <canvas id="cena"></canvas>
 <div id="topo" class="hud">
-  <button id="bMenu" class="btn" aria-label="Menu">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-  </button>
-  <div class="placar">
-    <div class="linha1"><span id="rotulo"></span><b id="pontos">0</b><small id="recorde"></small></div>
-    <div class="meta"><div class="barra"><i id="barra"></i></div><span id="metaTxt"></span></div>
+  <div id="painel" class="painel">
+    <div class="linha1">
+      <span id="rotulo"></span>
+      <span class="dano"><svg class="espada" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(45 12 12)"><path d="M12 1.5 14.2 4.5V15H9.8V4.5Z" fill="#e9eef6"/><rect x="6.5" y="15" width="11" height="2.6" rx="1" fill="#e8b84a"/><rect x="10.9" y="17.6" width="2.2" height="4.4" fill="#7a4b2a"/></g></svg><small id="danoTxt">DAMAGE</small><b id="pontos">0</b></span>
+    </div>
+    <div class="vida">
+      <svg class="coracao" viewBox="0 0 24 22" aria-hidden="true"><path d="M12 20.5C5 15.6 1.5 12 1.5 7.4 1.5 4.3 3.9 2 6.8 2c2.1 0 3.9 1.2 5.2 3 1.3-1.8 3.1-3 5.2-3 2.9 0 5.3 2.3 5.3 5.4 0 4.6-3.5 8.2-10.5 13.1z"/></svg>
+      <div class="barra"><i id="barraVis"></i><i id="barra"></i><span id="vidaTxt"></span></div>
+    </div>
+    <div class="meta"><span id="metaTxt"></span><small id="recorde"></small></div>
   </div>
-  <button id="bDesfazer" class="btn" aria-label="Undo">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
-    <i class="conta" id="nDesfazer" aria-hidden="true"></i>
-  </button>
-  <button id="bPausa" class="btn" aria-label="Pause">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
-  </button>
+  <div class="botoes">
+    <button id="bMenu" class="btn" aria-label="Menu">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <span class="vao"></span>
+    <button id="bDesfazer" class="btn" aria-label="Undo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+      <i class="conta" id="nDesfazer" aria-hidden="true"></i>
+    </button>
+    <button id="bPausa" class="btn" aria-label="Pause">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+    </button>
+  </div>
 </div>
 <div id="base" class="hud" hidden>
   <button id="iCoringa" class="btn item" aria-label="Wild"><span>★</span><i class="conta" aria-hidden="true">0</i></button>
   <button id="iMartelo" class="btn item" aria-label="Hammer"><span>🔨</span><i class="conta" aria-hidden="true">0</i></button>
   <button id="iTroca" class="btn item" aria-label="Swap"><span>⇄</span><i class="conta" aria-hidden="true">0</i></button>
 </div>
-<div id="febre" hidden><span id="febreTxt">FEVER!</span></div>
+<div id="febre" hidden><span id="febreTxt">FURY ×2</span></div>
 <div id="aviso" hidden><b id="avisoTitulo"></b><span id="avisoTxt"></span></div>
 <div id="menu" hidden>
   <div class="cartao" role="dialog" aria-modal="true" aria-labelledby="menuTitulo">
@@ -53,16 +63,13 @@
       <h3 id="missoesTitulo">Missions</h3>
       <div class="missoes" id="listaMissoes"></div>
       <div class="grade" id="gradeFases"></div>
-      <h3 id="colecaoTitulo">Collection <small id="colecaoEstrelas"></small></h3>
-      <div class="colecao" id="gradeSkins"></div>
-      <div class="colecao" id="gradeCenarios"></div>
     </div>
   </div>
 </div>
 <div id="fim" hidden>
   <div class="cartao">
     <h2 id="fimTitulo">No moves left</h2>
-    <div class="placarFim"><b id="fimPontos">0</b><small id="fimRecorde"></small></div>
+    <div class="placarFim"><b id="fimPontos">0</b><small id="fimRecorde"></small><small id="fimMonstros" hidden></small></div>
     <button class="acao grande" id="bFimContinuar">Continue</button>
     <button class="acao anuncio" id="bFimVideo"><span id="txtFimVideo">Continue</span><i class="selo-inline" aria-hidden="true">🎬</i></button>
     <button class="acao clara" id="bFimDeNovo">Play again</button>

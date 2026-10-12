@@ -1,6 +1,6 @@
-// Cenarios: paleta + fundo desenhado em canvas (camada parada, em cache no
-// resize, e camada viva por quadro). Cada cenario e o mundo visual de uma
-// fase; o laboratorio mostra todos e o usuario escolhe.
+// LEGADO (laboratorio visual de 2026-10-09, recusado em 2026-10-10): os 6
+// cenarios de antes do duelo, paleta + fundo desenhado em canvas (camada
+// parada e camada viva). O jogo usa as arenas de src/render/arena.js.
 
 const TAU = Math.PI * 2;
 

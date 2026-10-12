@@ -2,10 +2,10 @@
 // exemplo jogada pelo bot, mais os toggles de regra. Consome src/ direto
 // (nada daqui vai para a build: tools/empacotar.mjs so copia src/).
 import { calcularLayout } from '../src/render/layout.js';
-import { desenharMesa } from '../src/render/mesa.js';
+import { desenharMesa } from './legado/mesa.js';
 import { criarLinha } from '../src/render/linha.js';
-import { CENARIOS, CENARIOS_IDS } from '../src/render/cenarios.js';
-import { SKINS, limparCache } from '../src/render/cartas.js';
+import { CENARIOS, CENARIOS_IDS } from './legado/cenarios.js';
+import { SKINS, limparCache } from './legado/cartas.js';
 import { criarPartida, jogar } from '../src/jogo/partida.js';
 import { melhorJogada } from '../src/jogo/bot.js';
 import { CLASSICO } from '../src/jogo/fases.js';

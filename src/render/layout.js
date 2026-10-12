@@ -1,6 +1,9 @@
 // Geometria pura da tela: mesa (colunas e descarte), fila e medidas da
 // carta, como funcao de (W, H) e das faixas ocupadas pelo HUD. Retrato: HUD
 // em cima, mesa no meio, fila embaixo. Paisagem: fila numa coluna a direita.
+// Com `arena`, o monstro do duelo ganha espaco: em retrato uma faixa entre o
+// HUD e a mesa; em paisagem uma coluna a esquerda. L.monstro = { x, y, R }
+// (centro, linha dos pes e raio).
 
 const PROPORCAO = 0.72;      // largura / altura da carta
 const SOBREPOSICAO = 0.30;   // faixa visivel de cada carta coberta (fracao da altura)
@@ -8,11 +11,17 @@ const CARTA_MAX = 118;       // largura maxima da carta (desktop)
 const CARTA_MIN = 44;
 
 /**
- * @param {{ W: number, H: number, topo: number, base?: number, colunas: number, pilhaMax: number, tamFila: number }} p
+ * @param {{ W: number, H: number, topo: number, base?: number, colunas: number, pilhaMax: number, tamFila: number, arena?: boolean }} p
  */
-export function calcularLayout({ W, H, topo, base = 0, colunas, pilhaMax, tamFila }) {
+export function calcularLayout({ W, H, topo, base = 0, colunas, pilhaMax, tamFila, arena = false }) {
   const retrato = H >= W * 0.95;
   const margem = Math.max(10, Math.min(W, H) * 0.03);
+  const faixa = arena && retrato ? Math.round(Math.max(120, Math.min(230, H * 0.26))) : 0;
+  const esq = arena && !retrato ? Math.round(Math.max(110, Math.min(260, W * 0.19))) : 0;
+  const topoHud = topo;
+  topo += faixa;
+  const Wt = W;
+  W -= esq;
   const passoFator = SOBREPOSICAO;
   const alturaColuna = (ch) => ch + (pilhaMax - 1) * ch * passoFator;
   // descarte: na mesma linha das colunas, salvo retrato com 5 colunas (vai para junto da fila)
@@ -55,7 +64,7 @@ export function calcularLayout({ W, H, topo, base = 0, colunas, pilhaMax, tamFil
   } else {
     const filaW = filaCw + gap * 2;
     const total = mesaW + gap * 2 + filaW;
-    const x0 = Math.round((W - total) / 2);
+    const x0 = esq + Math.round((W - total) / 2);
     mesa = { x: x0, y: Math.round(topo + (H - topo - base - mesaH) / 2), w: mesaW, h: mesaH };
     fila = { vertical: true, x: mesa.x + mesaW + gap * 2, y: mesa.y, w: filaW, h: mesaH, cw: filaCw, ch: filaCh, gap: Math.round(gap * 1.2) };
   }
@@ -81,8 +90,19 @@ export function calcularLayout({ W, H, topo, base = 0, colunas, pilhaMax, tamFil
     const x0 = Math.round(fila.x + fila.w / 2 - largTotal / 2 + (descarteNaMesa ? 0 : filaCw + fila.gap * 3));
     return { x: x0 + k * (filaCw + fila.gap), y: fila.y, w: filaCw, h: filaCh };
   }
+  /** @type {{x:number,y:number,R:number}|null} */
+  let monstro = null;
+  if (faixa) {
+    const y = Math.round(topo + (mesa.y - topo) * 0.45 - 14);
+    const R = Math.round(Math.max(30, Math.min(84, Wt * 0.2, (y - topoHud - 6) / 2.1)));
+    monstro = { x: Math.round(Wt / 2), y, R };
+  } else if (esq) {
+    // no meio do espaco livre a esquerda da mesa (a coluna reservada e o minimo)
+    const R = Math.round(Math.max(28, Math.min(92, mesa.x * 0.36, (H - topoHud) * 0.2)));
+    monstro = { x: Math.round(Math.max(R * 1.2, mesa.x / 2)), y: Math.round(mesa.y + mesa.h * 0.78), R };
+  }
   return {
-    W, H, retrato, topo, base, margem, gap, pad, cw, ch, passo, colunas, pilhaMax, tamFila, mesa, fila, descarte, descarteNaMesa,
+    W: Wt, H, retrato, topo: topoHud, base, margem, gap, pad, cw, ch, passo, colunas, pilhaMax, tamFila, mesa, fila, descarte, descarteNaMesa, monstro, faixa, esq,
     coluna: (c) => ({ x: colX(c), y: colY, w: cw, h: colAlt }),
     carta: (c, i) => ({ x: colX(c), y: colY + i * passo, w: cw, h: ch }),
     filaPos,

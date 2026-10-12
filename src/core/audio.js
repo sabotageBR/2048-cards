@@ -166,5 +166,26 @@ export function criarAudio() {
       ruido(0.3, 600, 0.6, 0.15, 1.3, 'bandpass', 3000);
     },
     tique() { tom(900, 0.05, 'triangle', 0.08, 1200); },
+    /** golpe chegando no monstro: baque curto e estalo */
+    golpe() { ruido(0.09, 1800, 1.2, 0.35, 0, 'bandpass', 500); tom(160, 0.1, 'square', 0.05, 70); },
+    /** critico do golpe especial: baque grave e brilho */
+    critico() { ruido(0.35, 600, 0.6, 0.55, 0, 'lowpass', 90); tom(110, 0.3, 'sawtooth', 0.08, 45); [1046, 1318, 1568].forEach((f, i) => tom(f, 0.18, 'triangle', 0.06, 0, 0.05 + i * 0.05)); },
+    /** monstro derrotado: gemido que desce e um "puf" */
+    derrota() { tom(420, 0.45, 'square', 0.05, 120); ruido(0.3, 900, 0.7, 0.3, 0.25, 'bandpass', 200); },
+    /** monstro carregando o feitico: zumbido que sobe */
+    feitico() { tom(160, 0.3, 'sawtooth', 0.04, 420); ruido(0.3, 400, 1.5, 0.12, 0, 'bandpass', 1800); },
+    /** feitico caindo na mesa, com timbre de cada um */
+    impacto(tipo) {
+      if (tipo === 'lodo') { ruido(0.22, 500, 1, 0.45, 0, 'lowpass', 120); tom(220, 0.16, 'sine', 0.12, 70); }
+      else if (tipo === 'pedra') { ruido(0.25, 600, 0.6, 0.55, 0, 'lowpass', 90); tom(95, 0.2, 'square', 0.06, 50); }
+      else if (tipo === 'gelo') { [2093, 2637, 3136].forEach((f, i) => tom(f, 0.18, 'sine', 0.05, 0, i * 0.03)); ruido(0.15, 5000, 1, 0.15, 0, 'highpass'); }
+      else { tom(330, 0.1, 'square', 0.06, 0); tom(495, 0.12, 'square', 0.05, 0, 0.05); ruido(0.12, 3000, 2, 0.2, 0.02); }
+    },
+    /** proximo monstro da cadeia entrando: "boing" que sobe */
+    entrada() { tom(180, 0.25, 'triangle', 0.08, 520); tom(360, 0.18, 'sine', 0.05, 900, 0.12); ruido(0.2, 2000, 1, 0.12, 0.05, 'bandpass', 600); },
+    /** feitico sem alvo: "puf" */
+    erro() { ruido(0.18, 1200, 1, 0.22, 0, 'bandpass', 400); tom(300, 0.14, 'triangle', 0.05, 180); },
+    /** chefao enfurecido: rugido grave */
+    furia() { ruido(0.7, 300, 0.8, 0.5, 0, 'lowpass', 120); tom(120, 0.6, 'sawtooth', 0.07, 70); tom(180, 0.5, 'square', 0.03, 90, 0.05); },
   };
 }

@@ -9,15 +9,22 @@
 //   { tipo: 'retomar', t }          continuar depois da mesa cheia: limpa a coluna mais cheia
 //
 // Eventos (na ordem em que acontecem): colocar, recusar, fundir, completar,
-// pedra, gelo, cadeado, bomba, dobro, martelo, troca, descartar, recarga,
-// combo, comboFim, febre, meta, fila, limpar, fimFase, fimPartida.
+// pedra, gelo, cadeado, bomba, dobro, martelo, troca, item, descartar,
+// recarga, combo, comboFim, febre, meta, fila, limpar, furia, monstro,
+// derrotado (cadeia), fimFase, fimPartida. fundir, dobro e completar levam `dano`: os pontos que
+// aquele golpe deu. O ataque do monstro (monstro.js) vem depois da jogada:
+// jogar devolve tambem `meio`, a mesa antes do feitico (null sem feitico).
 import { normalizarRegras, podeColocar, topo, ehPedra } from './regras.js';
 import { colocar, cascata, completar } from './colunas.js';
 import { encherFila, jogadasLegais, ESPACO_ESPECIAL, PESOS_PADRAO } from './baralho.js';
 import { montarMesa, abrirCadeados } from './obstaculos.js';
-import { criarMetas, avaliar, todasFeitas, estrelas as calcEstrelas } from './metas.js';
+import { criarMetas, avaliar, todasFeitas, vidaDe, estrelas as calcEstrelas } from './metas.js';
+import { criarMonstro, ferir, atacar, folga, derrotar } from './monstro.js';
 
-export const VERSAO_ESTADO = 1;
+// Sobe quando o formato do estado muda ou quando as fases mudam (a partida
+// salva carrega a mesa e as metas de quando comecou): o main.js descarta a
+// partida salva de outra versao. 4: curva de dificuldade refeita (2026-10-11).
+export const VERSAO_ESTADO = 4;
 
 /**
  * @param {object} regrasBase regras do jogador (laboratorio/ajustes)
@@ -28,6 +35,8 @@ export function criarPartida(regrasBase, fase, semente) {
   const regras = normalizarRegras({ ...(regrasBase || {}), ...(fase.regras || {}), ...(fase.chefe ? { teto: 4096 } : {}) });
   const mesa = montarMesa(fase, regras, 1);
   const b = fase.baralho || {};
+  let pedrasHp = 0;
+  for (const col of mesa.colunas) if (col.length && ehPedra(col[0])) pedrasHp += col[0].hp;
   let e = {
     v: VERSAO_ESTADO, regras, faseId: fase.id, modo: fase.modo || 'aventura',
     rng: (semente >>> 0) || 1, proxId: mesa.proxId, n: 0,
@@ -36,9 +45,10 @@ export function criarPartida(regrasBase, fase, semente) {
     fila: [], descarte: null, descarteCarga: regras.descarteMax, desdeRecarga: 0,
     restantes: b.total === undefined || b.total === null || b.total === Infinity ? Infinity : Math.max(1, b.total | 0),
     pontos: 0, combo: 0, fusoesSeguidas: 0, secas: 0, febreAte: 0, febre: false,
-    maiorCascata: 0, montes: 0, cartasFeitas: {}, fusoes: 0, pedrasQuebradas: 0, pedrasTotal: mesa.pedrasTotal,
+    maiorCascata: 0, montes: 0, cartasFeitas: {}, fusoes: 0, pedrasQuebradas: 0, pedrasTotal: mesa.pedrasTotal, pedrasHp,
     itens: { coringa: 0, martelo: 0, troca: 0, desfazer: 1, ...(fase.itens || {}) },
-    metas: criarMetas(fase), estrelasRef: fase.estrelas || [0, 0, 0],
+    metas: criarMetas(fase, mesa.colunas, regras), estrelasRef: fase.estrelas || [0, 0, 0],
+    monstro: criarMonstro(fase.monstro, semente >>> 0),
     fim: null, recusas: 0, desdeEspecial: 2, continuacoes: 0,
   };
   e = encherFila(e);
@@ -56,7 +66,7 @@ export function acoesLegais(e) {
   for (const k of idx) for (const c of jogadasLegais(e, e.fila[k])) r.push({ tipo: 'colocar', c, k });
   if (e.descarteCarga > 0 && e.fila.length) r.push({ tipo: 'descartar' });
   if (e.itens.coringa > 0) for (const c of jogadasLegais(e, { tipo: 'coringa', v: 0, cor: 0 })) r.push({ tipo: 'item', item: 'coringa', c });
-  if (e.itens.martelo > 0) e.colunas.forEach((col, c) => { if (col.length) r.push({ tipo: 'item', item: 'martelo', c }); });
+  if (e.itens.martelo > 0) e.colunas.forEach((col, c) => { if (col.length && !e.cadeados[c]) r.push({ tipo: 'item', item: 'martelo', c }); });
   if (e.itens.troca > 0 && e.fila.length >= 2) r.push({ tipo: 'item', item: 'troca' });
   return r;
 }
@@ -77,12 +87,13 @@ export function desfazerPara(anterior) {
 
 /** Aplica a carta na coluna c (ja validada). Devolve o estado com a mesa nova e os contadores. */
 function aplicarCarta(e, carta, c, modo, eventos) {
+  const k0 = eventos.length;
   const colunas = e.colunas.slice();
   let col = colunas[c];
   let fusao = false, degrau = 0, valores = [], pedras = 0;
   if (modo === 'bomba') {
     const t = topo(col);
-    if (ehPedra(t)) { eventos.push({ tipo: 'pedra', c, id: t.id, hp: 0, quebrou: true }); pedras = 1; }
+    if (ehPedra(t)) { eventos.push({ tipo: 'pedra', c, id: t.id, hp: 0, quebrou: true }); pedras = t.lancada ? 0 : 1; }
     else eventos.push({ tipo: 'bomba', c, id: t.id, valor: t.v });
     col = col.slice(0, -1);
   } else if (modo === 'dobro') {
@@ -111,6 +122,7 @@ function aplicarCarta(e, carta, c, modo, eventos) {
     }
   }
   colunas[c] = col;
+  marcarDano(eventos, k0, mult);
   let fusoesSeguidas = e.fusoesSeguidas, secas = e.secas, combo = e.combo;
   if (fusao) {
     fusoesSeguidas++; secas = 0; combo = fusoesSeguidas;
@@ -125,6 +137,15 @@ function aplicarCarta(e, carta, c, modo, eventos) {
     maiorCascata: Math.max(e.maiorCascata, degrau),
     pedrasQuebradas: e.pedrasQuebradas + pedras,
   };
+}
+
+/** Pontos de cada golpe (mesma conta dos pontos acima): degrau d vale valor * d. */
+function marcarDano(eventos, k0, mult) {
+  for (let i = k0; i < eventos.length; i++) {
+    const ev = eventos[i];
+    if (ev.tipo === 'fundir') ev.dano = ev.valor * ev.degrau * mult;
+    else if (ev.tipo === 'dobro' || ev.tipo === 'completar') ev.dano = ev.valor * mult;
+  }
 }
 
 function ligarFebre(e, t, eventos) {
@@ -210,7 +231,7 @@ function acItem(e, acao, eventos) {
     const t = topo(col);
     eventos.push({ tipo: 'item', item, c, id: t.id });
     let pedras = e.pedrasQuebradas;
-    if (ehPedra(t)) { eventos.push({ tipo: 'pedra', c, id: t.id, hp: 0, quebrou: true }); pedras++; }
+    if (ehPedra(t)) { eventos.push({ tipo: 'pedra', c, id: t.id, hp: 0, quebrou: true }); if (!t.lancada) pedras++; }
     else eventos.push({ tipo: 'martelo', c, id: t.id, valor: t.v });
     const colunas = e.colunas.slice();
     colunas[c] = col.slice(0, -1);
@@ -239,39 +260,58 @@ function acRetomar(e, acao, eventos) {
   eventos.push({ tipo: 'limpar', c: melhor, ids: colunas[melhor].filter((k) => !ehPedra(k)).map((k) => k.id) });
   colunas[melhor] = colunas[melhor].filter((k) => ehPedra(k));
   return {
-    e: { ...e, colunas, fim: null, continuacoes: e.continuacoes + 1, descarteCarga: Math.max(1, e.descarteCarga), fusoesSeguidas: 0, secas: 0, combo: 0 },
+    e: folga({ ...e, colunas, fim: null, continuacoes: e.continuacoes + 1, descarteCarga: Math.max(1, e.descarteCarga), fusoesSeguidas: 0, secas: 0, combo: 0 }),
     aplicou: true,
   };
 }
 
-function fecharJogada(e, eventos) {
-  e = abrirCadeados(e, eventos);
-  const m = avaliar(e, eventos);
-  if (m.mudou) e = { ...e, metas: m.metas };
-  if (e.fim) return e;
-  if (todasFeitas(e.metas)) {
-    const est = calcEstrelas(e);
-    eventos.push({ tipo: 'fimFase', estrelas: est, pontos: e.pontos });
-    return { ...e, fim: 'venceu' };
-  }
-  if (!e.fila.length) {
-    eventos.push({ tipo: 'fimPartida', motivo: 'baralhoAcabou' });
-    return { ...e, fim: 'baralhoAcabou' };
-  }
-  if (!temJogada(e) && e.descarteCarga <= 0 && !(e.itens.coringa > 0 && jogadasLegais(e, { tipo: 'coringa', v: 0, cor: 0 }).length) && !(e.itens.martelo > 0)) {
-    eventos.push({ tipo: 'fimPartida', motivo: 'mesaCheia' });
-    return { ...e, fim: 'mesaCheia' };
-  }
-  return e;
+/** Sem jogada, sem descarte e sem item que salve: a mesa esta cheia. */
+export function presa(e) {
+  const martela = e.itens.martelo > 0 && e.colunas.some((col, c) => col.length && !e.cadeados[c]);
+  return !temJogada(e) && e.descarteCarga <= 0 && !(e.itens.coringa > 0 && jogadasLegais(e, { tipo: 'coringa', v: 0, cor: 0 }).length) && !martela;
 }
 
 /**
- * Aplica uma acao. Nunca muta a entrada.
- * @returns {{ estado: any, eventos: any[] }}
+ * Fecha a jogada: cadeados, metas, vitoria, furia, ataque do monstro (so se a
+ * jogada contou e o golpe nao foi fatal) e mesa cheia. Preso antes do ataque,
+ * o monstro nao ataca: a mesa cheia nunca vem junto com um feitico.
+ * @returns {{ e: any, meio: any }}
+ */
+function fecharJogada(e, eventos, contou) {
+  e = abrirCadeados(e, eventos);
+  const m = avaliar(e, eventos);
+  if (m.mudou) e = { ...e, metas: m.metas };
+  if (e.fim) return { e, meio: null };
+  if (todasFeitas(e.metas)) {
+    const est = calcEstrelas(e);
+    eventos.push({ tipo: 'fimFase', estrelas: est, pontos: e.pontos });
+    return { e: { ...e, fim: 'venceu' }, meio: null };
+  }
+  if (!e.fila.length) {
+    eventos.push({ tipo: 'fimPartida', motivo: 'baralhoAcabou' });
+    return { e: { ...e, fim: 'baralhoAcabou' }, meio: null };
+  }
+  let meio = null;
+  if (e.monstro && e.monstro.cadeia && vidaDe(e) <= 0) e = derrotar(e, eventos); // o golpe fatal da cadeia nao tem feitico
+  else if (e.monstro) {
+    e = ferir(e, vidaDe(e), eventos);
+    if (contou && !presa(e)) ({ e, meio } = atacar(e, eventos, presa));
+  }
+  if (presa(e)) {
+    eventos.push({ tipo: 'fimPartida', motivo: 'mesaCheia' });
+    return { e: { ...e, fim: 'mesaCheia' }, meio };
+  }
+  return { e, meio };
+}
+
+/**
+ * Aplica uma acao. Nunca muta a entrada. `meio`: a mesa depois da jogada e
+ * antes do feitico do monstro (null quando ele nao atacou).
+ * @returns {{ estado: any, eventos: any[], meio: any }}
  */
 export function jogar(estado, acao) {
   const eventos = [];
-  if (!acao || (estado.fim && acao.tipo !== 'retomar')) return { estado, eventos };
+  if (!acao || (estado.fim && acao.tipo !== 'retomar')) return { estado, eventos, meio: null };
   const t = acao.t || 0;
   let e = expirarFebre(estado, t, eventos);
   let r;
@@ -280,8 +320,9 @@ export function jogar(estado, acao) {
     case 'descartar': r = acDescartar(e, acao, eventos); break;
     case 'item': r = acItem(e, acao, eventos); break;
     case 'retomar': r = acRetomar(e, acao, eventos); break;
-    default: return { estado, eventos };
+    default: return { estado, eventos, meio: null };
   }
-  if (!r.aplicou) return { estado: r.e === e && e === estado ? estado : r.e, eventos };
-  return { estado: fecharJogada(r.e, eventos), eventos };
+  if (!r.aplicou) return { estado: r.e === e && e === estado ? estado : r.e, eventos, meio: null };
+  const f = fecharJogada(r.e, eventos, acao.tipo === 'colocar' || acao.tipo === 'descartar');
+  return { estado: f.e, eventos, meio: f.meio };
 }

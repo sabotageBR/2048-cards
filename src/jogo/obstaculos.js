@@ -14,7 +14,7 @@ export function montarMesa(fase, regras, proxId) {
   let pedrasTotal = 0;
   for (const [c, hp] of Object.entries(obst.pedras || {})) {
     const i = Number(c);
-    if (i < colunas.length) { colunas[i].push({ id: proxId++, tipo: 'pedra', v: 0, cor: 0, hp: Math.max(1, hp | 0) }); pedrasTotal++; }
+    if (i < colunas.length) { colunas[i].push({ id: proxId++, tipo: 'pedra', v: 0, cor: 0, hp: Math.max(1, hp | 0), hpMax: Math.max(1, hp | 0) }); pedrasTotal++; }
   }
   (fase.inicio || []).forEach((valores, c) => {
     if (c >= colunas.length) return;

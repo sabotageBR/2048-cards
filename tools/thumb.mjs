@@ -11,8 +11,8 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { servir, RAIZ } from './servir.mjs';
 
-/** Opcao escolhida (par cenario + skin de tools/thumb.html; muda no checkpoint). */
-const ESCOLHIDA = 'a';
+/** Opcao escolhida (reino + monstro de tools/thumb.html; provisoria ate o usuario escolher). */
+const ESCOLHIDA = 'b';
 /** Tamanhos entregues: o minimo da Poki (628) e o dobro. */
 const TAMANHOS = [1256, 628];
 /**

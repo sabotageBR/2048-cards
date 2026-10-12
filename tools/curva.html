@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<title>Curva de dificuldade</title>
+<style>
+  @font-face { font-family: 'Fredoka'; src: url('../src/ui/fontes/fredoka-latin-700-normal.woff2') format('woff2'); font-weight: 700; }
+  @font-face { font-family: 'Fredoka'; src: url('../src/ui/fontes/fredoka-latin-600-normal.woff2') format('woff2'); font-weight: 600; }
+  html, body { margin: 0; background: #fff8ee; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<!-- Grafico da curva de dificuldade (tools/curva.mjs mede e passa os dados):
+     vitorias do jogador casual por fase, antes e depois do ajuste, com a
+     faixa alvo (alvoCasual +- FAIXA_CASUAL) e os chefoes marcados.
+     ?d={"antes":[...],"depois":[...],"alvo":[...],"faixa":8,"chefes":[8,...],"jogadas":[...]} -->
+<canvas id="c"></canvas>
+<script type="module">
+const d = JSON.parse(new URLSearchParams(location.search).get('d') || '{}');
+const W = 1200, H = 680, dpr = 2;
+const c = document.getElementById('c');
+c.width = W * dpr; c.height = H * dpr; c.style.width = W + 'px'; c.style.height = H + 'px';
+const ctx = c.getContext('2d');
+ctx.scale(dpr, dpr);
+const REINOS = ['Campos (Gosmo)', 'Pedreira (Golem)', 'Reino gelado (Yeti)', 'Masmorra (Espectro)', 'Vulcão (Dragão)'];
+const CORES = ['#e3f3d4', '#efe2cf', '#dcecf7', '#e6def0', '#f7dccf'];
+const n = d.depois.length;
+const esq = 70, dir = 30, topo = 96, base = 120;
+const gw = W - esq - dir, gh = H - topo - base;
+const x = (i) => esq + (i + 0.5) * gw / n;
+const y = (p) => topo + gh * (1 - p / 100);
+const fonte = (px, peso = 600) => `${peso} ${px}px Fredoka, system-ui, sans-serif`;
+
+function desenhar() {
+  ctx.fillStyle = '#fff8ee'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#2a1630'; ctx.font = fonte(26, 700); ctx.textBaseline = 'alphabetic';
+  ctx.fillText('Vitórias do jogador casual por fase', esq, 40);
+  ctx.font = fonte(15); ctx.fillStyle = '#6b5a72';
+  ctx.fillText('bot que erra 1 em 5 jogadas, não prevê o feitiço e usa o "Continuar" grátis; a faixa é o alvo ± ' + d.faixa + ' pontos', esq, 64);
+
+  // mundos
+  for (let m = 0; m < 5; m++) {
+    const x0 = esq + (m * 8) * gw / n, x1 = esq + (m * 8 + 8) * gw / n;
+    ctx.fillStyle = CORES[m]; ctx.fillRect(x0, topo, x1 - x0, gh);
+    ctx.fillStyle = '#6b5a72'; ctx.font = fonte(14); ctx.textAlign = 'center';
+    ctx.fillText(REINOS[m], (x0 + x1) / 2, H - base + 50);
+  }
+  // grade
+  ctx.textAlign = 'right'; ctx.font = fonte(13);
+  for (let p = 0; p <= 100; p += 20) {
+    ctx.strokeStyle = 'rgba(42,22,48,0.12)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(esq, y(p)); ctx.lineTo(W - dir, y(p)); ctx.stroke();
+    ctx.fillStyle = '#6b5a72'; ctx.fillText(p + '%', esq - 8, y(p) + 4);
+  }
+  // faixa alvo
+  ctx.fillStyle = 'rgba(60,170,110,0.18)';
+  ctx.beginPath();
+  d.alvo.forEach((a, i) => { const yy = y(Math.min(100, a + d.faixa)); i ? ctx.lineTo(x(i), yy) : ctx.moveTo(x(i), yy); });
+  for (let i = n - 1; i >= 0; i--) ctx.lineTo(x(i), y(Math.max(0, d.alvo[i] - d.faixa)));
+  ctx.closePath(); ctx.fill();
+  ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(40,130,80,0.7)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); d.alvo.forEach((a, i) => (i ? ctx.lineTo(x(i), y(a)) : ctx.moveTo(x(i), y(a)))); ctx.stroke();
+  ctx.setLineDash([]);
+  // linhas
+  const linha = (vals, cor, larg, raio) => {
+    ctx.strokeStyle = cor; ctx.lineWidth = larg; ctx.lineJoin = 'round';
+    ctx.beginPath(); vals.forEach((v, i) => (i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)))); ctx.stroke();
+    ctx.fillStyle = cor;
+    vals.forEach((v, i) => { ctx.beginPath(); ctx.arc(x(i), y(v), raio, 0, Math.PI * 2); ctx.fill(); });
+  };
+  if (d.antes) linha(d.antes, 'rgba(214,72,72,0.75)', 2, 3.5);
+  linha(d.depois, '#3b4fd8', 3, 4.5);
+  // chefoes
+  ctx.textAlign = 'center';
+  for (const ch of d.chefes) {
+    const i = ch - 1;
+    ctx.fillStyle = '#c98a00'; ctx.font = fonte(18, 700);
+    ctx.fillText('♛', x(i), topo - 8);
+  }
+  // eixo x
+  ctx.fillStyle = '#2a1630'; ctx.font = fonte(12);
+  for (let i = 0; i < n; i++) ctx.fillText(String(i + 1), x(i), H - base + 20);
+  ctx.font = fonte(14); ctx.fillText('fase', esq + gw / 2, H - base + 78);
+  // destaque da fase 7
+  if (d.antes) {
+    const i = 6;
+    ctx.textAlign = 'left'; ctx.font = fonte(14, 700); ctx.fillStyle = '#b03030';
+    ctx.fillText(`fase 7: ${d.antes[i]}% → ${d.depois[i]}%`, x(i) + 10, y(d.antes[i]) + 5);
+  }
+  // legenda
+  const leg = [['#3b4fd8', 'depois (160 partidas por fase)'], ['rgba(214,72,72,0.75)', 'antes (40 partidas por fase)'], ['rgba(60,170,110,0.45)', 'faixa alvo'], ['#c98a00', '♛ chefão']];
+  let lx = esq; ctx.textAlign = 'left'; ctx.font = fonte(14);
+  for (const [cor, txt] of leg) {
+    ctx.fillStyle = cor; ctx.fillRect(lx, H - 25, 16, 10);
+    ctx.fillStyle = '#2a1630'; ctx.fillText(txt, lx + 22, H - 16);
+    lx += ctx.measureText(txt).width + 50;
+  }
+  document.title = 'PRONTO';
+}
+if (document.fonts && document.fonts.load) Promise.all([document.fonts.load('700 20px Fredoka'), document.fonts.load('600 14px Fredoka')]).then(desenhar, desenhar); else desenhar();
+</script>
+</body>
+</html>

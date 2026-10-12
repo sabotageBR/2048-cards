@@ -21,7 +21,7 @@ test('estrita: igual funde, menor empilha, maior e recusada, cheia e recusada', 
   assert.equal(podeColocar(R, [N(8)], N(4)).modo, 'empilha');
   assert.equal(podeColocar(R, [N(8)], N(16)).motivo, 'maior');
   assert.equal(podeColocar(R, [], N(16)).modo, 'empilha');
-  const cheia = [N(64), N(32), N(16), N(8), N(4)];
+  const cheia = [N(128), N(64), N(32), N(16), N(8), N(4)];
   assert.equal(podeColocar(R, cheia, N(2)).motivo, 'cheia');
   assert.equal(podeColocar(R, cheia, N(4)).modo, 'fusao', 'fusao nao ocupa espaco');
   assert.equal(podeColocar(R, [N(8)], N(4), { trancada: true }).motivo, 'trancada');

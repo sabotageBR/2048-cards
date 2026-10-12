@@ -11,7 +11,7 @@
 
 export const REGRAS_PADRAO = Object.freeze({
   colunas: 4,            // 3..5
-  pilhaMax: 5,           // cartas por coluna (a pedra conta)
+  pilhaMax: 6,           // cartas por coluna (a pedra conta)
   colocacao: 'estrita',  // 'estrita': topo >= carta | 'permissiva': qualquer carta
   naipes: false,         // so funde valor e cor iguais
   filaLivre: false,      // qualquer carta da fila pode ser jogada

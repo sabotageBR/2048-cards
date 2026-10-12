@@ -96,7 +96,8 @@ export const Transicoes = (() => {
   /** "YES!" (ou o texto dado): entra, treme, sai por cima. */
   function desenharGrito(ctx, t, W, H, txt, ini = 0.08, sai = 1.3, tamFator = 1) {
     if (t < ini || t > sai + 0.32) return;
-    const tam = Math.min(W * 0.22, H * 0.2, 170) * tamFator;
+    // textos longos ("VITORIA!") encolhem para caber na largura
+    const tam = Math.min(W * 0.22, H * 0.2, 170) * tamFator * Math.min(1, 5 / Math.max(4, txt.length));
     const u = (t - ini) / 0.3;
     let esc = u < 1 ? 1.7 - 0.7 * backOut(u) : 1;
     if (u >= 1) esc = 1 + Math.sin((t - ini) * 9) * 0.015;

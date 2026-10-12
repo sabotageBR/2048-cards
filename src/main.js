@@ -10,21 +10,20 @@
 
 import { criarCena } from './render/cena.js';
 import { Transicoes as Tr } from './render/transicoes.js';
-import { criarPartida, jogar, desfazerPara, jogadasLegais } from './jogo/partida.js';
+import { criarPartida, jogar, desfazerPara, jogadasLegais, VERSAO_ESTADO } from './jogo/partida.js';
 import { melhorJogada } from './jogo/bot.js';
 import { FASES, CLASSICO, POR_MUNDO, faseDe, mundoDe, posNoMundo } from './jogo/fases.js';
 import { criarAudio } from './core/audio.js';
 import { criarArmazem } from './core/armazenamento.js';
 import { lerDepuracao } from './core/depuracao.js';
-import { escolherIdioma, textos, textoMissao } from './i18n/textos.js';
+import { escolherIdioma, textos, textoMissao, nomeMonstro as nomeDe, dicaFeitico } from './i18n/textos.js';
 import { criarMissoes, progredir, renovar } from './jogo/missoes.js';
 import { faseDiaria } from './jogo/diario.js';
 import { vibrar } from './core/haptico.js';
 import { poki } from './core/poki.js';
 import { criarHud } from './ui/hud.js';
 import { criarMenus } from './ui/menus.js';
-import { CENARIOS } from './render/cenarios.js';
-import { SKINS } from './render/cartas.js';
+import { monstroDaFase, monstroDaCadeia } from './render/monstros.js';
 
 const $ = (/** @type {string} */ id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const canvas = /** @type {HTMLCanvasElement} */ ($('cena'));
@@ -44,21 +43,11 @@ const VERSAO_SAVE = 1;
 
 const salvo = armazem.ler('save', null);
 const padraoSave = {
-  v: VERSAO_SAVE, fase: 1, max: 1, estrelas: {}, recorde: 0, cenario: 'auto', skin: 'neon', mudo: false, modo: 'aventura', regras: {},
+  v: VERSAO_SAVE, fase: 1, max: 1, estrelas: {}, recorde: 0, mudo: false, modo: 'aventura', regras: {},
   itens: { coringa: 0, martelo: 0, troca: 0 }, ganhos: {}, baus: {}, partida: null, vistas: [], missoes: null, diario: { data: '', pontos: 0 },
 };
 const save = salvo && salvo.v === VERSAO_SAVE ? { ...padraoSave, ...salvo, itens: { ...padraoSave.itens, ...(salvo.itens || {}) }, vistas: salvo.vistas || [] } : { ...padraoSave };
-/** Skins por total de estrelas e cenarios por mundo alcancado (colecao). */
-const SKINS_POR_ESTRELAS = { neon: 0, classico: 0, blocos: 3, gemas: 6, pixel: 10, papel: 15 };
-const CENARIOS_POR_MUNDO = { neon: 1, espaco: 2, doce: 3, taverna: 4, feltro: 5, minimal: 5 };
-/** Cenario de cada mundo da Aventura (com save.cenario = 'auto'). */
-const CENARIO_DO_MUNDO = ['neon', 'neon', 'espaco', 'doce', 'taverna', 'feltro'];
-const totalEstrelas = () => Object.values(save.estrelas).reduce((a, b) => a + b, 0);
-const mundoMax = () => mundoDe(save.max);
-const skinLivre = (s) => totalEstrelas() >= (SKINS_POR_ESTRELAS[s] ?? 0);
-const cenarioLivre = (c) => mundoMax() >= (CENARIOS_POR_MUNDO[c] ?? 1);
-if (dep.cenario && CENARIOS[dep.cenario]) save.cenario = dep.cenario;
-if (dep.skin && SKINS.includes(dep.skin)) save.skin = dep.skin;
+// save.cenario e save.skin (da Colecao antiga) podem estar no save: sao ignorados, o visual e o do reino.
 if (dep.regras) save.regras = dep.regras;
 
 /** Data local AAAA-MM-DD (semente do diario). */
@@ -85,28 +74,55 @@ function salvar() {
 function layout() {
   const W = innerWidth, H = innerHeight;
   const dpr = Math.min(2, devicePixelRatio || 1);
-  const rt = $('topo').getBoundingClientRect();
-  const topo = dep.semHud ? 10 : rt.bottom + 6;
+  // o topo da arena e o fim do painel (em retrato os botoes ficam nos cantos da arena)
+  const rp = $('painel').getBoundingClientRect();
+  const topo = dep.semHud ? 10 : rp.bottom + 6;
   const base = $('base').hidden ? 0 : $('base').getBoundingClientRect().height + 8;
+  document.documentElement.style.setProperty('--febreY', `${Math.round(rp.bottom + 8)}px`);
   cena.redimensionar(W, H, dpr, topo, base);
+  posAviso();
+}
+
+/** O aviso aparece no meio da mesa (no comeco da fase quase sempre vazio). */
+function posAviso() {
+  const L = cena.L;
+  if (L) document.documentElement.style.setProperty('--avisoY', `${Math.round(L.mesa.y + L.mesa.h * 0.5)}px`);
 }
 
 // ------------------------------------------------------------- fases
+/** Nome do monstro da partida no idioma ("Gosmo Guloso", "Rei Golem"). */
+const nomeMonstro = () => nomeDe(T, cena.monstro);
+
+/** Monstro do estado: o da fase na Aventura; o da cadeia no Classico e no Diario. */
+const defDoEstado = (e) => (e && e.monstro && e.monstro.cadeia ? monstroDaCadeia(e.monstro) : monstroDaFase(J.fase || {}));
+/** Na cadeia, o numero do monstro que esta na tela (o motor pode ja estar no proximo). */
+const nivelVisivel = () => cena.monstro.nivel || 1;
+
 function rotulo() {
-  if (J.modo === 'classico') return T.classico;
-  if (J.modo === 'diario') return `${T.diario} · ${T.cartasRestantes.replace('{n}', String(Math.max(0, J.e.restantes) + J.e.fila.length))}`;
-  return `${T.mundo} ${mundoDe(J.n)} · ${posNoMundo(J.n)}/${POR_MUNDO}`;
+  if (J.modo === 'classico') return `${T.monstroN.replace('{n}', String(nivelVisivel()))} · ${nomeMonstro()}`;
+  if (J.modo === 'diario') return `${T.diario} · ${nomeMonstro()}`;
+  return `${T.fase} ${J.n} · ${nomeMonstro()}`;
+}
+
+/** Linha de baixo do painel nos modos em cadeia (na Aventura sao as metas). */
+function metaTexto() {
+  if (J.modo === 'classico') return `${T.classico} · ${T.derrotados.replace('{n}', String(nivelVisivel() - 1))}`;
+  if (J.modo === 'diario') return `${T.monstroN.replace('{n}', String(nivelVisivel()))} · ${T.cartasRestantes.replace('{n}', String(Math.max(0, J.e.restantes) + J.e.fila.length))}`;
+  return undefined;
 }
 
 function atualizarHud() {
-  hud.atualizar(J.e, { rotulo: rotulo(), recorde: J.modo !== 'aventura' ? J.recordeInicial : 0, podeDesfazer: J.hist.length > 0 && J.estado === 'jogando', itemPendente: J.itemPendente || '' });
+  hud.atualizar(J.e, { rotulo: rotulo(), metaTexto: metaTexto(), recorde: J.modo !== 'aventura' ? J.recordeInicial : 0, podeDesfazer: J.hist.length > 0 && J.estado === 'jogando', itemPendente: J.itemPendente || '' });
 }
 
 function prepararPartida(e, entrada) {
   J.e = e;
   J.hist = [];
-  if (cena.cenario.id !== cenarioAtual()) aplicarVisual();
+  const def = defDoEstado(e);
+  aplicarVisual(def.reino);
   cena.definirRegras(e.regras);
+  posAviso();
+  cena.novaBatalha(def, e);
   J.estado = 'jogando';
   J.mao = null; J.maoCalc = 0; J.arrasto = null; J.destaque = -1;
   J.continuouGratis = false; J.novoRecorde = false; J.febreAte = 0;
@@ -145,13 +161,33 @@ function carregarFase(n, entrada = true, retomar = false) {
   J.fase = faseDe(n);
   const salva = retomar && save.partida && save.partida.modo === 'aventura' && save.partida.n === n ? save.partida : null;
   let e;
-  if (salva && salva.e && salva.e.v === 1 && !salva.e.fim) { e = salva.e; J.tentativas = salva.tentativas || 0; }
+  if (salva && salva.e && salva.e.v === VERSAO_ESTADO && !salva.e.fim) { e = salva.e; J.tentativas = salva.tentativas || 0; }
   else e = comInventario(criarPartida(save.regras, J.fase, J.fase.semente + J.tentativas * 7919), J.fase);
   prepararPartida(e, entrada);
   save.fase = n; save.modo = 'aventura';
+  avisarNovidade(J.fase);
   guardarPartida();
   salvar();
   poki.measure('level', String(n), 'start');
+}
+
+/**
+ * Primeira vez de um feitico (ou do chefao furioso): aviso curto com a dica.
+ * Fica marcado em save.vistas.
+ */
+function avisarNovidade(fase) {
+  const m = fase && fase.monstro;
+  if (!m || dep.fixo) return;
+  const anteriores = FASES.filter((f) => f.id < fase.id && f.monstro);
+  const novo = m.feiticos.find((f) => !anteriores.some((a) => a.monstro.feiticos.includes(f)));
+  const chave = novo ? 'feitico:' + novo : m.furia && !anteriores.some((a) => a.monstro.furia) ? 'chefe' : '';
+  if (!chave || save.vistas.includes(chave)) return;
+  save.vistas = [...save.vistas, chave];
+  const nome = nomeMonstro();
+  setTimeout(() => {
+    if (novo) avisar(T.avisoAtaque.replace('{m}', nome), dicaFeitico(T, novo, m), 4000);
+    else avisar(T.avisoChefe, T.dicaChefe, 4000);
+  }, 900);
 }
 
 function iniciarClassico(entrada = true, retomar = false) {
@@ -160,7 +196,7 @@ function iniciarClassico(entrada = true, retomar = false) {
   J.recordeInicial = save.recorde;
   const salva = retomar && save.partida && save.partida.modo === 'classico' ? save.partida : null;
   let e;
-  if (salva && salva.e && salva.e.v === 1 && !salva.e.fim) e = salva.e;
+  if (salva && salva.e && salva.e.v === VERSAO_ESTADO && !salva.e.fim) e = salva.e;
   else {
     const semente = (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
     e = comInventario(criarPartida(save.regras, CLASSICO, semente || 1), CLASSICO);
@@ -206,7 +242,7 @@ function aplicar(acao, origem) {
   }
   J.hist = [antes];
   J.e = r.estado;
-  cena.tocar(r.eventos, J.agora, { antes, depois: r.estado, origem, carta });
+  cena.tocar(r.eventos, J.agora, { antes, depois: r.estado, meio: r.meio, origem, carta });
   J.ultimaAcao = J.agora;
   J.mao = null; J.maoCalc = 0;
   for (const ev of r.eventos) {
@@ -253,6 +289,8 @@ function desfazer() {
   if (J.estado !== 'jogando' || !J.hist.length || !(J.e.itens.desfazer > 0)) return;
   J.e = desfazerPara(J.hist.pop());
   cena.linha.limpar();
+  cena.sincronizar(J.e);
+  aplicarVisual(cena.monstro.reino);
   audio.tique();
   J.ultimaAcao = J.agora;
   atualizarHud();
@@ -290,13 +328,16 @@ function vencer() {
   }
   salvar();
   const L = cena.L;
+  // o "VITORIA!" espera o golpe final chegar no monstro (fim da cascata + voo do golpe + o monstro caindo)
+  const espera = Math.min(1600, Math.max(0, cena.linha.fim - J.agora) + ESPERA_DERROTA);
   J.trans = {
-    tipo: fimMundo ? 'mundo' : 'fase', t0: J.agora, trocou: false, anuncio: false, parada: -1,
-    fx: L.mesa.x + L.mesa.w / 2, fy: L.mesa.y + L.mesa.h / 2, estrelas: est, semente: J.n * 31 + 7, corMundo: cena.pal.acento,
+    tipo: fimMundo ? 'mundo' : 'fase', t0: J.agora + espera, trocou: false, anuncio: false, parada: -1, festa: false,
+    fx: L.mesa.x + L.mesa.w / 2, fy: L.mesa.y + L.mesa.h / 2, estrelas: est, semente: J.n * 31 + 7, corMundo: cena.pal.acento, fimMundo,
   };
-  cena.part.estourar(J.trans.fx, J.trans.fy, '#ffd84a', 30, 1.5, 1);
-  audio.yes(fimMundo);
 }
+
+/** ms entre o fim da cascata e o "VITORIA!": o golpe voa (320) e o monstro cai. */
+const ESPERA_DERROTA = 700;
 
 /** Troca para a proxima fase no meio da transicao (com intervalo, se for a hora). */
 function trocar() {
@@ -304,20 +345,18 @@ function trocar() {
   if (J.n >= FASES.length) { carregarFase(1, true); return; }
   carregarFase(J.n + 1, true);
   if (J.bau) { avisar(T.bau, Object.entries(J.bau).filter(([, n]) => n > 0).map(([k, n]) => `${ICONES[k]}×${n}`).join('  ')); J.bau = null; }
-  const skinNova = Object.keys(SKINS_POR_ESTRELAS).find((k) => SKINS_POR_ESTRELAS[k] > 0 && totalEstrelas() >= SKINS_POR_ESTRELAS[k] && !save.vistas.includes(k));
-  if (skinNova) { save.vistas.push(skinNova); salvar(); avisar(T.novaSkin, skinNova); }
 }
 
 const ICONES = { coringa: '★', martelo: '🔨', troca: '⇄' };
-/** Aviso curto, dentro do fluxo (<= 3 s), sem tela. */
-function avisar(titulo, texto) {
+/** Aviso curto, dentro do fluxo (<= 4 s), sem tela. */
+function avisar(titulo, texto, ms = 2600) {
   const el = $('aviso');
   $('avisoTitulo').textContent = titulo;
   $('avisoTxt').textContent = texto;
   el.hidden = false;
   audio.completar();
   clearTimeout(J.tAviso);
-  J.tAviso = setTimeout(() => { el.hidden = true; }, 2600);
+  J.tAviso = setTimeout(() => { el.hidden = true; }, ms);
 }
 
 function terminar(motivo) {
@@ -345,6 +384,7 @@ function terminar(motivo) {
   if (comVideo) poki.measure('rewarded', 'continuar', 'visible');
   menus.mostrarFim({
     titulo: motivo === 'fimDiario' ? T.diarioFim : T.semJogadas,
+    derrotados: J.e.monstro && J.e.monstro.cadeia ? J.e.monstro.derrotados : undefined,
     pontos: J.e.pontos, recorde: J.modo !== 'aventura' ? J.recordeInicial : 0, novo: J.modo !== 'aventura' && J.e.pontos > J.recordeInicial,
     gratis: motivo === 'mesaCheia' && !J.continuouGratis, video: comVideo,
   });
@@ -368,7 +408,9 @@ function continuar() {
 function atualizar(dt) {
   J.tVis += dt / 1000;
   if (J.trans && J.trans.parada >= 0) J.trans.t0 = J.agora - J.trans.parada;
-  const efeitos = cena.atualizar(dt / 1000, J.agora);
+  const efeitos = cena.atualizar(dt / 1000, J.agora, J.e);
+  const v = cena.vida;
+  hud.vida(v.hp, v.hpVis);
   for (const e of efeitos) {
     switch (e.tipo) {
       case 'pouso': audio.pouso(); break;
@@ -379,6 +421,13 @@ function atualizar(dt) {
       case 'racha': audio.pedra(); break;
       case 'gelo': audio.gelo(); break;
       case 'cadeado': audio.cadeado(); break;
+      case 'golpe': if (e.critico) { audio.critico(); vibrar([20, 40, 30]); } else audio.golpe(); break;
+      case 'derrotado': audio.derrota(); break;
+      case 'feitico': audio.feitico(); break;
+      case 'impacto': audio.impacto(e.feitico); vibrar(20); break;
+      case 'erro': audio.erro(); break;
+      case 'furia': audio.furia(); vibrar([30, 50, 30]); break;
+      case 'novoMonstro': audio.entrada(); aplicarVisual(e.def.reino); if (J.e) atualizarHud(); break;
       default: break;
     }
   }
@@ -398,6 +447,11 @@ function atualizar(dt) {
   }
   if (J.trans) {
     const t = (J.agora - J.trans.t0) / 1000;
+    if (t >= 0 && !J.trans.festa) {
+      J.trans.festa = true;
+      cena.part.estourar(J.trans.fx, J.trans.fy, '#ffd84a', 30, 1.5, 1);
+      audio.yes(J.trans.fimMundo);
+    }
     if (!J.trans.trocou && !J.trans.anuncio && t >= Tr.TROCA[J.trans.tipo]) {
       if (podeIntervalo()) {
         const trans = J.trans;
@@ -485,6 +539,11 @@ canvas.addEventListener('pointerdown', (e) => {
   if (!J.tocou) { J.tocou = true; poki.measure('game', 'toque', 'first'); }
   const L = cena.L;
   const x = e.clientX, y = e.clientY;
+  // o feitico do monstro ainda no ar: o toque so adianta (pegar a carta da fila continua valendo)
+  if (cena.linha.feiticoPendente(J.agora)) {
+    cena.linha.acelerar(J.agora);
+    if (!(L.filaEm(x, y) === 0 && !J.itemPendente)) return;
+  }
   if (J.itemPendente) {
     const c = L.colunaEm(x, y);
     const item = J.itemPendente;
@@ -541,6 +600,7 @@ window.addEventListener('keydown', (e) => {
   }
   if (menus.aberto || J.estado !== 'jogando' || !J.e) return;
   const L = cena.L;
+  if (cena.linha.feiticoPendente(J.agora)) { cena.linha.acelerar(J.agora); return; }
   const n = parseInt(e.key, 10);
   if (n >= 1 && n <= J.e.regras.colunas) { poki.gameplayStart(); aplicar({ tipo: 'colocar', c: n - 1, k: 0 }, L.filaPos(0)); return; }
   if (e.key === ' ' || e.key === 'Delete' || e.key === 'Backspace' || e.key === 'd' || e.key === 'D') { poki.gameplayStart(); aplicar({ tipo: 'descartar' }, L.filaPos(0)); return; }
@@ -631,31 +691,19 @@ const menus = criarMenus({
     modoDiario: () => { J.trans = null; iniciarDiario(true); },
     diarioHoje: () => (save.diario.data === dataLocal() ? save.diario.pontos : -1),
     missoes: () => save.missoes.missoes.map((m) => ({ ...m, texto: textoMissao(T, m), icone: ICONES[m.premio] })),
-    skins: () => Object.keys(SKINS_POR_ESTRELAS).map((k) => ({ id: k, livre: skinLivre(k), custo: SKINS_POR_ESTRELAS[k], atual: save.skin === k })),
-    cenarios: () => [{ id: 'auto', livre: true, custo: 0, atual: save.cenario === 'auto' }, ...Object.keys(CENARIOS_POR_MUNDO).map((k) => ({ id: k, livre: cenarioLivre(k), custo: CENARIOS_POR_MUNDO[k], atual: save.cenario === k }))],
-    estrelasTotal: totalEstrelas,
-    vestir: (tipo, id) => {
-      if (tipo === 'skin' && skinLivre(id)) save.skin = id;
-      else if (tipo === 'cenario' && (id === 'auto' || cenarioLivre(id))) save.cenario = id;
-      else return;
-      salvar();
-      aplicarVisual();
-      audio.tique();
-    },
   },
 });
 
-function cenarioAtual() {
-  if (save.cenario !== 'auto') return save.cenario;
-  return J.modo === 'aventura' ? CENARIO_DO_MUNDO[Math.min(CENARIO_DO_MUNDO.length - 1, mundoDe(J.n))] : 'neon';
-}
-function aplicarVisual() {
-  cena.definirVisual(cenarioAtual(), save.skin);
+/** Arena e cores do painel do reino (1..5): o mundo na Aventura; o do monstro da vez na cadeia. */
+function aplicarVisual(reino = 1) {
+  cena.definirReino(reino);
   document.body.style.background = cena.pal.fundo;
   document.documentElement.style.setProperty('--acento', cena.pal.acento);
   document.documentElement.style.setProperty('--secundario', cena.pal.secundario);
   document.documentElement.style.setProperty('--vidro', cena.pal.hud);
   document.documentElement.style.setProperty('--texto', cena.pal.texto);
+  document.documentElement.style.setProperty('--roxoA', cena.pal.painelA);
+  document.documentElement.style.setProperty('--roxoB', cena.pal.painelB);
 }
 botao('bMenu', abrirMenu);
 botao('bPausa', abrirMenu);
@@ -671,6 +719,7 @@ poki.init().then(() => {
   poki.movePill(0, 64);
 });
 audio.definirMudo(!!save.mudo);
+cena.definirTextos(T);
 aplicarVisual();
 layout();
 J.agora = performance.now();

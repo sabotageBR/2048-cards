@@ -17,13 +17,13 @@ export function descongelar(col, c, eventos) {
   });
 }
 
-/** Cada fusao na coluna tira 1 da pedra do fundo; com 0 ela quebra. */
+/** Cada fusao na coluna tira 1 da pedra do fundo; com 0 ela quebra. lancada: pedra do monstro. */
 export function danificarPedra(col, c, eventos) {
   if (!col.length || !ehPedra(col[0])) return { col, quebrou: false };
   const p = { ...col[0], hp: col[0].hp - 1 };
   if (p.hp <= 0) {
     eventos.push({ tipo: 'pedra', c, id: p.id, hp: 0, quebrou: true });
-    return { col: col.slice(1), quebrou: true };
+    return { col: col.slice(1), quebrou: true, lancada: !!p.lancada };
   }
   eventos.push({ tipo: 'pedra', c, id: p.id, hp: p.hp, quebrou: false });
   return { col: [p, ...col.slice(1)], quebrou: false };
@@ -42,7 +42,7 @@ export function cascata(col, regras, c, eventos, degrau = 1, valores = []) {
     col = descongelar(col, c, eventos);
     const d = danificarPedra(col, c, eventos);
     col = d.col;
-    if (d.quebrou) pedras++;
+    if (d.quebrou && !d.lancada) pedras++; // a pedra do monstro nao conta para a meta
     if (col.length < 2) break;
     const t = col[col.length - 1];
     const b = col[col.length - 2];

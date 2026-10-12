@@ -1,4 +1,6 @@
-// HUD em DOM: placar, barra da meta, contadores de itens e descarte.
+// HUD em DOM: painel do duelo (fase e monstro, vida, metas, dano), contadores
+// de itens e desfazer. A vida vem da cena a cada quadro (so cai quando o
+// golpe chega); o resto muda a cada jogada.
 import { textoMeta } from '../i18n/textos.js';
 
 /**
@@ -6,6 +8,8 @@ import { textoMeta } from '../i18n/textos.js';
  */
 export function criarHud({ T, $ }) {
   let ultimoPontos = -1;
+  let ultimaVida = -1, ultimaVis = -1;
+  $('danoTxt').textContent = T.dano;
   function atualizar(e, info = {}) {
     const pontos = $('pontos');
     if (e.pontos !== ultimoPontos) {
@@ -15,17 +19,10 @@ export function criarHud({ T, $ }) {
     }
     $('rotulo').textContent = info.rotulo || '';
     $('recorde').textContent = info.recorde ? `${T.recorde} ${info.recorde}` : '';
-    const placar = $('pontos').closest('.placar');
-    const m = e.metas[0];
-    if (m) {
-      placar.classList.remove('semMeta');
-      const feitas = e.metas.filter((x) => x.feita).length;
-      const total = e.metas.length;
-      const prog = e.metas.reduce((s, x) => s + Math.min(1, x.atual / x.alvo), 0) / total;
-      $('barra').style.width = `${Math.round(prog * 100)}%`;
-      const pend = e.metas.find((x) => !x.feita) || m;
-      $('metaTxt').textContent = (total > 1 ? `${feitas}/${total} · ` : '') + textoMeta(T, pend) + (pend.alvo > 1 && pend.tipo !== 'pontos' ? ` (${pend.atual}/${pend.alvo})` : '');
-    } else placar.classList.add('semMeta');
+    // na cadeia (Classico e Diario) a vida e de pontos: a barra fica mesmo sem metas
+    $('painel').classList.toggle('semMeta', !e.metas.length && !(e.monstro && e.monstro.cadeia));
+    if (info.metaTexto !== undefined) $('metaTxt').textContent = info.metaTexto;
+    else $('metaTxt').textContent = e.metas.map((m) => (m.feita ? '✓ ' : '• ') + textoMeta(T, m) + (m.alvo > 1 && !m.feita && m.tipo !== 'pontos' && m.tipo !== 'montes' && m.tipo !== 'cascata' ? ` (${m.atual}/${m.alvo})` : '')).join('   ');
     $('nDesfazer').textContent = e.itens.desfazer > 1 ? String(e.itens.desfazer) : '';
     /** @type {HTMLButtonElement} */ ($('bDesfazer')).disabled = !(info.podeDesfazer && e.itens.desfazer > 0);
     const temItens = e.itens.coringa + e.itens.martelo + e.itens.troca > 0;
@@ -38,10 +35,20 @@ export function criarHud({ T, $ }) {
       b.classList.toggle('pendente', info.itemPendente === k);
     }
   }
+  const largura = (v) => (v > 0.001 ? `max(18px, calc(${(v * 100).toFixed(2)}% - 4px))` : '0px');
+  /** Vida do monstro (0..1) e a barra clara que segue atras. */
+  function vida(hp, hpVis) {
+    if (Math.abs(hp - ultimaVida) > 0.0005) {
+      ultimaVida = hp;
+      $('barra').style.width = largura(hp);
+      $('vidaTxt').textContent = `HP ${Math.ceil(hp * 100 - 0.001)}/100`;
+    }
+    if (Math.abs(hpVis - ultimaVis) > 0.0005) { ultimaVis = hpVis; $('barraVis').style.width = largura(hpVis); }
+  }
   function febre(ligada) {
     const el = $('febre');
     el.hidden = !ligada;
     if (ligada) $('febreTxt').textContent = T.febre;
   }
-  return { atualizar, febre };
+  return { atualizar, vida, febre };
 }

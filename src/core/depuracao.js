@@ -6,7 +6,6 @@
 //   ?fixo            sem a animacao de entrada
 //   ?semanuncio      nao pede intervalo comercial (prints e testes longos)
 //   ?lang=pt         forca o idioma (en, pt, es)
-//   ?cenario=neon&skin=neon   visual (ids de cenarios.js e cartas.js)
 //   ?regras={"colunas":5}     regras do laboratorio (JSON)
 //   ?quadro=900      joga ate vencer e congela a transicao no instante dado (ms)
 //   ?filme=12&dur=6000&larg=360   quadros JPEG em <pre id="filme"> (GIFs)
@@ -22,7 +21,7 @@
 export function lerDepuracao() {
   const base = {
     local: false, ganchos: false, nivel: 0, modo: '', auto: 0, fixo: false, semAnuncio: false, lang: '',
-    cenario: '', skin: '', regras: null, quadro: -1, filme: 0, dur: 0, larg: 0, semHud: false, menu: false, gesto: '', vitrine: false,
+    regras: null, quadro: -1, filme: 0, dur: 0, larg: 0, semHud: false, menu: false, gesto: '', vitrine: false,
   };
   let local = false;
   try {
@@ -48,8 +47,6 @@ export function lerDepuracao() {
     fixo: q.has('fixo'),
     semAnuncio: q.has('semanuncio') || q.has('quadro') || q.has('filme'),
     lang: q.get('lang') || '',
-    cenario: q.get('cenario') || '',
-    skin: q.get('skin') || '',
     regras,
     quadro: q.has('quadro') ? Number(q.get('quadro')) || 0 : -1,
     filme: num('filme', 12),
