@@ -12,14 +12,14 @@
 //   - um assunto principal (o monstro levando o golpe), fundo limpo;
 //   - contraste alto e nenhuma cor perto do #83FFE7 do site;
 //   - legivel nos tiles pequenos (ver ?grade).
-//   ?opcao=a|b|c|d&s=1256   a thumb no tamanho s (a janela deve ter s x s)
+//   ?opcao=a..h&s=1256      a thumb no tamanho s (a janela deve ter s x s)
 //   ?opcao=a&grade          folha de conferencia: tiles de 314 a 94 px sobre o #83FFE7
 //   ?opcao=a&medir          mede a thumb de 628 px e escreve o JSON em #medidas
 import { arenaDe } from '../src/render/arena.js';
 import { desenharCarta } from '../src/render/cartas.js';
 import { corDuelo } from '../src/render/cartaDuelo.js';
 import { desenharMonstro, variante } from '../src/render/monstros.js';
-import { texto, estrela, rr } from '../src/render/desenho.js';
+import { texto, estrela, rr, circulo, elipse, TINTA } from '../src/render/desenho.js';
 
 const q = new URLSearchParams(location.search);
 const opcao = q.get('opcao') || 'a';
@@ -27,12 +27,28 @@ const S = Math.max(64, parseInt(q.get('s') || '1256', 10));
 const POKI = '#83FFE7';
 const TILES = [314, 204, 140, 94];
 
-/** Opcoes: reino, monstro (especie e posicao; 8 = chefao) e pose. */
+/**
+ * Opcoes: reino, monstro (especie e posicao; 8 = chefao), pose e cena.
+ * a-d: cena 'raio' (coluna da cascata a esquerda, raio do 2048 ate o monstro, dano);
+ * e-g: cena 'perto' (o monstro de perto levando a carta 2048 na cara; sem texto alem da carta).
+ */
 const OPCOES = {
-  a: { reino: 1, especie: 'gosmo', pos: 1, furia: false },
-  b: { reino: 5, especie: 'dragao', pos: 8, furia: true },
-  c: { reino: 3, especie: 'yeti', pos: 8, furia: false },
-  d: { reino: 4, especie: 'espectro', pos: 4, furia: false },
+  a: { cena: 'raio', reino: 1, especie: 'gosmo', pos: 1, furia: false },
+  b: { cena: 'raio', reino: 5, especie: 'dragao', pos: 8, furia: true },
+  c: { cena: 'raio', reino: 3, especie: 'yeti', pos: 8, furia: false },
+  d: { cena: 'raio', reino: 4, especie: 'espectro', pos: 4, furia: false },
+  e: { cena: 'perto', reino: 1, especie: 'gosmo', pos: 1, furia: false, perto: {
+    M: { x: 412, y: 598, R: 192 }, recua: 0.05, golpe: true, estouro: [228, 306, 72],
+    carta: { x: 16, y: 92, w: 184, rot: -0.3 },
+  } },
+  f: { cena: 'perto', reino: 5, especie: 'dragao', pos: 8, furia: true, perto: {
+    M: { x: 410, y: 600, R: 180 }, recua: 0.05, golpe: true, estouro: [246, 276, 72],
+    carta: { x: 16, y: 90, w: 184, rot: -0.3 },
+  } },
+  h: { cena: 'perto', reino: 1, especie: 'gosmo', pos: 1, furia: false, perto: {
+    M: { x: 424, y: 600, R: 188 }, recua: 0.04,
+    carta: { x: 16, y: 168, w: 184, rot: -0.2 }, voo: -0.3, linhas: [[-70, -50, 130, 11], [-10, -70, 190, 15], [50, -50, 120, 11]],
+  } },
 };
 const O = OPCOES[opcao] || OPCOES.a;
 const arena = arenaDe(O.reino);
@@ -40,8 +56,10 @@ const def = variante(O.especie, O.pos);
 
 let ctx = null;
 let k = 1; // tudo num quadrado virtual de 600
-/** Monstro grande a direita; os pes na arena. */
+/** Monstro grande a direita; os pes na arena (cena 'raio'). */
 const M = { x: 398, y: 372, R: 122 };
+/** Cena 'perto': a arena atras fica na escala normal (o monstro de perto vem de OPCOES). */
+const FUNDO = { x: 384, y: 470, R: 118 };
 
 function carta(v, x, y, w, rot, alpha = 1) {
   ctx.save();
@@ -85,6 +103,7 @@ function faiscas(cx, cy, raioMin, raioMax, n, semente) {
 
 function desenhar(s) {
   k = s / 600;
+  if (O.cena === 'perto') { cenaPerto(); return; }
   ctx.save(); ctx.scale(k, k);
   arena.parado(ctx, 600, 600, { monstro: M, retrato: true });
   arena.vivo(ctx, 600, 600, 2.2, { monstro: M, retrato: true });
@@ -112,6 +131,84 @@ function desenhar(s) {
   ctx.translate(M.x + 40, M.y - M.R * 2.22); ctx.rotate(0.06);
   texto(ctx, '-2048', 0, 0, 72, '#ffffff', { contorno: '#a3122b', espessura: 16 });
   ctx.restore();
+}
+
+/** Estouro do golpe (sem texto): estrela de quadrinho com miolo branco e brilho. */
+function estouro(x, y, r) {
+  ctx.save(); ctx.scale(k, k);
+  const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 1.7);
+  g.addColorStop(0, 'rgba(255,240,170,0.9)'); g.addColorStop(0.5, 'rgba(255,190,60,0.35)'); g.addColorStop(1, 'rgba(255,160,40,0)');
+  ctx.fillStyle = g; circulo(ctx, x, y, r * 1.7); ctx.fill();
+  estrela(ctx, x, y, r, r * 0.62, 11, 0.2); ctx.fillStyle = '#ff9a2e'; ctx.fill();
+  ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.strokeStyle = TINTA; ctx.stroke();
+  estrela(ctx, x, y, r * 0.78, r * 0.5, 11, 0.35); ctx.fillStyle = '#ffe27a'; ctx.fill();
+  estrela(ctx, x, y, r * 0.46, r * 0.3, 9, 0.1); ctx.fillStyle = '#ffffff'; ctx.fill();
+  ctx.restore();
+}
+
+/** Linhas de velocidade atras da carta (ang: direcao do voo). */
+function velocidade(x, y, ang, linhas) {
+  ctx.save(); ctx.scale(k, k);
+  ctx.translate(x, y); ctx.rotate(ang);
+  ctx.lineCap = 'round';
+  for (const [dy, x0, comp, larg] of linhas) {
+    const g = ctx.createLinearGradient(x0, 0, x0 - comp, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath(); ctx.moveTo(x0, dy); ctx.lineTo(x0 - comp, dy);
+    ctx.strokeStyle = g; ctx.lineWidth = larg; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Lagrimas saltando dos olhos, no espaco do monstro (origem nos pes, raio R). */
+function lagrimas(R) {
+  for (const s of [-1, 1]) {
+    const r = R * 0.085;
+    ctx.save(); ctx.translate(s * R * 0.7, -R * 1.02); ctx.rotate(s * 1.0);
+    ctx.beginPath(); ctx.moveTo(0, -r * 1.7); ctx.quadraticCurveTo(r * 1.05, -r * 0.2, 0, r); ctx.quadraticCurveTo(-r * 1.05, -r * 0.2, 0, -r * 1.7); ctx.closePath();
+    ctx.fillStyle = '#7fd0ff'; ctx.fill(); ctx.lineWidth = R * 0.03; ctx.strokeStyle = TINTA; ctx.stroke();
+    elipse(ctx, -r * 0.3, -r * 0.2, r * 0.22, r * 0.34); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill();
+    ctx.restore();
+  }
+}
+
+/** Carta 2048 com brilho dourado atras. */
+function carta2048(x, y, w, rot) {
+  const h = w / 0.72;
+  ctx.save(); ctx.scale(k, k);
+  ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot);
+  ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = 60;
+  rr(ctx, -w / 2 - 6, -h / 2 - 6, w + 12, h + 12, 26); ctx.fillStyle = 'rgba(255,216,74,0.45)'; ctx.fill();
+  ctx.restore();
+  carta(2048, x, y, w, rot);
+}
+
+/**
+ * Cena 'perto': a arena atras e o monstro gigante. Com golpe, a carta 2048
+ * acerta a cabeca dele (careta de dor, lagrimas, estouro); sem golpe, ela
+ * vem voando e ele arregala os olhos.
+ */
+function cenaPerto() {
+  const P = O.perto, M = P.M;
+  ctx.save(); ctx.scale(k, k);
+  arena.parado(ctx, 600, 600, { monstro: FUNDO, retrato: true });
+  arena.vivo(ctx, 600, 600, 2.2, { monstro: FUNDO, retrato: true });
+  const v = ctx.createRadialGradient(360, 330, 200, 360, 330, 560);
+  v.addColorStop(0, 'rgba(10,4,20,0)'); v.addColorStop(0.65, 'rgba(10,4,20,0.3)'); v.addColorStop(1, 'rgba(10,4,20,0.75)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, 600, 600);
+  // o monstro recua: inclina para longe da carta, apoiado na base
+  ctx.save();
+  ctx.translate(M.x, M.y); ctx.rotate(P.recua); ctx.translate(-M.x, -M.y);
+  desenharMonstro(ctx, def, M, 1.1, { golpe: P.golpe ? 0.93 : 1, furia: O.furia, espanto: 1 });
+  if (P.golpe) { ctx.translate(M.x, M.y); lagrimas(M.R * (def.escala || 1)); }
+  ctx.restore();
+  ctx.restore();
+  if (P.estouro) { const [bx, by, br] = P.estouro; estouro(bx, by, br); }
+  const { x, y, w, rot } = P.carta;
+  if (P.linhas) velocidade(x + w / 2, y + w / 0.72 / 2, P.voo, P.linhas);
+  carta2048(x, y, w, rot);
+  if (P.estouro) { const [bx, by, br] = P.estouro; faiscas(bx, by, br * 0.7, br * 1.9, 22, 7); }
+  else faiscas(x + w * 0.6, y + w * 0.7, w * 0.75, w * 1.1, 16, 3);
 }
 
 function thumb(cv, s) {

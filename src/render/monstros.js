@@ -4,7 +4,8 @@
 // origem nos pes; desenharMonstro cuida da posicao, da escala (o chefao e
 // maior), da aura, do tremor do golpe e do corpo que encolhe e estica no ataque.
 // m = { x, y, R }: centro, linha dos pes e raio. Caixa: 2.1R acima dos pes, +-1.15R.
-// pose = { golpe (0..1, 1 = sem golpe), derrotado, ataque (0..1, 1 = parado), furia }
+// pose = { golpe (0..1, 1 = sem golpe), derrotado, ataque (0..1, 1 = parado), furia,
+//   espanto (0..1: olhos arregalados e boca em O; com o golpe vira careta de dor) }
 // monstroDaFase escolhe a especie pelo mundo e a variante (cor, chifres,
 // acessorio, apelido) pela posicao no mundo; a posicao 8 e o chefao de coroa.
 // monstroDaCadeia faz o mesmo para o monstro n do Classico e do Diario.
@@ -59,29 +60,34 @@ function olhos(ctx, def, f, pose, t, lw) {
       const cor = pose.furia ? '#ff4a4a' : def.olho || '#ffe066';
       ctx.save();
       ctx.shadowColor = cor; ctx.shadowBlur = R * 0.3;
-      elipse(ctx, ox, oy, f.rx, f.ry * (piscar ? 0.12 : 1), brava ? s * 0.3 : 0); ctx.fillStyle = cor; ctx.fill();
+      const e = 1 + (pose.espanto || 0) * 0.25;
+      elipse(ctx, ox, oy, f.rx * e, f.ry * e * (piscar && !pose.espanto ? 0.12 : 1), brava && !pose.espanto ? s * 0.3 : 0); ctx.fillStyle = cor; ctx.fill();
       ctx.restore();
       if (!piscar) { elipse(ctx, ox - s * f.rx * 0.2, oy - f.ry * 0.25, f.rx * 0.32, f.ry * 0.24); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill(); }
       continue;
     }
-    elipse(ctx, ox, oy, f.rx, f.ry); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = lw * 0.7; ctx.strokeStyle = TINTA; ctx.stroke();
-    if (piscar) {
+    // espanto: o branco cresce e a pupila encolhe
+    const esp = pose.espanto || 0;
+    const rx = f.rx * (1 + esp * 0.22), ry = f.ry * (1 + esp * 0.22), pk = 1 - esp * 0.45;
+    elipse(ctx, ox, oy, rx, ry); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = lw * 0.7; ctx.strokeStyle = TINTA; ctx.stroke();
+    if (piscar && !esp) {
       ctx.fillStyle = def.piscar || def.corA; elipse(ctx, ox, oy, f.rx * 1.05, f.ry * 1.04); ctx.fill();
       ctx.beginPath(); ctx.moveTo(ox - f.rx * 0.86, oy); ctx.lineTo(ox + f.rx * 0.86, oy); ctx.stroke();
     } else if (f.estilo === 'reptil') {
-      elipse(ctx, ox + s * f.rx * 0.08, oy + f.ry * 0.12, f.rx * 0.72, f.ry * 0.8); ctx.fillStyle = pose.furia ? '#ff3b3b' : def.olho || '#ffd23f'; ctx.fill();
-      elipse(ctx, ox + s * f.rx * 0.08, oy + f.ry * 0.12, f.rx * 0.17, f.ry * 0.7); ctx.fillStyle = '#1a0d22'; ctx.fill();
+      elipse(ctx, ox + s * f.rx * 0.08, oy + f.ry * 0.12, f.rx * 0.72 * pk, f.ry * 0.8 * pk); ctx.fillStyle = pose.furia ? '#ff3b3b' : def.olho || '#ffd23f'; ctx.fill();
+      elipse(ctx, ox + s * f.rx * 0.08, oy + f.ry * 0.12, f.rx * 0.17 * pk, f.ry * 0.7 * pk); ctx.fillStyle = '#1a0d22'; ctx.fill();
       circulo(ctx, ox + s * f.rx * 0.3, oy - f.ry * 0.2, f.rx * 0.16); ctx.fillStyle = '#fff'; ctx.fill();
     } else {
-      const px = ox + s * f.rx * 0.14, py = oy + f.ry * 0.32, pr = f.rx * 0.52;
+      const px = ox + s * f.rx * 0.14 * (1 - esp), py = oy + f.ry * 0.32 * (1 - esp), pr = f.rx * 0.52 * pk;
       if (pose.furia) { circulo(ctx, px, py, pr * 1.35); ctx.fillStyle = '#ff3b3b'; ctx.fill(); }
       circulo(ctx, px, py, pr); ctx.fillStyle = '#1a0d22'; ctx.fill();
       circulo(ctx, px + f.rx * 0.19, py - f.ry * 0.16, pr * 0.32); ctx.fillStyle = '#fff'; ctx.fill();
     }
     if (f.sobrancelha !== false) {
       ctx.strokeStyle = TINTA; ctx.lineWidth = Math.max(lw * 0.85, R * 0.07);
-      const yi = brava ? oy - f.ry * 0.82 : oy - f.ry * 1.44;
-      const ye = brava ? oy - f.ry * 1.5 : oy - f.ry * 0.96;
+      // no espanto as sobrancelhas sobem e se erguem no meio
+      const yi = esp ? oy - ry * 1.62 : brava ? oy - f.ry * 0.82 : oy - f.ry * 1.44;
+      const ye = esp ? oy - ry * 1.38 : brava ? oy - f.ry * 1.5 : oy - f.ry * 0.96;
       ctx.beginPath(); ctx.moveTo(ox - s * f.rx * 0.95, yi); ctx.lineTo(ox + s * f.rx * 0.67, ye); ctx.stroke();
     }
   }
@@ -93,6 +99,7 @@ function olhos(ctx, def, f, pose, t, lw) {
  */
 function boca(ctx, f, pose, lw) {
   const { R, by, bl } = f;
+  if (pose.espanto > 0 && !pose.derrotado && !(pose.aberta > 0.15)) { bocaO(ctx, f, pose.espanto, lw); return; }
   const aberta = pose.derrotado ? 0 : pose.aberta;
   const baixo = pose.derrotado ? by - R * 0.08 : by + R * (0.24 + aberta * 0.34);
   const cima = by + R * (0.12 - aberta * 0.1);
@@ -120,6 +127,23 @@ function boca(ctx, f, pose, lw) {
       ctx.beginPath(); ctx.moveTo(xc - w / 2, yBaixo(xc - w / 2) + R * 0.02); ctx.lineTo(xc + s * w * 0.15, yBaixo(xc) - R * 0.2); ctx.lineTo(xc + w / 2, yBaixo(xc + w / 2) + R * 0.02); ctx.closePath();
       ctx.fill(); ctx.lineWidth = lw * 0.5; ctx.strokeStyle = TINTA; ctx.stroke();
     }
+  }
+}
+
+/** Boca em O do espanto (e 0..1 abre), com a lingua e as duas presas de cima. */
+function bocaO(ctx, f, e, lw) {
+  const { R, by, bl } = f;
+  const rx = bl * (0.36 + 0.14 * e), ry = R * (0.1 + 0.13 * e), cy = by + ry * 0.55;
+  elipse(ctx, 0, cy, rx, ry); ctx.fillStyle = '#3a0f3e'; ctx.fill();
+  ctx.save(); elipse(ctx, 0, cy, rx, ry); ctx.clip();
+  elipse(ctx, 0, cy + ry * 0.75, rx * 0.7, ry * 0.5); ctx.fillStyle = '#e8456a'; ctx.fill();
+  ctx.restore();
+  elipse(ctx, 0, cy, rx, ry); ctx.lineWidth = lw * 0.7; ctx.strokeStyle = TINTA; ctx.stroke();
+  if (f.presas === false) return;
+  ctx.fillStyle = '#fff';
+  for (const s of [-1, 1]) {
+    const x = s * rx * 0.45, y = cy - ry * 0.93;
+    ctx.beginPath(); ctx.moveTo(x - rx * 0.18, y); ctx.lineTo(x, y + ry * 0.42); ctx.lineTo(x + rx * 0.18, y); ctx.closePath(); ctx.fill();
   }
 }
 
@@ -689,6 +713,6 @@ export function desenharMonstro(ctx, def, m, t, pose = {}) {
   ctx.translate(m.x + tremor, m.y);
   // ataque: encolhe na preparacao, estica ao soltar
   ctx.scale(1 + atk.prep * 0.08 - atk.solta * 0.05, (derrotado ? 0.55 : 1) * (1 - atk.prep * 0.1 + atk.solta * 0.1));
-  (ESPECIES[def.especie] || gosmo)(ctx, def, R, t, { golpe, derrotado, furia, prep: derrotado ? 0 : atk.prep, aberta: derrotado ? 0 : atk.solta });
+  (ESPECIES[def.especie] || gosmo)(ctx, def, R, t, { golpe, derrotado, furia, prep: derrotado ? 0 : atk.prep, aberta: derrotado ? 0 : atk.solta, espanto: derrotado ? 0 : clamp(pose.espanto || 0) });
   ctx.restore();
 }

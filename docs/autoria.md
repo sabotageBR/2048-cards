@@ -77,3 +77,12 @@ Pedido do usuário: "To preso na fase 7, está impossível de matar o monstro, r
 - **Chefões** com um degrau a mais na mesa inicial. As fases fáceis demais para a posição (9–11, 13, 14, 25, 26, 33) ficaram mais apertadas.
 - **Fase 33:** o Dragão estreia atacando a cada 3 jogadas (lodo, pedra e gelo) e a meta passou a ser as pedras e um 512. Foi o único jeito de deixá-la difícil sem mudar o tamanho da pilha.
 - **Partidas salvas:** as antigas são descartadas (`VERSAO_ESTADO` 4) para que a fase em andamento recomece já na versão nova. Progresso e estrelas ficam.
+
+## 2026-10-12 · thumb da Poki
+
+Pedido do usuário: "Crie uma thumb para a poki". As opções a–d (coluna da cascata, raio e o número "-2048") tinham elementos demais para o tile pequeno, e a regra da Poki pede um assunto só, sem texto, com pose dinâmica e o personagem principal na skin padrão (developers.poki.com/guide/game-thumbnail). Na categoria Merge, quase todas as thumbs são grades de números; as que se destacam são close-ups de um personagem.
+
+- **Cena nova 'perto'** em `tools/thumb.html`: a arena atrás, na escala normal, o monstro gigante na frente e a carta 2048 voando. Três opções: **h** o Gosmo da fase 1 arregalando os olhos com o 2048 chegando, **e** o Gosmo levando a carta na cabeça (careta e lágrimas) e **f** o Rei Dragão levando a carta no vulcão.
+- **Pose de espanto** em `src/render/monstros.js` (`pose.espanto`): olhos arregalados e boca em O; junto com o golpe, vira careta de dor. Sem ela, os olhos "> <" com a boca sorrindo pareciam contentes. O jogo não usa a pose (só a thumb).
+- **Escolha do usuário: h**, a que mais se destaca no tile de 94 px e mostra o monstro que o jogador encontra ao abrir o jogo.
+- **Régua de contraste vira aviso:** a faixa da carta 2048 contra a média dos cantos (≥ 3:1) era régua nossa, não da Poki, e reprova o céu claro dos campos (h dá 1,5:1) sem que a carta suma. Continuam barrando: nada perto do `#83FFE7`, beirada longe dele, sem tarja e opaca.
