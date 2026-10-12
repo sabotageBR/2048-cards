@@ -86,3 +86,19 @@ Pedido do usuário: "Crie uma thumb para a poki". As opções a–d (coluna da c
 - **Pose de espanto** em `src/render/monstros.js` (`pose.espanto`): olhos arregalados e boca em O; junto com o golpe, vira careta de dor. Sem ela, os olhos "> <" com a boca sorrindo pareciam contentes. O jogo não usa a pose (só a thumb).
 - **Escolha do usuário: h**, a que mais se destaca no tile de 94 px e mostra o monstro que o jogador encontra ao abrir o jogo.
 - **Régua de contraste vira aviso:** a faixa da carta 2048 contra a média dos cantos (≥ 3:1) era régua nossa, não da Poki, e reprova o céu claro dos campos (h dá 1,5:1) sem que a carta suma. Continuam barrando: nada perto do `#83FFE7`, beirada longe dele, sem tarja e opaca.
+
+## 2026-10-12 · layouts de monstro escolhidos
+
+Vistos na página `modelos/monstros-layout/`: 50 silhuetas (10 por reino), cada uma desenhada no canvas e pintada por cima, mais a faixa "Os de hoje" (Gosmo, Golem, Yeti, Espectro e Dragão), que não entrou na conta. O usuário marcou 17 e copiou a lista.
+
+| Reino | Escolhidos |
+|---|---|
+| Campos | 01 Gota · 05 Ameba |
+| Pedreira | 12 Pedregulho · 13 Muralha · 15 Martelo · 17 Rolamento · 19 Máscara de pedra |
+| Gelo | 24 Cubo |
+| Masmorra | 31 Lençol · 32 Caveira · 35 Mão · 39 Máscara · 40 Esqueleto |
+| Vulcão | 41 Dragão de barriga · 46 Serpente · 47 Elemental · 49 Verme |
+
+`{"ids":["01","05","12","13","15","17","19","24","31","32","35","39","40","41","46","47","49"]}`
+
+Ainda não entram no jogo. A decisão de 2026-10-10 (uma espécie de canvas por reino, com ataque, fúria e derrota) continua valendo: a conta aqui não é uma por reino (2, 5, 1, 5 e 4) e as pinturas são imagem, não o desenho procedural. Poses, fases e thumb ficam para quando o usuário pedir o porte.

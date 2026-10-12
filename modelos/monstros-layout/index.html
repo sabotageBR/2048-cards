@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>50 layouts de monstro</title>
+<style>
+  @font-face {
+    font-family: Fredoka;
+    src: url('../../src/ui/fontes/fredoka-latin-700-normal.woff2') format('woff2');
+    font-weight: 700;
+    font-display: swap;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #1b1424; color: #f4ecff; font: 700 15px Fredoka, system-ui, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: #2a1b34; padding: 14px 16px 12px; border-bottom: 1px solid #4a3358; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  header p { margin: 0 0 10px; color: #c8b6d8; font-size: 13px; }
+  h2 { margin: 18px 16px 8px; font-size: 16px; color: #ffd23f; }
+  .barra { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .barra button, #reinos button, #vistas button {
+    font: 700 13px Fredoka, system-ui, sans-serif;
+    color: #f4ecff; background: #3a2648; border: 2px solid #5a4070;
+    border-radius: 999px; padding: 6px 12px; cursor: pointer;
+  }
+  button.on { background: #ffd23f; color: #2a1630; border-color: #ffd23f; }
+  #copiar { background: #ff5470; border-color: #ff5470; }
+  #conta { margin-left: auto; color: #ffd23f; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; padding: 0 16px 8px; }
+  .carta {
+    display: flex; flex-direction: column; gap: 6px; text-align: left;
+    background: #241830; color: inherit; border: 3px solid transparent; border-radius: 16px;
+    padding: 8px; cursor: pointer; font: inherit;
+  }
+  .carta.atual { cursor: default; }
+  .carta.escolhida { border-color: #ffd23f; }
+  .carta[hidden] { display: none; }
+  canvas.desenho, img.pintura, .vazio {
+    width: 100%; background: #e7e2f2; border-radius: 12px; display: block;
+  }
+  canvas.desenho { height: auto; }
+  img.pintura, .vazio { aspect-ratio: 1 / 1; object-fit: contain; height: auto; }
+  .vazio { margin: 0; display: grid; place-items: center; color: #6d5a78; background: #e7e2f2; }
+  body[data-vista="desenho"] #grade .pintura, body[data-vista="desenho"] #grade .vazio { display: none; }
+  body[data-vista="pintura"] #grade canvas.desenho { display: none; }
+  .rotulo { display: flex; flex-direction: column; gap: 2px; padding: 0 4px 4px; }
+  .rotulo span { color: #c8b6d8; font-size: 12px; }
+  .nota { margin: 0; color: #ffb15c; font-size: 12px; padding: 0 4px; }
+  .linhas { display: flex; flex-direction: column; gap: 12px; padding: 0 16px 8px; }
+  .linha {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(120px, 200px)) minmax(220px, 1fr);
+    gap: 8px; align-items: start;
+    background: #241830; border-radius: 16px; padding: 8px;
+  }
+  .linha .quem { grid-column: 1 / -1; display: flex; gap: 8px; align-items: baseline; }
+  .linha .quem span { color: #c8b6d8; font-size: 12px; }
+  .celula { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .celula > span { color: #c8b6d8; font-size: 12px; padding-left: 4px; }
+  .tira { width: 100%; height: auto; background: #e7e2f2; border-radius: 12px; display: block; }
+  .sprites { display: flex; flex-direction: column; gap: 6px; }
+  .sprites .desenho, .sprites .vazio { max-width: 220px; }
+  @media (max-width: 560px) {
+    .grade { grid-template-columns: 1fr; }
+    #conta { margin-left: 0; }
+    .linha { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>50 layouts de monstro</h1>
+  <p>Cada monstro mostra o desenho parado, o desenho do ataque e os sprites. A marca da escolha fica neste navegador. Nada disso entra no jogo.</p>
+  <div class="barra">
+    <div id="reinos"></div>
+    <div id="vistas"></div>
+    <button id="copiar" type="button">Copiar escolha</button>
+    <span id="conta">0 escolhidos</span>
+  </div>
+</header>
+<h2>Os de hoje</h2>
+<div id="atuais" class="grade"></div>
+<h2>Ataque dos escolhidos</h2>
+<div id="escolhidos" class="linhas"></div>
+<h2>Os 50</h2>
+<div id="grade" class="grade"></div>
+<script type="module" src="./pagina.js"></script>
+</body>
+</html>

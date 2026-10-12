@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<title>exportar layout</title>
+<style>
+  html, body { margin: 0; background: #e7e2f2; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+import { CATALOGO, ESCOLHIDOS } from './catalogo.js';
+import { desenharAtaque } from './ataques.js';
+import { desenharLayout } from './silhuetas.js';
+const q = new URLSearchParams(location.search);
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+if (q.get('folha') === '1') {
+  const celW = 160, celH = 188, cols = 10;
+  const rows = Math.ceil(CATALOGO.length / cols);
+  c.width = celW * cols;
+  c.height = celH * rows;
+  ctx.fillStyle = '#f6f1e8';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.font = '600 13px sans-serif';
+  ctx.textAlign = 'center';
+  CATALOGO.forEach((m, i) => {
+    const col = i % cols, lin = Math.floor(i / cols);
+    const x = col * celW, y = lin * celH;
+    ctx.fillStyle = (col + lin) % 2 ? '#fffdf8' : '#efe6d6';
+    ctx.fillRect(x + 3, y + 3, celW - 6, celH - 6);
+    ctx.fillStyle = '#2a1630';
+    ctx.fillText(m.id + ' ' + m.nome, x + celW / 2, y + 16);
+    ctx.save();
+    ctx.translate(x + celW / 2, y + celH - 14);
+    desenharLayout(ctx, m.id, 54);
+    ctx.restore();
+  });
+} else if (q.get('folha') === 'ataque') {
+  const lista = CATALOGO.filter((m) => ESCOLHIDOS.includes(m.id));
+  const celW = 180, celH = 200, cols = 6;
+  const rows = Math.ceil(lista.length / cols);
+  c.width = celW * cols;
+  c.height = celH * rows;
+  ctx.fillStyle = '#e7e2f2';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.font = '600 14px sans-serif';
+  ctx.textAlign = 'center';
+  lista.forEach((m, i) => {
+    const col = i % cols, lin = Math.floor(i / cols);
+    const x = col * celW, y = lin * celH;
+    ctx.fillStyle = '#2a1630';
+    ctx.fillText(m.id + ' ' + m.nome, x + celW / 2, y + 18);
+    ctx.save();
+    ctx.translate(x + celW / 2, y + celH - 16);
+    desenharAtaque(ctx, m.id, 62);
+    ctx.restore();
+  });
+} else {
+  const id = q.get('id') || '01';
+  const S = 640;
+  c.width = S;
+  c.height = S;
+  ctx.fillStyle = '#e7e2f2';
+  ctx.fillRect(0, 0, S, S);
+  ctx.translate(S / 2, S - 64);
+  if (q.get('ataque') === '1') desenharAtaque(ctx, id, 200);
+  else desenharLayout(ctx, id, 220);
+}
+document.title = 'PRONTO';
+</script>
+</body>
+</html>
