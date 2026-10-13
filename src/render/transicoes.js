@@ -242,8 +242,77 @@ export const Transicoes = (() => {
   }
 
   /**
+   * Trilha do mundo (so na passagem de fase, sem clique): as fases do mundo,
+   * a vencida acendendo, a proxima pulsando, a coroa no chefao e o nome do
+   * proximo monstro. trilha = { pos (1..total, a fase vencida), total, nome, rotulo }.
+   */
+  function desenharTrilha(ctx, t, W, H, trilha, cor) {
+    const ini = 0.45, fim = TROCA.fase;
+    if (!trilha || t < ini || t > fim) return;
+    const u = easeOut((t - ini) / 0.35);
+    const sai = t > fim - 0.2 ? (t - (fim - 0.2)) / 0.2 : 0;
+    const n = trilha.total;
+    const larg = Math.min(W * 0.8, 420);
+    const passo = larg / (n - 1);
+    const r = clamp(passo * 0.24, 8, 16);
+    const tamTxt = Math.round(clamp(r * 1.3, 14, 22));
+    const cy = H * 0.5 + (1 - u) * 24;
+    const x0 = W / 2 - larg / 2;
+    const xk = (k) => x0 + (k - 1) * passo;
+    ctx.save();
+    ctx.globalAlpha = clamp(u) * (1 - sai);
+    // placa
+    const px = x0 - r * 2.2, pw = larg + r * 4.4, py = cy - r * 3.1, ph = r * 4.2 + tamTxt * 1.9;
+    ctx.beginPath(); ctx.roundRect(px, py, pw, ph, r * 1.4);
+    ctx.fillStyle = 'rgba(28,14,38,0.82)'; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.stroke();
+    // a vencida acende em 0,7..1,0 s; a seguinte pulsa depois disso
+    const acende = backOut((t - 0.7) / 0.3);
+    ctx.lineCap = 'round';
+    for (let k = 1; k < n; k++) {
+      ctx.beginPath(); ctx.moveTo(xk(k) + r, cy); ctx.lineTo(xk(k + 1) - r, cy);
+      ctx.lineWidth = Math.max(3, r * 0.35);
+      ctx.strokeStyle = k < trilha.pos || (k === trilha.pos && t > 0.9) ? cor : 'rgba(255,255,255,0.3)';
+      ctx.stroke();
+    }
+    for (let k = 1; k <= n; k++) {
+      const chefe = k === n;
+      let rk = r * (chefe ? 1.3 : 1);
+      const feita = k < trilha.pos || (k === trilha.pos && t > 0.7);
+      if (k === trilha.pos) rk *= t > 0.7 ? clamp(acende, 0, 1.4) * 0.25 + 0.75 : 1;
+      if (k === trilha.pos + 1 && t > 1) rk *= 1 + Math.sin((t - 1) * 9) * 0.1;
+      ctx.beginPath(); ctx.arc(xk(k), cy, rk, 0, TAU);
+      ctx.fillStyle = feita ? cor : k === trilha.pos + 1 ? '#ffffff' : 'rgba(255,255,255,0.14)';
+      ctx.fill();
+      ctx.lineWidth = 2.5; ctx.strokeStyle = feita || k === trilha.pos + 1 ? '#ffffff' : 'rgba(255,255,255,0.55)'; ctx.stroke();
+      if (feita) {
+        // visto
+        ctx.beginPath(); ctx.moveTo(xk(k) - rk * 0.42, cy + rk * 0.02); ctx.lineTo(xk(k) - rk * 0.1, cy + rk * 0.34); ctx.lineTo(xk(k) + rk * 0.45, cy - rk * 0.32);
+        ctx.lineWidth = Math.max(2.5, rk * 0.26); ctx.strokeStyle = '#ffffff'; ctx.stroke();
+      }
+      if (chefe) {
+        // coroa do chefao em cima da marca
+        const cx = xk(k), cyc = cy - rk - r * 0.95, cw = r * 1.5, ch = r * 0.95;
+        ctx.beginPath();
+        ctx.moveTo(cx - cw / 2, cyc + ch / 2); ctx.lineTo(cx - cw / 2, cyc - ch / 2); ctx.lineTo(cx - cw / 4, cyc);
+        ctx.lineTo(cx, cyc - ch / 2 - ch * 0.15); ctx.lineTo(cx + cw / 4, cyc); ctx.lineTo(cx + cw / 2, cyc - ch / 2); ctx.lineTo(cx + cw / 2, cyc + ch / 2);
+        ctx.closePath();
+        ctx.fillStyle = '#ffd84a'; ctx.fill(); ctx.lineJoin = 'round'; ctx.lineWidth = 2; ctx.strokeStyle = '#7a4a00'; ctx.stroke();
+      }
+    }
+    // "Proximo: Gosmo Ranzinza"
+    ctx.font = `700 ${tamTxt}px Fredoka, "Arial Rounded MT Bold", system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    const txt = `${trilha.rotulo} ${trilha.nome}`;
+    const ty = cy + r * 1.3 + tamTxt * 0.95;
+    ctx.lineWidth = Math.max(3, tamTxt * 0.22); ctx.strokeStyle = '#1c0e26'; ctx.strokeText(txt, W / 2, ty, pw - r * 2);
+    ctx.fillStyle = '#ffffff'; ctx.fillText(txt, W / 2, ty, pw - r * 2);
+    ctx.restore();
+  }
+
+  /**
    * Desenha a camada da transicao (tela). info: { W, H, fx, texto, mundo,
-   * textoMundo, pontos, corMundo, semente }.
+   * textoMundo, pontos, corMundo, semente, trilha? }.
    */
   function desenhar(ctx, tipo, t, info) {
     const { W, H } = info;
@@ -251,6 +320,7 @@ export const Transicoes = (() => {
     const canhoes = tipo === 'mundo' ? [0.12, 0.62] : [0.12];
     desenharConfete(ctx, t, W, H, info.semente || 7, canhoes);
     desenharGrito(ctx, t, W, H, info.texto || 'YES!');
+    if (tipo === 'fase') desenharTrilha(ctx, t, W, H, info.trilha, info.corMundo || '#43dd6e');
     if (tipo === 'mundo') {
       desenharBolinhas(ctx, t, W, H, info.pontos);
       desenharVarredura(ctx, t, W, H, info.corMundo || '#ffd84a');

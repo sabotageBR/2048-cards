@@ -3,7 +3,7 @@
 // entrada de fase e transicoes. Nao conhece a Poki nem o DOM alem do canvas.
 // Um relogio so: o `agora` do main.js (ms) move a linha, os golpes e o monstro.
 import { calcularLayout } from './layout.js';
-import { desenharMesa, desenharMao } from './mesa.js';
+import { desenharMesa, desenharMao, desenharGuia } from './mesa.js';
 import { criarLinha } from './linha.js';
 import { criarParticulas } from './particulas.js';
 import { arenaDe } from './arena.js';
@@ -186,12 +186,13 @@ export function criarCena(canvas) {
       desenharMesa(ctx, vis, L, { pal, agora: q.agora, t, dpr, linha, arrasto: q.arrasto, destaque: q.destaque, legal: q.legal, febre: q.febre || 0, semFila: q.semFila, alvo: q.alvo || '', textos: txt });
     }
     part.desenhar(ctx);
-    if (q.mao) desenharMao(ctx, q.mao.x, q.mao.y, tVis, '#fff');
+    if (q.mao && q.mao.de) desenharGuia(ctx, q.mao, tVis, dpr);
+    else if (q.mao) desenharMao(ctx, q.mao.x, q.mao.y, tVis, '#fff');
     ctx.restore();
     duelo.frente(ctx, W, H, q.agora, !!q.febre);
     if (branco > 0) { ctx.fillStyle = `rgba(255,255,255,${branco})`; ctx.fillRect(0, 0, W, H); }
     if (trans) {
-      Tr.desenhar(ctx, trans.tipo, (q.agora - trans.t0) / 1000, { W, H, fx: trans.fx, fy: trans.fy, texto: q.info && q.info.texto, textoMundo: q.info && q.info.textoMundo, pontos: [], corMundo: trans.corMundo, semente: trans.semente });
+      Tr.desenhar(ctx, trans.tipo, (q.agora - trans.t0) / 1000, { W, H, fx: trans.fx, fy: trans.fy, texto: q.info && q.info.texto, textoMundo: q.info && q.info.textoMundo, pontos: [], corMundo: trans.corMundo, semente: trans.semente, trilha: trans.trilha });
     }
   }
 

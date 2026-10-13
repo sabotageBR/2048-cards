@@ -22,12 +22,12 @@ Regra de curva (vault): uma novidade por fase, nunca junto com salto de dificuld
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 1 | 100% (100%) | 8 | 100% | 6 | 52 / 76 / 92 | 50 / 80 | — | — | — | colocar e fundir (2 + 2). Meta: fazer um 16 |
 | 2 | 1 | 100% (99%) | 10 | 100% | 8 | 120 / 160 / 208 | 110 / 160 | — | — | — | menor sob maior. Meta: fazer um 32 |
-| 3 | 1 | 100% (98%) | 14 | 100% | 13 | 412 / 448 / 472 | 320 / 460 | — | — | — | cascata. Meta: fazer um 64 e 400 pontos |
-| 4 | 1 | 98% (100%) | 26 | 100% | 19 | 1076 / 1268 / 1864 | 910 / 1300 | lodo / 5 | 3 | 0 | o monstro ataca: a cada 5 jogadas o Gosmo cobre uma pilha com lodo (carta da metade do topo). Meta: fazer um 128 |
-| 5 | 1 | 90% (95%) | 5 | 96% | 6 | 14592 / 14740 / 22592 | 10500 / 15000 | lodo / 5 | 1 | 1 | o monte completo. A coluna 1 esta pronta para uma cascata ate 2048 |
-| 6 | 1 | 99% (94%) | 7 | 100% | 7 | 3136 / 3424 / 4552 | 2400 / 3400 | lodo / 5 | 1 | 0 | coringa (sai do baralho). Meta: cascata x3 e 1500 pontos |
-| 7 | 1 | 88% (93%) | 15 | 96% | 8 | 10924 / 15232 / 16588 | 10500 / 15000 | lodo / 7 | 1 | 1 | o monte sem a escada pronta (falta um 256, a coluna 2 ajuda), com coringa e duas cargas de descarte |
-| 8 | 1 | 78% (86%) | 67 | 92% | 18 | 7260 / 13496 / 21540 | 9400 / 13500 | lodo / 6 (fúria 3) | 2 | 1 | chefe do mundo 1: um monte com baralho dinamico (falta um 512); o Rei Gosmo fica furioso |
+| 3 | 1 | 93% (98%) | 8 | 100% | 6 | 14664 / 14720 / 15704 | 10300 / 14700 | — | — | — | cascata ate o 2048 (o golpe especial): a coluna 1 ja tem a escada, falta o 128 |
+| 4 | 1 | 99% (97%) | 12 | 100% | 10 | 652 / 868 / 1028 | 610 / 870 | — | — | — | cascata longa: o 32 sobre o 64 pede 16, 8, 4... Meta: fazer um 128 |
+| 5 | 1 | 100% (95%) | 7 | 100% | 6 | 288 / 2176 / 2760 | 1500 / 2200 | — | — | — | coringa (sai do baralho). Meta: cascata x3 |
+| 6 | 1 | 93% (94%) | 10 | 100% | 8 | 12712 / 15312 / 16080 | 10700 / 15300 | — | — | — | o monte sem a escada pronta (falta um 256, a coluna 2 ajuda), com coringa e duas cargas de descarte |
+| 7 | 1 | 96% (98%) | 7 | 100% | 8 | 14656 / 14800 / 20288 | 10400 / 14800 | lodo / 6 | 1 | 0 | o monstro ataca: a cada 6 jogadas o Gosmo cobre uma pilha com lodo (carta da metade do topo). A escada ja conhecida, do outro lado |
+| 8 | 1 | 90% (86%) | 28 | 100% | 12 | 11216 / 14648 / 15228 | 10300 / 14600 | lodo / 7 (fúria 4) | 1 | 0 | chefe do mundo 1: um monte com baralho dinamico (falta um 256); o Rei Gosmo fica furioso |
 | 9 | 2 | 99% (96%) | 14 | 100% | 14 | 328 / 704 / 1228 | 490 / 700 | lodo / 5 | 2 | 0 | a pedra. Cada fusao na coluna tira 1; quebre-a |
 | 10 | 2 | 96% (95%) | 26 | 100% | 23 | 1520 / 1972 / 2456 | 1400 / 2000 | pedra, lodo / 5 | 4 | 0 | o Golem lanca pedras no fundo das colunas. Pedra mais dura e um 256 |
 | 11 | 2 | 90% (88%) | 26 | 92% | 22 | 936 / 1316 / 1888 | 920 / 1300 | pedra, lodo / 4 | 5 | 0 | a bomba (sai do baralho) contra duas pedras duras, sem martelo |
@@ -106,3 +106,23 @@ O usuário travou na fase 7 ("impossível de matar o monstro"). Pelo guloso ela 
 - **`VERSAO_ESTADO` 4:** a partida salva leva a mesa e as metas de quando começou, então a subida descarta as partidas salvas antigas e quem estava na fase 7 recomeça na versão nova.
 
 Próxima rodada: medir com jogadores reais (Player Fit Test) e comparar a perda por fase (1 − Completed) com estas taxas.
+
+## 2026-10-12 · mundo 1 depois do Player Fit Test
+
+A parcial do Player Fit Test da Poki (0.1.0, 393 partidas) mostrou que quase ninguém perde nas primeiras fases: o jogador fecha o jogo no meio da fase. Saíram 26% na fase 3 e 34% na fase 4, contra 2% a 5% de derrotas. A análise completa está em `docs/autoria.md`. O mundo 1 foi refeito para pôr o golpe especial no primeiro minuto e tirar o ataque do monstro dos ~3 primeiros minutos:
+
+| Fase | Antes | Agora | Casual (alvo) | Jogadas casual |
+|---|---|---|---|---|
+| 3 | cascata pequena, "fazer um 64" e "400 pontos" (duas metas) | **cascata até o 2048**: escada [1024, 512, 256, 128] pronta, sem ataque | 93% (98) | 8 (antes 14) |
+| 4 | o monstro ataca (lodo a cada 5), fazer um 128 | cascata longa (o 32 sobre o 64 pede 16, 8, 4…), fazer um 128, **sem ataque** | 99% (97) | 12 (antes 26) |
+| 5 | o monte com a escada pronta | coringa, só "cascata ×3" (sem a meta de pontos) | 100% (95) | 7 |
+| 6 | coringa | o monte sem a escada pronta, sem ataque | 93% (94) | 10 |
+| 7 | o monte sem a escada pronta | **o monstro ataca** (lodo a cada 6) com a escada já conhecida, do outro lado | 96% (98) | 7 |
+| 8 | chefão: falta um 512 (67 jogadas) | chefão: falta um 256, ataque a cada 7 (fúria a cada 4) | 90% (86) | 28 (antes 67) |
+
+**Lições:**
+
+- **Tirar o lodo pode deixar a fase mais difícil.** A carta da metade do topo arma a cascata: a fase 4 antiga, sem o monstro, caiu de 98% para 69% no casual. Sem ataque, a mesa e o baralho é que precisam armar a escada: a fase 4 começa com [64, 32], e o baralho da fase 3 é quase todo de 32 e 64 (com o baralho de 2 a 64 do jeito antigo, a fase 3 ficava em 65%).
+- **A fase que ensina o feitiço passou da 4 para a 7** (`ENSINA` = {1, 7, 9, 10, 17, 18, 25, 28, 33}).
+- **O guloso costuma vencer a fase 7 antes do primeiro feitiço.** Com a semente 1 ele vence antes da 6ª jogada. Uma pessoa joga mais devagar e vê o ataque. Quem passar sem ver vê na fase 8. O aviso do feitiço agora sai no primeiro impacto, então ele aparece onde o ataque acontecer.
+- **O mundo 1 ficou mais curto:** das fases 1 a 7, 62 jogadas do casual em vez de 85. Isso dá mais vitórias por minuto, que é o que o funil pede: quem chega à fase 6 passa dos 3 minutos.

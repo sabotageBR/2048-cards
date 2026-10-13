@@ -102,3 +102,56 @@ Vistos na página `modelos/monstros-layout/`: 50 silhuetas (10 por reino), cada 
 `{"ids":["01","05","12","13","15","17","19","24","31","32","35","39","40","41","46","47","49"]}`
 
 Ainda não entram no jogo. A decisão de 2026-10-10 (uma espécie de canvas por reino, com ataque, fúria e derrota) continua valendo: a conta aqui não é uma por reino (2, 5, 1, 5 e 4) e as pinturas são imagem, não o desenho procedural. Poses, fases e thumb ficam para quando o usuário pedir o porte.
+
+## 2026-10-12 · retenção depois do Player Fit Test (0.2.0)
+
+Pedido do usuário: "o 2048 cards está em Player fit test e ainda não terminou mas temos as preliminares dos game event … analise e vamos melhorar o jogo para aumentar a retenção".
+
+**O que a Poki exige:** tempo médio de 3 min ou mais e pelo menos 25% dos jogadores com 3 min ou mais.
+
+**A parcial da 0.1.0** (393 partidas, painel Game Events):
+- Tempo médio de 2 min 36 s. Só 16% passam de 3 min (`tempo/3/min`), e 13% saem sem tocar no jogo.
+- O funil da Aventura:
+
+| Fase | Entraram | Venceram | Perderam | Saíram no meio |
+|---|---|---|---|---|
+| 1 | 98% | 79% | 0% | 12% |
+| 2 | 77% | 84% | 0% | 15% |
+| 3 | 66% | 61% | 2,3% | 26% |
+| 4 | 40% | 51% | 5,1% | 34% |
+| 5 | 20% | 70% | 1,3% | 25% |
+| 6 | 14% | 84% | 0% | 13% |
+
+- Celular e computador mostram o mesmo desenho.
+
+**Leitura:**
+- Quem chega à fase 6 é praticamente quem passa dos 3 min.
+- As pessoas saem a um ritmo quase constante (~0,9% por segundo) até o 3º minuto. Desistem, não perdem.
+- O que pesa é o que cada segundo mostra:
+  - o golpe especial, que é a cena da thumb, só vinha na fase 5;
+  - a fase 3 tinha três novidades e uma meta de pontos sem progresso na tela;
+  - a fase 4 dobrava a duração e estreava um ataque que parecia o jogo bagunçando a mesa;
+  - "Special attack ×1" não dizia o que fazer.
+- O painel também escondia derrotas: a mesa cheia não mandava `fail`, e "Jogar de novo" passava comercial a partir da fase 4.
+
+**Escolhas do usuário:**
+- **Reorganizar o mundo 1:** o golpe especial vem na fase 3.
+- **Ataque do monstro mais tarde.** Ele estreia na fase 7. O usuário talvez o tire de vez ("Talvez eu extingue o ataque"); por isso ele continua só como dado em `monstro:` de cada fase.
+- **Comercial:** sai só do "Jogar de novo" antes de 3 min. O da passagem de fase continua a partir de 4→5.
+- **Aprovou as quatro propostas visuais** (`docs/retencao/propostas.png`):
+  - a trilha do mundo na vitória, com 8 marcas, a coroa no chefão e "Next: <monstro>", sem clique;
+  - a carta de lodo marcada, com baba verde que some quando a carta funde;
+  - o gesto guiado na fase 1, em que a mão arrasta a carta da fila até a pilha a partir de 1 s, até o primeiro toque;
+  - as metas "Make 1× 2048" e "Deal N damage (x/N)".
+
+**Também entrou:**
+- **Primeira mesa cheia no mundo 1:** o "Continuar" grátis vem sozinho ("Second chance!"), sem o cartão.
+- **Aviso do feitiço:** sai no primeiro impacto, não ao carregar a fase.
+- **Telemetria nova:** `mesa/N/cheia`, `continuar/N/gratis` e `ajuda/N/ocio|recusa`. As missões viraram `missao/<tipo>/feita`, fora do funil de progresso.
+- **Versão 0.2.0,** para comparar no filtro Version.
+- **`VERSAO_ESTADO` 5.**
+
+**Próximo passo:** subir a 0.2.0 na Poki e rodar outro Player Fit Test, comparando as duas versões em:
+- tempo médio e % com 3 min;
+- saída nas fases 3 a 5;
+- os eventos novos.

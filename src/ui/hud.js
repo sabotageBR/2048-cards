@@ -22,7 +22,7 @@ export function criarHud({ T, $ }) {
     // na cadeia (Classico e Diario) a vida e de pontos: a barra fica mesmo sem metas
     $('painel').classList.toggle('semMeta', !e.metas.length && !(e.monstro && e.monstro.cadeia));
     if (info.metaTexto !== undefined) $('metaTxt').textContent = info.metaTexto;
-    else $('metaTxt').textContent = e.metas.map((m) => (m.feita ? '✓ ' : '• ') + textoMeta(T, m) + (m.alvo > 1 && !m.feita && m.tipo !== 'pontos' && m.tipo !== 'montes' && m.tipo !== 'cascata' ? ` (${m.atual}/${m.alvo})` : '')).join('   ');
+    else $('metaTxt').textContent = e.metas.map((m) => (m.feita ? '✓ ' : '• ') + textoMeta(T, m, e.regras.teto) + (m.alvo > 1 && !m.feita && m.tipo !== 'montes' && m.tipo !== 'cascata' ? ` (${Math.min(m.atual, m.alvo)}/${m.alvo})` : '')).join('   ');
     $('nDesfazer').textContent = e.itens.desfazer > 1 ? String(e.itens.desfazer) : '';
     /** @type {HTMLButtonElement} */ ($('bDesfazer')).disabled = !(info.podeDesfazer && e.itens.desfazer > 0);
     const temItens = e.itens.coringa + e.itens.martelo + e.itens.troca > 0;

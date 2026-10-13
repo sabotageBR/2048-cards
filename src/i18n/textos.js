@@ -9,8 +9,8 @@ const TEXTOS = {
     menu: 'Menu', som: 'Sound', desfazer: 'Undo', recomecar: 'Restart', fechar: 'Close', continuar: 'Continue',
     jogarDeNovo: 'Play again', semJogadas: 'No moves left', continuarVideo: 'Continue', gratis: 'Free',
     aventura: 'Adventure', classico: 'Endless', fases: 'Levels', bloqueado: 'Locked', pausa: 'Paused',
-    tenteDeNovo: 'Try again',
-    metaPontos: 'Score {n}', metaCartas: 'Make {n}× {v}', metaMontes: 'Special attack ×{n}', metaMontesPl: 'Special attack ×{n}',
+    tenteDeNovo: 'Try again', segundaChance: 'Second chance!', proximo: 'Next:',
+    metaPontos: 'Deal {n} damage', metaCartas: 'Make {n}× {v}',
     metaPedras: 'Break the stones', metaSobreviver: 'Play {n} cards', metaCascata: 'Chain ×{x}',
     coringa: 'Wild', martelo: 'Hammer', troca: 'Swap', febre: 'FURY ×2',
     bau: 'World chest!',
@@ -19,7 +19,7 @@ const TEXTOS = {
     epitetos: ['Little', 'Greedy', 'Grumpy', 'Sneaky', 'Stubborn', 'Brute', 'Elder'], nomeMonstro: '{ep} {m}', rei: 'King {m}',
     monstroN: 'Monster {n}', derrotados: '{n} defeated', fimDerrotados: 'Monsters defeated: {n}',
     errou: 'MISS!', enfurecido: 'ENRAGED!', avisoAtaque: '{m} attacks!', avisoChefe: 'Boss fight!',
-    dicaLodo: 'Every {n} moves it slimes a pile with a card half its top.', dicaPedra: 'Every {n} moves it drops a stone under a pile.',
+    dicaLodo: 'It slimed a pile! Merge the slimy card to clean it.', dicaPedra: 'Every {n} moves it drops a stone under a pile.',
     dicaGelo: 'Every {n} moves it freezes a top card.', dicaCorrente: 'Every {n} moves it chains a column for {k} moves.',
     dicaChefe: 'At half HP it gets enraged: faster attacks on two targets.',
     missoes: 'Missions', missaoFeita: 'Mission done!', diario: 'Daily', diarioFim: 'Daily done!', cartasRestantes: '{n} cards left',
@@ -31,8 +31,8 @@ const TEXTOS = {
     menu: 'Menu', som: 'Som', desfazer: 'Desfazer', recomecar: 'Recomeçar', fechar: 'Fechar', continuar: 'Continuar',
     jogarDeNovo: 'Jogar de novo', semJogadas: 'Sem jogadas', continuarVideo: 'Continuar', gratis: 'Grátis',
     aventura: 'Aventura', classico: 'Infinito', fases: 'Fases', bloqueado: 'Bloqueado', pausa: 'Pausa',
-    tenteDeNovo: 'Tente de novo',
-    metaPontos: 'Faça {n} pontos', metaCartas: 'Faça {n}× {v}', metaMontes: 'Golpe especial ×{n}', metaMontesPl: 'Golpe especial ×{n}',
+    tenteDeNovo: 'Tente de novo', segundaChance: 'Segunda chance!', proximo: 'Próximo:',
+    metaPontos: 'Cause {n} de dano', metaCartas: 'Faça {n}× {v}',
     metaPedras: 'Quebre as pedras', metaSobreviver: 'Jogue {n} cartas', metaCascata: 'Cascata ×{x}',
     coringa: 'Coringa', martelo: 'Martelo', troca: 'Troca', febre: 'FÚRIA ×2',
     bau: 'Baú do mundo!',
@@ -41,7 +41,7 @@ const TEXTOS = {
     epitetos: ['Pequeno', 'Guloso', 'Ranzinza', 'Sorrateiro', 'Teimoso', 'Brutamontes', 'Ancião'], nomeMonstro: '{m} {ep}', rei: 'Rei {m}',
     monstroN: 'Monstro {n}', derrotados: '{n} derrotados', fimDerrotados: 'Monstros derrotados: {n}',
     errou: 'ERROU!', enfurecido: 'ENFURECIDO!', avisoAtaque: '{m} ataca!', avisoChefe: 'Chefão!',
-    dicaLodo: 'A cada {n} jogadas cobre uma pilha com lodo: uma carta da metade do topo.', dicaPedra: 'A cada {n} jogadas joga uma pedra embaixo de uma pilha.',
+    dicaLodo: 'Melou uma pilha! Funda a carta melada para limpar.', dicaPedra: 'A cada {n} jogadas joga uma pedra embaixo de uma pilha.',
     dicaGelo: 'A cada {n} jogadas congela a carta do topo.', dicaCorrente: 'A cada {n} jogadas acorrenta uma coluna por {k} jogadas.',
     dicaChefe: 'Com metade da vida ele se enfurece: ataca mais e em dois alvos.',
     missoes: 'Missões', missaoFeita: 'Missão cumprida!', diario: 'Diário', diarioFim: 'Diário completo!', cartasRestantes: '{n} cartas restantes',
@@ -53,8 +53,8 @@ const TEXTOS = {
     menu: 'Menú', som: 'Sonido', desfazer: 'Deshacer', recomecar: 'Reiniciar', fechar: 'Cerrar', continuar: 'Continuar',
     jogarDeNovo: 'Jugar otra vez', semJogadas: 'Sin jugadas', continuarVideo: 'Continuar', gratis: 'Gratis',
     aventura: 'Aventura', classico: 'Infinito', fases: 'Niveles', bloqueado: 'Bloqueado', pausa: 'Pausa',
-    tenteDeNovo: 'Inténtalo de nuevo',
-    metaPontos: 'Haz {n} puntos', metaCartas: 'Haz {n}× {v}', metaMontes: 'Golpe especial ×{n}', metaMontesPl: 'Golpe especial ×{n}',
+    tenteDeNovo: 'Inténtalo de nuevo', segundaChance: '¡Segunda oportunidad!', proximo: 'Siguiente:',
+    metaPontos: 'Haz {n} de daño', metaCartas: 'Haz {n}× {v}',
     metaPedras: 'Rompe las piedras', metaSobreviver: 'Juega {n} cartas', metaCascata: 'Cascada ×{x}',
     coringa: 'Comodín', martelo: 'Martillo', troca: 'Cambio', febre: 'FURIA ×2',
     bau: '¡Cofre del mundo!',
@@ -63,7 +63,7 @@ const TEXTOS = {
     epitetos: ['Pequeño', 'Glotón', 'Gruñón', 'Astuto', 'Terco', 'Bruto', 'Anciano'], nomeMonstro: '{m} {ep}', rei: 'Rey {m}',
     monstroN: 'Monstruo {n}', derrotados: '{n} derrotados', fimDerrotados: 'Monstruos derrotados: {n}',
     errou: '¡FALLÓ!', enfurecido: '¡FURIOSO!', avisoAtaque: '¡{m} ataca!', avisoChefe: '¡Jefe!',
-    dicaLodo: 'Cada {n} jugadas cubre una pila con lodo: una carta de la mitad del tope.', dicaPedra: 'Cada {n} jugadas pone una piedra debajo de una pila.',
+    dicaLodo: '¡Embarró una pila! Fusiona la carta babosa para limpiarla.', dicaPedra: 'Cada {n} jugadas pone una piedra debajo de una pila.',
     dicaGelo: 'Cada {n} jugadas congela la carta de arriba.', dicaCorrente: 'Cada {n} jugadas encadena una columna por {k} jugadas.',
     dicaChefe: 'Con la mitad de la vida se enfurece: ataca más y a dos objetivos.',
     missoes: 'Misiones', missaoFeita: '¡Misión cumplida!', diario: 'Diario', diarioFim: '¡Diario completo!', cartasRestantes: '{n} cartas restantes',
@@ -107,13 +107,16 @@ export function dicaFeitico(T, feitico, cfg) {
   return (mapa[feitico] || '').replace('{n}', String(cfg.cada)).replace('{k}', String(cfg.trancaK || 3));
 }
 
-/** Texto de uma meta. */
-export function textoMeta(T, m) {
+/**
+ * Texto de uma meta. O monte e dito pela carta que o fecha ("Make 1× 2048";
+ * 4096 no chefe), e os pontos pelo nome do contador do painel (DAMAGE).
+ */
+export function textoMeta(T, m, teto = 2048) {
   const f = (s, o) => s.replace(/\{(\w+)\}/g, (_, k) => String(o[k]));
   switch (m.tipo) {
     case 'pontos': return f(T.metaPontos, { n: m.alvo });
     case 'cartas': return f(T.metaCartas, { n: m.alvo, v: m.v });
-    case 'montes': return f(m.alvo > 1 ? T.metaMontesPl : T.metaMontes, { n: m.alvo });
+    case 'montes': return f(T.metaCartas, { n: m.alvo, v: teto });
     case 'pedras': return T.metaPedras;
     case 'sobreviver': return f(T.metaSobreviver, { n: m.alvo });
     case 'cascata': return f(T.metaCascata, { x: m.alvo });

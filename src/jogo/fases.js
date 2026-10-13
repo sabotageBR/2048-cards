@@ -8,7 +8,7 @@
 //     metas: [...ate 2], estrelas: [0, p2, p3], itens?: {...}, semente }
 //
 // O monstro de cada mundo ataca com o feitico do reino (lodo do Gosmo a
-// partir da fase 4, pedra do Golem a partir da 10, gelo do Yeti a partir da
+// partir da fase 7, pedra do Golem a partir da 10, gelo do Yeti a partir da
 // 18, corrente do Espectro a partir da 28; o Dragao mistura tudo), sempre um
 // obstaculo que a fase anterior ja ensinou. Os chefoes (posicao 8) ficam
 // furiosos quando a vida cai ate o limiar: contagem menor e dois alvos.
@@ -26,7 +26,10 @@ const chefao = (cada, furia, hp, ...feiticos) => ({ cada, feiticos, furia: { hp,
 
 const M1 = (id, extra) => ({ id, mundo: 1, semente: 2048 * 31 + id * 977, ...extra });
 
-/** Mundo 1: o basico. Baralho finito e pequeno, sem derrota. */
+/**
+ * Mundo 1: o basico, curto, com o golpe especial (cascata ate o 2048) ja na
+ * fase 3 e o monstro atacando so a partir da 7. Baralho finito e pequeno.
+ */
 export const FASES = [
   // 1: colocar e fundir (2 + 2). Meta: fazer um 16.
   M1(1, {
@@ -42,52 +45,51 @@ export const FASES = [
     metas: [{ tipo: 'cartas', v: 32, n: 1 }],
     estrelas: [0, 110, 160],
   }),
-  // 3: cascata. Meta: fazer um 64 e 400 pontos.
+  // 3: cascata ate o 2048 (o golpe especial): a coluna 1 ja tem a escada, falta o 128.
   M1(3, {
-    baralho: { pesos: { 2: 4, 4: 3, 8: 2, 16: 1 }, total: 34, dinamico: false },
-    inicio: [[32, 16], [], [8, 4], []],
-    metas: [{ tipo: 'cartas', v: 64, n: 1 }, { tipo: 'pontos', alvo: 400 }],
-    estrelas: [0, 320, 460],
-  }),
-  // 4: o monstro ataca: a cada 5 jogadas o Gosmo cobre uma pilha com lodo (carta da metade do topo). Meta: fazer um 128.
-  M1(4, {
-    monstro: ataque(5, 'lodo'),
-    baralho: { pesos: { 2: 4, 4: 3, 8: 2, 16: 1.2 }, total: 48, dinamico: false },
-    inicio: [[64], [32, 16], [8], []],
-    metas: [{ tipo: 'cartas', v: 128, n: 1 }],
-    estrelas: [0, 910, 1300],
-  }),
-  // 5: o monte completo. A coluna 1 esta pronta para uma cascata ate 2048.
-  M1(5, {
-    monstro: ataque(5, 'lodo'), regras: { descarteMax: 2 },
-    baralho: { pesos: { 2: 1.5, 4: 2, 8: 2, 16: 2, 32: 2, 64: 2.2, 128: 2.4 }, total: 44, dinamico: false },
+    regras: { descarteMax: 2 },
+    baralho: { pesos: { 4: 1, 8: 1.5, 16: 2, 32: 3, 64: 3, 128: 1 }, total: 40, dinamico: false },
     inicio: [[1024, 512, 256, 128], [64], [32], []],
     metas: [{ tipo: 'montes', n: 1 }],
-    estrelas: [0, 10500, 15000],
+    estrelas: [0, 10300, 14700],
   }),
-  // 6: coringa (sai do baralho). Meta: cascata x3 e 1500 pontos.
-  M1(6, {
-    monstro: ataque(5, 'lodo'),
+  // 4: cascata longa: o 32 sobre o 64 pede 16, 8, 4... Meta: fazer um 128.
+  M1(4, {
+    baralho: { pesos: { 2: 3, 4: 3, 8: 2.5, 16: 2 }, total: 40, dinamico: false },
+    inicio: [[64, 32], [], [8, 4], []],
+    metas: [{ tipo: 'cartas', v: 128, n: 1 }],
+    estrelas: [0, 610, 870],
+  }),
+  // 5: coringa (sai do baralho). Meta: cascata x3.
+  M1(5, {
     baralho: { pesos: { 2: 3, 4: 3, 8: 2.5, 16: 2, 32: 1.2, 64: 0.6 }, especiais: { coringa: 0.12 }, total: 46, dinamico: false },
     inicio: [[256, 128, 64], [], [32, 16], []],
-    metas: [{ tipo: 'cascata', x: 3 }, { tipo: 'pontos', alvo: 1500 }],
-    estrelas: [0, 2400, 3400],
+    metas: [{ tipo: 'cascata', x: 3 }],
+    estrelas: [0, 1500, 2200],
   }),
-  // 7: o monte sem a escada pronta (falta um 256, a coluna 2 ajuda), com coringa e duas cargas de descarte.
-  M1(7, {
-    monstro: ataque(7, 'lodo'), regras: { descarteMax: 2 },
-    baralho: { pesos: { 2: 2, 4: 2, 8: 2, 16: 2, 32: 2, 64: 1.5, 128: 1 }, especiais: { coringa: 0.14 }, total: 70, dinamico: false },
+  // 6: o monte sem a escada pronta (falta um 256, a coluna 2 ajuda), com coringa e duas cargas de descarte.
+  M1(6, {
+    regras: { descarteMax: 2 },
+    baralho: { pesos: { 4: 1.5, 8: 2, 16: 2, 32: 2.2, 64: 2.2, 128: 1.6 }, especiais: { coringa: 0.16 }, total: 60, dinamico: false },
     inicio: [[1024, 512, 256], [128, 64], [32], []],
     metas: [{ tipo: 'montes', n: 1 }],
-    estrelas: [0, 10500, 15000],
+    estrelas: [0, 10700, 15300],
   }),
-  // 8: chefe do mundo 1: um monte com baralho dinamico (falta um 512); o Rei Gosmo fica furioso.
-  M1(8, {
-    monstro: chefao(6, 3, 0.6, 'lodo'),
-    baralho: { pesos: { 2: 6, 4: 5, 8: 3.5, 16: 2.2, 32: 1.4, 64: 0.9, 128: 0.5 }, especiais: { coringa: 0.08 }, total: 190, dinamico: true, minimo: 8 },
-    inicio: [[1024, 512], [128, 64], [32], []],
+  // 7: o monstro ataca: a cada 6 jogadas o Gosmo cobre uma pilha com lodo (carta da metade do topo). A escada ja conhecida, do outro lado.
+  M1(7, {
+    monstro: ataque(6, 'lodo'), regras: { descarteMax: 2 },
+    baralho: { pesos: { 4: 1, 8: 1.5, 16: 2, 32: 3, 64: 3, 128: 1 }, total: 40, dinamico: false },
+    inicio: [[32], [64], [], [1024, 512, 256, 128]],
     metas: [{ tipo: 'montes', n: 1 }],
-    estrelas: [0, 9400, 13500],
+    estrelas: [0, 10400, 14800],
+  }),
+  // 8: chefe do mundo 1: um monte com baralho dinamico (falta um 256); o Rei Gosmo fica furioso.
+  M1(8, {
+    monstro: chefao(7, 4, 0.6, 'lodo'),
+    baralho: { pesos: { 2: 6, 4: 5, 8: 3.5, 16: 2.2, 32: 1.4, 64: 0.9, 128: 0.5 }, especiais: { coringa: 0.1 }, total: 190, dinamico: true, minimo: 8 },
+    inicio: [[1024, 512, 256], [64], [32], []],
+    metas: [{ tipo: 'montes', n: 1 }],
+    estrelas: [0, 10300, 14600],
     itens: { martelo: 1 },
   }),
 ];
@@ -217,7 +219,7 @@ export const CLASSICO = {
 };
 
 /** Fases que ensinam um obstaculo ou feitico novo: a curva alivia um pouco nelas. */
-const ENSINA = new Set([1, 4, 9, 10, 17, 18, 25, 28, 33]);
+const ENSINA = new Set([1, 7, 9, 10, 17, 18, 25, 28, 33]);
 
 /**
  * Curva de dificuldade: vitorias esperadas (%) do jogador casual (bot.js,

@@ -326,6 +326,52 @@ function gelo(ctx, r) {
   for (let k = 0; k < 3; k++) { const a = (k * Math.PI) / 3; ctx.beginPath(); ctx.moveTo(fx - Math.cos(a) * fl, fy - Math.sin(a) * fl); ctx.lineTo(fx + Math.cos(a) * fl, fy + Math.sin(a) * fl); ctx.stroke(); }
 }
 
+/**
+ * Lodo do Gosmo (feitico): baba verde na beirada de cima, escorrendo pelos
+ * lados da faixa (o numero fica livre), e o corpo tingido com bolhas. A marca
+ * vai embora quando a carta funde (colunas.js apaga `lodo` na carta nova).
+ */
+function lodo(ctx, r) {
+  const raio = raioCarta(r.w);
+  const verde = '#86d94a', claro = '#c4f28c';
+  const lw = Math.max(1.4, r.w * 0.025);
+  ctx.save();
+  // corpo tingido abaixo da faixa, com duas bolhas
+  rr(ctx, r.x, r.y, r.w, r.h, raio); ctx.clip();
+  const yb = r.y + r.h * 0.3;
+  ctx.fillStyle = 'rgba(120,205,70,0.3)'; ctx.fillRect(r.x, yb, r.w, r.h - (yb - r.y));
+  for (const [bx, by, br] of [[-0.24, 0.8, 0.07], [0.27, 0.68, 0.05]]) {
+    circulo(ctx, r.w * bx, r.y + r.h * by, r.w * br); ctx.fillStyle = 'rgba(196,242,140,0.55)'; ctx.fill();
+    ctx.lineWidth = lw * 0.7; ctx.strokeStyle = 'rgba(47,125,28,0.8)'; ctx.stroke();
+  }
+  ctx.restore();
+  // baba de cima: borda ondulada por fora e gotas penduradas dos lados
+  const th = r.h * 0.07, y0 = r.y - r.h * 0.02;
+  const gotas = [[-0.36, 0.11, 0.24], [-0.17, 0.07, 0.1], [0.3, 0.1, 0.19], [0.43, 0.06, 0.08]];
+  ctx.beginPath();
+  ctx.moveTo(r.x + raio * 0.3, y0 + th * 0.4);
+  const n = 5;
+  for (let k = 0; k < n; k++) {
+    const x1 = r.x + raio * 0.3 + ((r.w - raio * 0.6) * (k + 0.5)) / n, x2 = r.x + raio * 0.3 + ((r.w - raio * 0.6) * (k + 1)) / n;
+    ctx.quadraticCurveTo(x1, y0 - th * (k % 2 ? 0.55 : 0.9), x2, y0 + th * 0.15);
+  }
+  ctx.lineTo(r.x + r.w - raio * 0.3, y0 + th);
+  for (const [gx, gw, gl] of gotas.slice().sort((p, q) => q[0] - p[0])) {
+    const cx = r.w * gx, w2 = (r.w * gw) / 2, base = r.y + th;
+    ctx.lineTo(cx + w2, base);
+    ctx.bezierCurveTo(cx + w2 * 0.6, base + r.h * gl * 0.55, cx + w2, base + r.h * gl, cx, base + r.h * gl);
+    ctx.bezierCurveTo(cx - w2, base + r.h * gl, cx - w2 * 0.6, base + r.h * gl * 0.55, cx - w2, base);
+  }
+  ctx.lineTo(r.x + raio * 0.3, y0 + th);
+  ctx.closePath();
+  ctx.fillStyle = verde; ctx.fill();
+  ctx.lineJoin = 'round'; ctx.lineWidth = lw; ctx.strokeStyle = TINTA; ctx.stroke();
+  // brilho da baba
+  ctx.fillStyle = claro;
+  elipse(ctx, -r.w * 0.2, y0 + th * 0.2, r.w * 0.09, th * 0.22); ctx.fill();
+  for (const [gx, , gl] of gotas.slice(0, 1).concat(gotas.slice(2, 3))) { elipse(ctx, r.w * gx - r.w * 0.015, r.y + th + r.h * gl * 0.7, r.w * 0.012, r.h * 0.025); ctx.fill(); }
+}
+
 /** Parte parada da carta (vai para a cache). */
 export function pintarDuelo(ctx, carta, r) {
   if (carta.tipo === 'pedra') cartaPedra(ctx, r, carta.hp, carta.hpMax);
@@ -334,6 +380,7 @@ export function pintarDuelo(ctx, carta, r) {
   else if (carta.tipo === 'dobro') cartaDobro(ctx, r);
   else {
     cartaNormal(ctx, carta.v, r);
+    if (carta.lodo) lodo(ctx, r);
     if (carta.gelo) gelo(ctx, r);
   }
 }

@@ -38,6 +38,8 @@ const FASES_SEM_INTERVALO = 4;
 /** Ajuda gratis (mao) por ocio ou recusas seguidas, nos dois primeiros mundos. */
 const AJUDA_ATE = POR_MUNDO * 2;
 const OCIO_AJUDA = 6000;
+/** Jogador novo na fase 1, antes do primeiro toque: o gesto guiado aparece logo. */
+const OCIO_GUIA = 1000;
 const RECUSAS_AJUDA = 3;
 const VERSAO_SAVE = 1;
 
@@ -58,11 +60,12 @@ const MARCOS_MIN = [1, 2, 3, 5, 7, 10, 15];
 
 const J = {
   modo: 'aventura', n: 1, fase: null, e: null, tJogo: 0, marco: 0, tocou: false,
-  /** 'jogando' | 'vitoria' | 'refazendo' | 'fim' | 'anuncio' | 'menu' */
+  /** 'jogando' | 'vitoria' | 'refazendo' | 'chance' | 'fim' | 'anuncio' | 'menu' */
   estado: 'jogando',
   hist: [], trans: null, tEntrada: -1e9, tRefazer: 0, bloqueio: 0, agora: 0, tVis: 0,
   carregou: false, ultimaAcao: 0, mao: null, maoCalc: 0, arrasto: null, destaque: -1, legal: true,
   tentativas: 0, continuouGratis: false, autoProx: 0, congelado: false, novoRecorde: false, febreAte: 0, recordeInicial: 0,
+  ajudaMedida: false, feiticoNovo: '', tChance: 0,
 };
 
 function salvar() {
@@ -104,6 +107,9 @@ function rotulo() {
   return `${T.fase} ${J.n} · ${nomeMonstro()}`;
 }
 
+/** Segundo campo da telemetria: o numero da fase na Aventura, o nome do modo fora dela. */
+const rotuloMedida = () => (J.modo === 'aventura' ? String(J.n) : J.modo);
+
 /** Linha de baixo do painel nos modos em cadeia (na Aventura sao as metas). */
 function metaTexto() {
   if (J.modo === 'classico') return `${T.classico} · ${T.derrotados.replace('{n}', String(nivelVisivel() - 1))}`;
@@ -125,7 +131,7 @@ function prepararPartida(e, entrada) {
   cena.novaBatalha(def, e);
   J.estado = 'jogando';
   J.mao = null; J.maoCalc = 0; J.arrasto = null; J.destaque = -1;
-  J.continuouGratis = false; J.novoRecorde = false; J.febreAte = 0;
+  J.continuouGratis = false; J.novoRecorde = false; J.febreAte = 0; J.ajudaMedida = false;
   J.ultimaAcao = J.agora; J.autoProx = J.agora + (dep.auto ? 700 : 0);
   J.tEntrada = entrada && !dep.fixo ? J.agora : -1e9;
   J.bloqueio = J.agora + (entrada && !dep.fixo ? 220 : 0);
@@ -173,21 +179,29 @@ function carregarFase(n, entrada = true, retomar = false) {
 
 /**
  * Primeira vez de um feitico (ou do chefao furioso): aviso curto com a dica.
- * Fica marcado em save.vistas.
+ * O do chefao sai na entrada da fase; o do feitico espera o primeiro impacto
+ * (avisarFeitico), quando a carta atingida esta na tela. Fica marcado em
+ * save.vistas so quando aparece.
  */
 function avisarNovidade(fase) {
+  J.feiticoNovo = '';
   const m = fase && fase.monstro;
   if (!m || dep.fixo) return;
   const anteriores = FASES.filter((f) => f.id < fase.id && f.monstro);
   const novo = m.feiticos.find((f) => !anteriores.some((a) => a.monstro.feiticos.includes(f)));
-  const chave = novo ? 'feitico:' + novo : m.furia && !anteriores.some((a) => a.monstro.furia) ? 'chefe' : '';
-  if (!chave || save.vistas.includes(chave)) return;
-  save.vistas = [...save.vistas, chave];
-  const nome = nomeMonstro();
-  setTimeout(() => {
-    if (novo) avisar(T.avisoAtaque.replace('{m}', nome), dicaFeitico(T, novo, m), 4000);
-    else avisar(T.avisoChefe, T.dicaChefe, 4000);
-  }, 900);
+  if (novo) { if (!save.vistas.includes('feitico:' + novo)) J.feiticoNovo = novo; return; }
+  if (!m.furia || anteriores.some((a) => a.monstro.furia) || save.vistas.includes('chefe')) return;
+  save.vistas = [...save.vistas, 'chefe'];
+  setTimeout(() => avisar(T.avisoChefe, T.dicaChefe, 4000), 900);
+}
+
+/** No primeiro impacto do feitico novo da fase: o aviso com a dica. */
+function avisarFeitico(feitico) {
+  if (!J.feiticoNovo || feitico !== J.feiticoNovo || !J.fase || !J.fase.monstro) return;
+  J.feiticoNovo = '';
+  save.vistas = [...save.vistas, 'feitico:' + feitico];
+  salvar();
+  avisar(T.avisoAtaque.replace('{m}', nomeMonstro()), dicaFeitico(T, feitico, J.fase.monstro), 4500);
 }
 
 function iniciarClassico(entrada = true, retomar = false) {
@@ -263,7 +277,8 @@ function aplicar(acao, origem) {
     for (const m of pm.concluidas) {
       J.e = { ...J.e, itens: { ...J.e.itens, [m.premio]: (J.e.itens[m.premio] || 0) + 1 } };
       avisar(T.missaoFeita, `${textoMissao(T, m)} · ${ICONES[m.premio]}+1`);
-      poki.measure('missao', m.tipo, 'complete');
+      // fora do funil de progresso (start/complete/fail): cai em Other Events
+      poki.measure('missao', m.tipo, 'feita');
     }
     if (pm.concluidas.length) save.missoes = renovar(save.missoes);
   }
@@ -303,8 +318,12 @@ function recomecar() {
   else { J.tentativas++; carregarFase(J.n, true); }
 }
 
-/** Intervalo comercial so depois da carencia: fase 5 ou 3 min de jogo. */
-const podeIntervalo = () => !dep.semAnuncio && ((J.modo === 'aventura' && J.n >= FASES_SEM_INTERVALO) || J.tJogo >= 180000);
+/** Jogo ativo (ms) antes do primeiro intervalo fora da passagem de fase. */
+const CARENCIA_MS = 180000;
+/** Intervalo comercial na passagem de fase: so depois da carencia (fase 5 ou 3 min de jogo). */
+const podeIntervalo = () => !dep.semAnuncio && ((J.modo === 'aventura' && J.n >= FASES_SEM_INTERVALO) || J.tJogo >= CARENCIA_MS);
+/** "Jogar de novo" depois de perder: comercial so com 3 min de jogo (perder e anuncio no comeco espantam). */
+const podeIntervaloDeNovo = () => !dep.semAnuncio && J.tJogo >= CARENCIA_MS;
 
 function vencer() {
   J.estado = 'vitoria';
@@ -333,6 +352,8 @@ function vencer() {
   J.trans = {
     tipo: fimMundo ? 'mundo' : 'fase', t0: J.agora + espera, trocou: false, anuncio: false, parada: -1, festa: false,
     fx: L.mesa.x + L.mesa.w / 2, fy: L.mesa.y + L.mesa.h / 2, estrelas: est, semente: J.n * 31 + 7, corMundo: cena.pal.acento, fimMundo,
+    // trilha do mundo com o proximo monstro (a passagem de mundo tem o "MUNDO N" no lugar)
+    trilha: fimMundo || J.n >= FASES.length ? null : { pos: posNoMundo(J.n), total: POR_MUNDO, nome: nomeDe(T, monstroDaFase(faseDe(J.n + 1))), rotulo: T.proximo },
   };
 }
 
@@ -359,7 +380,7 @@ function avisar(titulo, texto, ms = 2600) {
   J.tAviso = setTimeout(() => { el.hidden = true; }, ms);
 }
 
-function terminar(motivo) {
+function terminar(motivo, medida = false) {
   poki.gameplayStop();
   if (motivo === 'baralhoAcabou' && J.modo === 'aventura') {
     // derrota sem cartao: a mesa treme e a fase recomeca
@@ -369,6 +390,16 @@ function terminar(motivo) {
     cena.part.texto(cena.W / 2, cena.L.mesa.y + cena.L.mesa.h / 2, T.tenteDeNovo, '#ffffff', 30);
     poki.measure('level', String(J.n), 'fail');
     return;
+  }
+  if (motivo === 'mesaCheia' && !medida) {
+    poki.measure('mesa', rotuloMedida(), 'cheia');
+    if (J.modo === 'aventura' && mundoDe(J.n) === 1 && !J.continuouGratis) {
+      // mundo 1: a segunda chance (o "Continuar" gratis) vem sozinha, sem cartao
+      J.continuouGratis = true;
+      J.estado = 'chance';
+      J.tChance = J.agora;
+      return;
+    }
   }
   J.estado = 'fim';
   if (motivo === 'fimDiario') audio.yes(false); else audio.fim();
@@ -388,6 +419,15 @@ function terminar(motivo) {
     pontos: J.e.pontos, recorde: J.modo !== 'aventura' ? J.recordeInicial : 0, novo: J.modo !== 'aventura' && J.e.pontos > J.recordeInicial,
     gratis: motivo === 'mesaCheia' && !J.continuouGratis, video: comVideo,
   });
+}
+
+/** A segunda chance do mundo 1, um instante depois da mesa encher: libera a coluna mais cheia. */
+function segundaChance() {
+  J.estado = 'fim';
+  continuar();
+  if (J.estado !== 'jogando') { terminar('mesaCheia', true); return; }
+  poki.measure('continuar', rotuloMedida(), 'gratis');
+  cena.part.texto(cena.W / 2, cena.L.mesa.y + cena.L.mesa.h / 2, T.segundaChance, '#ffd84a', 30);
 }
 
 function continuar() {
@@ -424,7 +464,7 @@ function atualizar(dt) {
       case 'golpe': if (e.critico) { audio.critico(); vibrar([20, 40, 30]); } else audio.golpe(); break;
       case 'derrotado': audio.derrota(); break;
       case 'feitico': audio.feitico(); break;
-      case 'impacto': audio.impacto(e.feitico); vibrar(20); break;
+      case 'impacto': audio.impacto(e.feitico); vibrar(20); avisarFeitico(e.feitico); break;
       case 'erro': audio.erro(); break;
       case 'furia': audio.furia(); vibrar([30, 50, 30]); break;
       case 'novoMonstro': audio.entrada(); aplicarVisual(e.def.reino); if (J.e) atualizarHud(); break;
@@ -439,6 +479,10 @@ function atualizar(dt) {
   }
   if (J.estado === 'refazendo') {
     if (J.agora - J.tRefazer > 900) { J.tentativas++; carregarFase(J.n, true); }
+    return;
+  }
+  if (J.estado === 'chance') {
+    if (J.agora - J.tChance > 700) segundaChance();
     return;
   }
   if (J.e && J.e.febre && J.agora >= J.e.febreAte) {
@@ -469,16 +513,16 @@ function atualizar(dt) {
   // mao de ajuda: ocio ou recusas seguidas, nos primeiros mundos
   if (J.estado === 'jogando' && J.e && !J.arrasto) {
     const parado = J.agora - J.ultimaAcao;
-    const precisa = (J.modo === 'aventura' && J.n <= AJUDA_ATE && parado > OCIO_AJUDA) || J.e.recusas >= RECUSAS_AJUDA;
+    const porRecusa = J.e.recusas >= RECUSAS_AJUDA;
+    const guiaInicial = J.modo === 'aventura' && J.n === 1 && save.max <= 1 && !J.tocou;
+    const precisa = (J.modo === 'aventura' && J.n <= AJUDA_ATE && parado > (guiaInicial ? OCIO_GUIA : OCIO_AJUDA)) || porRecusa;
     if (precisa && J.agora - J.maoCalc > 800) {
       J.maoCalc = J.agora;
+      // uma medida por fase: o jogador travou (parado) ou nao entendeu a regra (recusas); o guia inicial nao conta
+      if (!J.ajudaMedida && !guiaInicial) { J.ajudaMedida = true; poki.measure('ajuda', rotuloMedida(), porRecusa ? 'recusa' : 'ocio'); }
+      // guarda a jogada; a posicao sai do layout de cada quadro (maoNaTela)
       const a = melhorJogada(J.e, J.agora);
-      if (a) {
-        const L = cena.L;
-        if (a.tipo === 'colocar') { const col = J.e.colunas[a.c]; const p = L.carta(a.c, Math.min(col.length, L.pilhaMax - 1)); J.mao = { x: p.x + p.w / 2, y: p.y + p.h * 0.5 }; }
-        else if (a.tipo === 'descartar') J.mao = { x: L.descarte.x + L.descarte.w / 2, y: L.descarte.y + L.descarte.h / 2 };
-        else J.mao = null;
-      } else J.mao = null;
+      J.mao = a && (a.tipo === 'colocar' || a.tipo === 'descartar') ? a : null;
     } else if (!precisa) J.mao = null;
   }
   if (dep.auto && J.estado === 'jogando' && J.e && J.agora >= J.autoProx) {
@@ -488,11 +532,26 @@ function atualizar(dt) {
   }
 }
 
+/**
+ * A mao de ajuda na tela, pelo layout atual: no 'colocar', o gesto guiado da
+ * carta da fila ate a coluna; no 'descartar', a mao apontando o descarte.
+ */
+function maoNaTela() {
+  const a = J.mao;
+  if (!a || J.estado !== 'jogando' || J.arrasto || !J.e) return null;
+  const L = cena.L;
+  if (a.tipo === 'descartar') return { x: L.descarte.x + L.descarte.w / 2, y: L.descarte.y + L.descarte.h / 2 };
+  const col = J.e.colunas[a.c], k = a.k || 0;
+  if (!col || !J.e.fila[k]) return null;
+  const p = L.carta(a.c, Math.min(col.length, L.pilhaMax - 1)), f = L.filaPos(k);
+  return { x: p.x + p.w / 2, y: p.y + p.h / 2, de: { x: f.x + f.w / 2, y: f.y + f.h / 2 }, carta: J.e.fila[k], w: f.w, h: f.h };
+}
+
 function quadro() {
   const info = { texto: T.yes, textoMundo: `${T.mundo} ${mundoDe(J.n + (J.trans && J.trans.trocou ? 0 : 1))}` };
   cena.desenhar({
     estado: J.e, agora: J.agora, trans: J.trans, tEntrada: J.tEntrada, arrasto: J.arrasto, destaque: J.destaque, legal: J.legal, alvo: J.itemPendente || '',
-    mao: J.estado === 'jogando' ? J.mao : null, febre: J.e && J.e.febre && J.agora < J.e.febreAte ? 1 : 0, info, semFila: false,
+    mao: maoNaTela(), febre: J.e && J.e.febre && J.agora < J.e.febreAte ? 1 : 0, info, semFila: false,
   });
 }
 
@@ -675,7 +734,12 @@ const menus = criarMenus({
     modoAventura: () => { J.trans = null; carregarFase(save.fase || 1, true); },
     modoClassico: () => { J.trans = null; iniciarClassico(true); },
     aoFechar: () => { if (J.estado === 'menu') J.estado = 'jogando'; },
-    continuarGratis: () => { J.continuouGratis = true; continuar(); },
+    continuarGratis: () => {
+      if (J.estado !== 'fim' || J.continuouGratis) return;
+      J.continuouGratis = true;
+      poki.measure('continuar', rotuloMedida(), 'gratis');
+      continuar();
+    },
     continuarVideo: async () => {
       if (J.estado !== 'fim') return;
       poki.measure('rewarded', 'continuar', 'interact');
@@ -686,7 +750,7 @@ const menus = criarMenus({
     },
     deNovo: () => {
       const ir = () => { J.trans = null; recomecar(); };
-      if (podeIntervalo() && J.estado !== 'anuncio') { J.estado = 'anuncio'; poki.commercialBreak().then(ir, ir); } else ir();
+      if (podeIntervaloDeNovo() && J.estado !== 'anuncio') { J.estado = 'anuncio'; poki.commercialBreak().then(ir, ir); } else ir();
     },
     modoDiario: () => { J.trans = null; iniciarDiario(true); },
     diarioHoje: () => (save.diario.data === dataLocal() ? save.diario.pontos : -1),

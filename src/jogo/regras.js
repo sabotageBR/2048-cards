@@ -1,13 +1,14 @@
 // Regras da mesa: presets e validacao de colocacao. Modulo puro.
 //
 // Uma coluna e um vetor de cartas do fundo (indice 0) ao topo. A carta nova
-// entra sempre pelo topo. Carta: { id, tipo, v, cor, gelo?, hp? }
+// entra sempre pelo topo. Carta: { id, tipo, v, cor, gelo?, hp?, lodo? }
 //   tipo 'normal'  : valor v (potencia de 2) e cor (0..3, so com naipes)
 //   tipo 'coringa' : funde com qualquer topo e dobra; em coluna vazia vira 2
 //   tipo 'bomba'   : destroi o topo da coluna escolhida (ou quebra a pedra)
 //   tipo 'dobro'   : dobra o topo da coluna escolhida e dispara a cascata
 //   tipo 'pedra'   : obstaculo sem valor no fundo da coluna, com hp
 //   gelo true      : carta congelada; nao funde ate uma fusao na coluna
+//   lodo true      : carta posta pelo feitico do monstro (so visual; some ao fundir)
 
 export const REGRAS_PADRAO = Object.freeze({
   colunas: 4,            // 3..5

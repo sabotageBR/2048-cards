@@ -120,7 +120,8 @@ export function aplicarFeitico(e, feitico, c) {
   switch (feitico) {
     case 'lodo': {
       const t = col[col.length - 1];
-      const carta = { id: e.proxId, tipo: 'normal', v: t.v / 2, cor: t.cor || 0 };
+      // lodo: marca da carta do monstro (some quando ela funde, ver colunas.js)
+      const carta = { id: e.proxId, tipo: 'normal', v: t.v / 2, cor: t.cor || 0, lodo: true };
       colunas[c] = [...col, carta];
       return { e: { ...e, colunas, proxId: e.proxId + 1 }, alvo: { c, id: carta.id, altura: col.length, valor: carta.v } };
     }

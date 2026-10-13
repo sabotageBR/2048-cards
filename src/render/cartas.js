@@ -1,5 +1,5 @@
 // Cartas na mesa: a parte parada de cada carta do duelo (cartaDuelo.js) vai
-// para uma cache offscreen por tipo, valor, gelo, hp e tamanho; por cima, a
+// para uma cache offscreen por tipo, valor, gelo, lodo, hp e tamanho; por cima, a
 // cada quadro, a pose (escala, squash pela base, giro, alpha), o brilho que
 // anda, a sombra das cartas de tras da fila e o destaque da carta da vez.
 // As skins de antes do duelo estao em modelos/legado/cartas.js.
@@ -10,7 +10,7 @@ const cache = new Map();
 let cacheDpr = 1;
 export function limparCache() { cache.clear(); }
 
-const chave = (carta, w, h) => `${carta.tipo}|${carta.v}|${carta.gelo ? 1 : 0}|${carta.hp || 0}/${carta.hpMax || 0}|${w}x${h}`;
+const chave = (carta, w, h) => `${carta.tipo}|${carta.v}|${carta.gelo ? 1 : 0}${carta.lodo ? 'l' : ''}|${carta.hp || 0}/${carta.hpMax || 0}|${w}x${h}`;
 
 /** Imagem da carta (offscreen), com margem para a sombra e o brilho. */
 export function imagemCarta(carta, w, h, dpr = 1) {

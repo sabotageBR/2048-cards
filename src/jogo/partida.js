@@ -24,7 +24,7 @@ import { criarMonstro, ferir, atacar, folga, derrotar } from './monstro.js';
 // Sobe quando o formato do estado muda ou quando as fases mudam (a partida
 // salva carrega a mesa e as metas de quando comecou): o main.js descarta a
 // partida salva de outra versao. 4: curva de dificuldade refeita (2026-10-11).
-export const VERSAO_ESTADO = 4;
+export const VERSAO_ESTADO = 5;
 
 /**
  * @param {object} regrasBase regras do jogador (laboratorio/ajustes)
@@ -99,6 +99,7 @@ function aplicarCarta(e, carta, c, modo, eventos) {
   } else if (modo === 'dobro') {
     const t = topo(col);
     const novo = { ...t, v: t.v * 2 };
+    delete novo.lodo;
     eventos.push({ tipo: 'dobro', c, id: novo.id, valor: novo.v });
     const r = cascata([...col.slice(0, -1), novo], e.regras, c, eventos, 1, [novo.v]);
     col = r.col; fusao = true; degrau = r.degrau; valores = r.valores; pedras = r.pedras;

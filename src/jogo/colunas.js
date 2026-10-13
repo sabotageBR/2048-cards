@@ -51,6 +51,7 @@ export function cascata(col, regras, c, eventos, degrau = 1, valores = []) {
     if (regras.naipes && b.cor !== t.cor) break;
     degrau++;
     const novo = { ...b, v: b.v * 2 };
+    delete novo.lodo;
     col = [...col.slice(0, -2), novo];
     valores.push(novo.v);
     eventos.push({ tipo: 'fundir', c, id: novo.id, idEntra: t.id, degrau, valor: novo.v });
@@ -67,6 +68,7 @@ export function colocar(col, regras, c, carta, eventos) {
   if (fundeCom(regras, t, carta)) {
     const novo = { ...t, v: t.v * 2 };
     delete novo.gelo;
+    delete novo.lodo;
     const base = [...col.slice(0, -1), novo];
     eventos.push({ tipo: 'fundir', c, id: novo.id, idEntra: carta.id, degrau: 1, valor: novo.v });
     const r = cascata(base, regras, c, eventos, 1, [novo.v]);

@@ -82,14 +82,19 @@ if (cenario === 'bloqueado' || cenario === 'pendente') {
   // toque real na mesa
   toque(1);
   conferir(nomes().includes('gameplayStart'), 'gameplayStart nao veio depois do toque');
-  // mesa cheia: primeiro o continuar gratis, depois o video
+  // mesa cheia: no mundo 1 o continuar gratis vem sozinho (segunda chance, sem cartao); na segunda, o video
   ct().fimTeste();
   await espera(300);
   conferir(nomes().lastIndexOf('gameplayStop') > nomes().lastIndexOf('gameplayStart'), 'mesa cheia sem gameplayStop');
+  conferir(w().document.getElementById('fim').hidden, 'mundo 1: a primeira mesa cheia mostrou o cartao');
+  // o botao escondido nao conta outro continuar gratis
   w().document.getElementById('bFimContinuar').click();
-  await espera(300);
-  conferir(ct().J.estado === 'jogando', 'continuar gratis nao voltou ao jogo');
-  conferir(!nomes().includes('rewardedBreak'), 'continuar gratis chamou rewardedBreak');
+  await espera(800);
+  conferir(ct().J.estado === 'jogando', 'a segunda chance nao voltou ao jogo');
+  conferir(!nomes().includes('rewardedBreak'), 'a segunda chance chamou rewardedBreak');
+  const medidas0 = log.filter((l) => l[1] === 'measure').map((l) => l[2]);
+  conferir(medidas0.includes('mesa/' + nivel + '/cheia'), 'measure da mesa cheia faltando');
+  conferir(medidas0.filter((m) => m === 'continuar/' + nivel + '/gratis').length === 1, 'measure da segunda chance faltando ou repetida');
   ct().fimTeste();
   await espera(300);
   conferir(!w().document.getElementById('bFimVideo').hidden, 'botao de video do continuar nao apareceu');

@@ -235,12 +235,11 @@ export function desenharMesa(ctx, estado, L, op) {
   }
 }
 
-/** Mao animada apontando para uma coluna (ou para a fila). */
-export function desenharMao(ctx, x, y, t, cor = '#ffffff') {
-  const bate = Math.abs(Math.sin(t * 4));
-  const esc = 1 - bate * 0.12;
+/** Desenho da mao em (x, y), com a ponta do dedo em (2, -32) * esc. */
+function mao(ctx, x, y, esc, cor, alpha = 1) {
   ctx.save();
-  ctx.translate(x, y + 10 - bate * 14);
+  if (alpha < 1) ctx.globalAlpha = Math.max(0, alpha);
+  ctx.translate(x, y);
   ctx.scale(esc, esc);
   ctx.lineWidth = 3; ctx.strokeStyle = '#1f1a2e'; ctx.fillStyle = cor; ctx.lineJoin = 'round';
   ctx.beginPath();
@@ -250,4 +249,38 @@ export function desenharMao(ctx, x, y, t, cor = '#ffffff') {
   ctx.quadraticCurveTo(-18, 26, -18, 12); ctx.lineTo(-16, 2); ctx.closePath();
   ctx.fill(); ctx.stroke();
   ctx.restore();
+}
+
+/** Mao animada apontando para uma coluna (ou para a fila). */
+export function desenharMao(ctx, x, y, t, cor = '#ffffff') {
+  const bate = Math.abs(Math.sin(t * 4));
+  mao(ctx, x, y + 10 - bate * 14, 1 - bate * 0.12, cor);
+}
+
+/** Duracao (s) de uma volta do gesto guiado. */
+const CICLO_GUIA = 1.8;
+
+/**
+ * Gesto guiado: a mao aperta a carta da frente da fila e a arrasta ate a
+ * coluna certa, em loop (ensina o arrasto, nao so o destino).
+ * g = { x, y, de: { x, y }, carta, w, h }: centro do destino, centro da
+ * carta na fila, a carta e o tamanho dela.
+ */
+export function desenharGuia(ctx, g, t, dpr) {
+  const u = (t % CICLO_GUIA) / CICLO_GUIA;
+  const aperta = Math.min(1, u / 0.12);
+  const anda = Math.max(0, Math.min(1, (u - 0.15) / 0.5));
+  const e = anda < 0.5 ? 2 * anda * anda : 1 - Math.pow(2 - 2 * anda, 2) / 2;
+  const some = u > 0.8 ? (u - 0.8) / 0.2 : 0;
+  const x = g.de.x + (g.x - g.de.x) * e, y = g.de.y + (g.y - g.de.y) * e;
+  if (g.carta && anda > 0) {
+    const w = g.w * 1.06, h = g.h * 1.06;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 8;
+    desenharCarta(ctx, g.carta, { x: x - w / 2, y: y - h / 2, w, h, dpr, t, alpha: 0.75 * (1 - some) });
+    ctx.restore();
+  }
+  // a ponta do dedo um pouco abaixo do meio da carta; aperta no comeco e solta no fim
+  const esc = 1 - 0.12 * aperta * (1 - Math.max(0, (u - 0.68) / 0.12));
+  mao(ctx, x - 2 * esc, y + g.h * 0.12 + 32 * esc, esc, '#ffffff', 1 - some);
 }

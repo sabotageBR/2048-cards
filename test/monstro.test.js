@@ -80,6 +80,27 @@ test('lodo: so sobre topo normal de 8 a 256, nunca em coluna cheia, congelada ou
   assert.deepEqual(candidatos(trancada, 'lodo'), []);
 });
 
+test('lodo: a carta do monstro vem marcada e a marca some quando ela funde', () => {
+  const e = montar([[64], [], [], []], { cada: 1, feiticos: ['lodo'] });
+  const r = aplicarFeitico(e, 'lodo', 0);
+  const melada = r.e.colunas[0][1];
+  assert.equal(melada.v, 32);
+  assert.equal(melada.lodo, true);
+  assert.equal(r.e.colunas[0][0].lodo, undefined, 'so a carta nova fica melada');
+  // 16 sobre a melada empilha (a marca fica); 32 sobre ela funde e cascateia ate o 128
+  let x = jogar({ ...r.e, fila: [N(16), ...r.e.fila.slice(1)] }, { tipo: 'colocar', c: 0, t: 0 }).estado;
+  assert.equal(x.colunas[0][1].lodo, true);
+  // (com o monstro longe do proximo feitico, para ele nao melar o 128 na mesma jogada)
+  x = { ...r.e, monstro: { ...r.e.monstro, conta: 9 }, fila: [N(32), ...r.e.fila.slice(1)] };
+  x = jogar(x, { tipo: 'colocar', c: 0, t: 0 }).estado;
+  assert.deepEqual(x.colunas[0].map((k) => k.v), [128]);
+  assert.equal(x.colunas[0][0].lodo, undefined);
+  // fusao direta na melada (sem cascata) tambem limpa
+  const y = montar([[256, N(16, { lodo: true })], [], [], []], { cada: 9, feiticos: ['lodo'] });
+  const z = jogar({ ...y, fila: [N(16), ...y.fila.slice(1)] }, { tipo: 'colocar', c: 0, t: 0 }).estado;
+  assert.deepEqual(z.colunas[0].map((k) => [k.v, !!k.lodo]), [[256, false], [32, false]]);
+});
+
 test('pedra: no fundo (as cartas sobem), nunca onde ja ha pedra; nao conta para a meta', () => {
   const pedra = { id: 600, tipo: 'pedra', v: 0, cor: 0, hp: 3, hpMax: 3 };
   const e = montar([[pedra, 8], [64, 32], [], [16]], { cada: 1, feiticos: ['pedra'], pedraHp: 2 }, { metas: [{ tipo: 'pedras' }] });
