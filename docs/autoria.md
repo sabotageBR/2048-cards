@@ -246,3 +246,23 @@ Pedidos do usuário, com prints: "Retirar esse painel de progresso e mesmo com o
 - **As medidas ficaram:** `regra/maior/first` (primeira recusa de maior sobre menor) e `guia/N/feito` continuam, agora sem texto junto; no próximo teste elas dizem se a regra se explica sozinha.
 - **O "16!" fica no alto da mesa** (sobre o topo das colunas), pequeno o bastante para não esconder a fila, e sem o soco de câmera da versão com pausa (deslocaria o visual durante um arrasto).
 - `?quadro=` e `?filme=` saíram da depuração (estavam mortos no jogo). Versão 0.4.3; `VERSAO_ESTADO` não mudou.
+
+## 2026-10-13 · Player Fit Test da 0.4.2 parado e a 0.4.4 (robustez)
+
+O usuário parou o Player Fit Test da 0.4.2 com 143 sessões, para testar a versão nova, e pediu para conferir os Game Events e se a nova já trazia as correções obrigatórias. Depois da análise: "pode fazer a 0.4.4".
+
+**Game Events da 0.4.2 contra a 0.4.1 (608 sessões):**
+
+| Métrica | Meta | 0.4.1 | 0.4.2 |
+|---|---|---|---|
+| Toque no desktop | ≥ 85% | 75% | 79% |
+| Nível 1 completo (geral / celular / desktop) | ≥ 85% | 73% / — / 63% | 83% / 91% / 70% |
+| Retenção 4→5 / 5→6 / 6→7 | ≥ 80% | 70 / 70 / 71% | 77 / 80 / 76% |
+| Chegam ao nível 7 | | 15% | 22% |
+| `tempo/N/min` 1 / 3 / 7 / 10 min | 3 min+ ≥ 45% no teste | 54 / 32 / 18 / 12% | 57 / 31 / 13 / 6% |
+
+O jogador passa mais níveis, mas não joga mais tempo, e a cauda (7 min ou mais) caiu (amostra pequena). O nível 3 piorou (70% completam; eram 81%). 64% das sessões tentam maior sobre menor (`regra/maior/first`). Rewarded: descarte 36% veem e 21% deles clicam; coringa 33% e 6%.
+
+**A 0.4.4 (sem mudança de visual nem de regra):** a página Errors da Poki mostrava erros que congelavam a tela. O `frame()` só agendava o próximo quadro no fim, e um erro no desenho parava o laço para sempre: o `drawImage` de um canvas 0×0 (`InvalidStateError`, 5 sessões em tablets com WebKit) e o `ctx.roundRect` do Safari antigo (na placa da trilha, que a 0.4.3 já tirou). Agora o próximo quadro é agendado antes de desenhar, um erro custa um quadro (e ainda vai para a Poki, uma vez por mensagem), a cena não desenha com o canvas 0×0 e, quando o Android devolve o contexto do canvas em branco (`canvas.contextlost`), o fundo e as cartas são refeitos. Conferido no Chrome headless com o jogo num iframe que começa 0×0: a 0.4.3 fica com a tela transparente para sempre; a 0.4.4 desenha a mesa quando o iframe ganha tamanho. `Failed to fetch` e `Object.hasOwn` vêm do SDK da Poki (`poki-sdk-hoist`), não do jogo.
+
+**Fica para o usuário escolher:** o desktop (79% tocam, 70% fazem o 16) com um cursor de mouse junto da mão guiada e as teclas 1 a 4 desenhadas sobre as colunas, que mudaria o visual.

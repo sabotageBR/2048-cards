@@ -87,11 +87,22 @@ export function criarCena(canvas) {
   }
 
   function prepararFundo() {
-    fundo = document.createElement('canvas');
-    fundo.width = canvas.width; fundo.height = canvas.height;
-    const g = /** @type {CanvasRenderingContext2D} */ (fundo.getContext('2d'));
+    const f = document.createElement('canvas');
+    f.width = canvas.width; f.height = canvas.height;
+    f.addEventListener('contextrestored', () => { if (fundo === f) fundo = null; });
+    const g = /** @type {CanvasRenderingContext2D} */ (f.getContext('2d'));
     g.scale(dpr, dpr);
     tema.parado(g, W, H, L);
+    fundo = f;
+  }
+
+  // o navegador pode descartar o contexto do canvas (Android com pouca memoria)
+  // e devolve-lo em branco: as caches offscreen (fundo e cartas) sao refeitas
+  canvas.addEventListener('contextrestored', () => { fundo = null; limparCache(); });
+
+  /** Depois de um erro no meio do desenho: o contexto volta ao estado inicial (pilha de save, clip). */
+  function recuperar() {
+    canvas.width = canvas.width;
   }
 
   /** Agenda as animacoes de uma jogada. */
@@ -142,7 +153,8 @@ export function criarCena(canvas) {
    * @param {{ estado: any, agora: number, trans?: any, festa?: any, tEntrada?: number, arrasto?: any, destaque?: number, legal?: boolean, mao?: any, febre?: number, info?: any, semFila?: boolean, alvo?: string }} q
    */
   function desenhar(q) {
-    if (!L) return;
+    // janela sem largura ou altura (o iPad passa por 0x0): drawImage de um canvas 0x0 lanca InvalidStateError
+    if (!L || canvas.width < 1 || canvas.height < 1) return;
     if (!fundo) prepararFundo();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.drawImage(fundo, 0, 0, W, H);
@@ -179,7 +191,7 @@ export function criarCena(canvas) {
   }
 
   return {
-    redimensionar, definirRegras, definirReino, definirVisual, definirTextos, tocar, atualizar, desenhar, festejar, part, linha,
+    redimensionar, definirRegras, definirReino, definirVisual, definirTextos, tocar, atualizar, desenhar, recuperar, festejar, part, linha,
     get L() { return L; }, get pal() { return tema.paleta; }, get reino() { return reino; },
     get W() { return W; }, get H() { return H; },
   };

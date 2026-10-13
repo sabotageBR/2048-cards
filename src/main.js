@@ -613,15 +613,44 @@ function quadro() {
 
 let ultimo = performance.now();
 function frame() {
+  // o proximo quadro sai agendado antes de desenhar: um erro no desenho perde
+  // um quadro e nao congela a tela (na 0.4.1/0.4.2, o canvas 0x0 do iPad e o
+  // roundRect do Safari antigo paravam o laco de vez)
+  requestAnimationFrame(frame);
   // um relogio so: o carimbo do requestAnimationFrame pode ficar atras do performance.now()
   const agora = performance.now();
   const dt = Math.max(0, Math.min(100, agora - ultimo));
   ultimo = agora;
   J.agora = agora;
-  atualizar(dt);
-  quadro();
+  try {
+    atualizar(dt);
+    quadroSeguro();
+  } catch (err) { relatarErro(err); }
+}
+
+/** Desenha o quadro e, no primeiro, tira a tela de carregamento da Poki. */
+function quadroSeguro() {
+  try {
+    quadro();
+  } catch (err) {
+    // o erro pode sair entre um save e um restore: o contexto volta ao estado inicial
+    cena.recuperar();
+    throw err;
+  }
   carregou();
-  requestAnimationFrame(frame);
+}
+
+/** Mensagens de erro ja relatadas: cada uma vai uma vez, e nao 60 vezes por segundo. */
+const errosRelatados = new Set();
+/**
+ * O laco segue; o erro e lancado de novo fora dele (uma vez por mensagem),
+ * para a Poki e o titulo de depuracao continuarem vendo a pilha.
+ */
+function relatarErro(err) {
+  const msg = String((err && err.message) || err);
+  if (errosRelatados.has(msg)) return;
+  errosRelatados.add(msg);
+  setTimeout(() => { throw err; });
 }
 
 /**
@@ -940,7 +969,12 @@ const comecar = () => {
   requestAnimationFrame(frame);
   setInterval(reserva, 50);
   // reserva: se o requestAnimationFrame nao andar (aba escondida ao carregar), desenha um quadro e avisa a Poki
-  setTimeout(() => { if (!J.carregou) { J.agora = performance.now(); quadro(); carregou(); } }, 800);
+  setTimeout(() => {
+    if (J.carregou) return;
+    J.agora = performance.now();
+    try { quadroSeguro(); } catch (err) { relatarErro(err); }
+    carregou();
+  }, 800);
 };
 if (document.fonts && document.fonts.load) document.fonts.load('700 40px Fredoka').then(comecar, comecar);
 else comecar();

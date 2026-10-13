@@ -28,6 +28,8 @@ export function imagemCarta(carta, w, h, dpr = 1) {
   const c = document.createElement('canvas');
   c.width = Math.ceil((w + folga * 2) * dpr);
   c.height = Math.ceil((h + folga * 2) * dpr);
+  // contexto perdido e devolvido (Android com pouca memoria): a carta volta em branco, a cache e refeita
+  c.addEventListener('contextrestored', limparCache);
   const ctx = /** @type {CanvasRenderingContext2D} */ (c.getContext('2d'));
   ctx.scale(dpr, dpr);
   ctx.translate(folga + w / 2, folga + h / 2);
