@@ -32,8 +32,10 @@ import { criarMetas, avaliar, todasFeitas } from './metas.js';
 // Sobe quando o formato do estado muda ou quando as fases mudam (a partida
 // salva carrega a mesa e as metas de quando comecou): o main.js descarta a
 // partida salva de outra versao. 6: a escada de valores, sem monstro; 7: um
-// especial por carta (`esp`) e o descarte com lugares por nivel (2026-10-13).
-export const VERSAO_ESTADO = 7;
+// especial por carta (`esp`) e o descarte com lugares por nivel (2026-10-13);
+// 8: a escada nova da 0.4.2 (coringa e bomba no mundo 1, baralho curto, os
+// mundos 2 a 4 deslocados).
+export const VERSAO_ESTADO = 8;
 
 /** Mesa inicial: as cartas de `inicio` (fundo -> topo) em cada coluna. */
 function montarMesa(fase, regras, proxId) {

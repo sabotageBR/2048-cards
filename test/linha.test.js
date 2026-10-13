@@ -30,8 +30,8 @@ test('fantasma do monte completo mostra 2048 ao sair (nao o valor antigo)', () =
 
 test('subida de nivel: as cartas abaixo do piso saem depois da cascata, uma de cada vez', async () => {
   const { faseDe, faseGlobal } = await import('../src/jogo/fases.js');
-  // nivel 5 (256) do mundo 1: o 8 jogado fecha o 256; o baralho do 512 comeca no 4 e os 2 saem
-  const f = { ...faseDe(faseGlobal(1, 5)), inicio: [[128, 64, 32, 16, 8], [2], [4, 2], []] };
+  // nivel 5 (256) do mundo 2 (baralho do alvo/8): o 8 jogado fecha o 256; o baralho do 512 comeca no 4 e os 2 saem
+  const f = { ...faseDe(faseGlobal(2, 5)), inicio: [[128, 64, 32, 16, 8], [2], [4, 2], []] };
   const antes = { ...criarPartida({}, f, 1), fila: [{ id: 900, tipo: 'normal', v: 8 }] };
   const r = jogar(antes, { tipo: 'colocar', c: 0, t: 0 });
   const g = r.eventos.find((e) => e.tipo === 'graduar');

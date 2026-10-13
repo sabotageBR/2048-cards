@@ -19,7 +19,7 @@ let ok = true;
 for (const def of MUNDOS) {
   if (so.length && !so.includes(def.id)) continue;
   const mm = medirMundo(def.id);
-  process.stdout.write(`\nmundo ${def.id} (${def.novidade.tipo}): o casual completa ${Math.round(mm.completou * 100)}% em ${mm.jogadasCasual} jogadas (mediana); o guloso, sem recomecar, ${Math.round(mm.gulosoLimpo * 100)}% em ${mm.jogadasGuloso}\n`);
+  process.stdout.write(`\nmundo ${def.id} (${def.novidades.map((x) => x.tipo).join(', ')}): o casual completa ${Math.round(mm.completou * 100)}% em ${mm.jogadasCasual} jogadas (mediana); o guloso, sem recomecar, ${Math.round(mm.gulosoLimpo * 100)}% em ${mm.jogadasGuloso}\n`);
   process.stdout.write(`fase nivel valor  guloso  casual alvo  jogadas  desc/${String(normalizarRegras(def.regras).descarteMax).padEnd(2)} cheias recomecos   nota\n`);
   let ant = null;
   for (const nv of mm.niveis) {

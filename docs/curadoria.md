@@ -3,7 +3,7 @@
 Cada mundo foi ajustado e conferido pelo simulador (`npm run simular`; a tabela abaixo sai de `node tools/curadoria.mjs`, e o gráfico `docs/escada/curva.png` de `node tools/curva.mjs`). O bot joga **o mundo inteiro numa mesa só** (`jogarMundo` em `bot.js`): o nível sobe na mesma mesa; na mesa cheia vem o "Continuar" grátis do nível e, sem ele, o recomeço pela mesa pronta do nível (`[alvo/2] [alvo/4]`, semente nova). São duas réguas (`tools/medir.mjs`):
 
 - **Guloso** (25 partidas por mundo): prova que cada nível é passável por quem joga bem. Piso: passa o nível sem recomeçar em 82% das partidas que chegaram a ele (78% no 2048).
-- **Casual** (`PERFIL_CASUAL` em `bot.js`, 160 partidas em duas séries de sementes): erra 1 em 5 jogadas e usa o "Continuar" grátis. Mede a curva: em quantas partidas ele passa o nível sem recomeçar fica a até 8 pontos de `alvoCasual(N)` (`fases.js`), nenhum nível tem mais de 12 pontos a menos que o anterior, e a mediana de jogadas do nível (com os recomeços) fica dentro de `ritmoMax` (60 no mundo 1, 80 nos outros).
+- **Casual** (`PERFIL_CASUAL` em `bot.js`, 160 partidas em duas séries de sementes): erra 1 em 5 jogadas e usa o "Continuar" grátis. Mede a curva: em quantas partidas ele passa o nível sem recomeçar fica a até 8 pontos de `alvoCasual(N)` (`fases.js`), nenhum nível tem mais de 12 pontos a menos que o anterior, e a mediana de jogadas do nível (com os recomeços) fica dentro de `ritmoMax` (40 no mundo 1, 80 nos outros).
 
 ## 2026-10-13 · a escada de valores (branch `so-cartas`)
 
@@ -23,41 +23,48 @@ Pedidos do usuário depois de jogar a 0.3.0 (ver `docs/autoria.md`): a carta que
 - **Mundo 4 (×4).** A carta ×4 sozinha deixava o mundo inteiro em 96 a 100%. O que segurou: baralho largo (6 valores), 2 lugares no descarte e, no 1024 e no 2048, cartas grandes em baralho largo (do alvo/4 para baixo, 6 e 7 valores). O piso foi de 70 para 80: sem naipes, o mundo 4 é de folga como o 2 e o 3.
 - **Mundo 5 (3 colunas, tudo junto, agora com o ×4).** Com o 2048 a 60%, o guloso caía abaixo do piso (68% nas sementes do teste); o piso foi para 70 e o 1024 e o 2048 têm o mesmo baralho largo de cartas grandes do mundo 4.
 
+## 2026-10-13 · depois do Player Fit Test da 0.4.1: mundo 1 curto e as novidades cedo
+
+O teste passou, mas o funil (ver `docs/autoria.md`) mostrou 30% de perda por nível do 128 ao 512 e 88% dos jogadores sem nunca ver a bomba. O que mudou na escada, medido de novo:
+
+- **Mundo 1 pela metade.** Cartas do alvo/4 para baixo (`div` 4) e uma `forma` mais chata (`[4, 4, 3, 2, 1.2]`, menos 2 e 4 no baralho): a mediana do casual foi de 7, 15, 18, 30, 43, 47, 43, 47 para **2, 9, 12, 21, 22, 22, 23, 22 jogadas** (~135 no mundo, eram ~250), sem perder a curva (99–100%). O nível 1 é a abertura roteirizada (3 jogadas). O `ritmoMax` do mundo 1 caiu para 40.
+- **Coringa no nível 2 e bomba no nível 4 do mundo 1.** Os mundos 2 a 4 deslocaram (dobro, ×4, descarte de 2 lugares) e o 5 ficou como era. O ×4 levou junto o baralho largo e as cartas grandes do 1024 e do 2048; sem o descarte apertado ele fica a 89–91% nos dois últimos níveis (alvo 93 e 90). O mundo 4, agora com o descarte de 2 lugares e todos os especiais, fecha o 2048 em 86% (alvo 80). Os pisos (94, 92, 90, 80, 70) não mudaram.
+
 <!-- tabela -->
 | Fase | Mundo | Nível | Baralho | Especiais | Casual (alvo) | Guloso | Jogadas casual | Mesas cheias | Recomeços | Novidade / ajuste |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 1 | 16 | 2–4 | — | 100% (100%) | 100% | 7 | 0.00 | 0.00 | so cartas; o coringa entra no nivel 3 (64) |
-| 2 | 1 | 32 | 2–4 | — | 100% (100%) | 100% | 15 | 0.00 | 0.00 |  |
-| 3 | 1 | 64 | 2–8 | coringa 5% | 100% (100%) | 100% | 18 | 0.00 | 0.00 |  |
-| 4 | 1 | 128 | 2–16 | coringa 5% | 100% (99%) | 100% | 30 | 0.00 | 0.00 |  |
-| 5 | 1 | 256 | 2–32 | coringa 5% | 99% (98%) | 100% | 43 | 0.07 | 0.01 |  |
-| 6 | 1 | 512 | 4–64 | coringa 5% | 93% (97%) | 100% | 47 | 0.21 | 0.07 |  |
-| 7 | 1 | 1024 | 8–128 | coringa 5% | 96% (96%) | 100% | 43 | 0.15 | 0.04 |  |
-| 8 | 1 | 2048 | 16–256 | coringa 5% | 93% (94%) | 100% | 47 | 0.26 | 0.07 |  |
-| 9 | 2 | 16 | 2–4 | coringa 4%, bomba 6% | 100% (100%) | 100% | 5 | 0.00 | 0.00 | a bomba (destroi o topo da coluna escolhida) |
-| 10 | 2 | 32 | 2–4 | coringa 4%, bomba 6% | 100% (100%) | 100% | 13 | 0.00 | 0.00 |  |
-| 11 | 2 | 64 | 2–8 | coringa 4%, bomba 6% | 100% (99%) | 100% | 24 | 0.01 | 0.00 |  |
-| 12 | 2 | 128 | 2–16 | coringa 4%, bomba 6% | 100% (99%) | 100% | 32 | 0.01 | 0.00 |  |
-| 13 | 2 | 256 | 2–32 | coringa 4%, bomba 6% | 100% (97%) | 100% | 47 | 0.04 | 0.00 |  |
-| 14 | 2 | 512 | 4–64 | coringa 4%, bomba 6% | 96% (96%) | 100% | 50 | 0.18 | 0.04 |  |
-| 15 | 2 | 1024 | 8–128 | coringa 4%, bomba 6% | 99% (94%) | 100% | 54 | 0.10 | 0.01 |  |
-| 16 | 2 | 2048 | 16–256 | coringa 4%, bomba 6% | 99% (92%) | 100% | 54 | 0.13 | 0.01 |  |
-| 17 | 3 | 16 | 2–4 | coringa 4%, bomba 4%, dobro 6% | 100% (100%) | 100% | 5 | 0.00 | 0.00 | o dobro (dobra o topo e cascateia). O 2048 tem o baralho largo (6 valores) |
-| 18 | 3 | 32 | 2–4 | coringa 4%, bomba 4%, dobro 6% | 100% (100%) | 100% | 12 | 0.00 | 0.00 |  |
-| 19 | 3 | 64 | 2–8 | coringa 4%, bomba 4%, dobro 6% | 100% (99%) | 100% | 17 | 0.00 | 0.00 |  |
-| 20 | 3 | 128 | 2–16 | coringa 4%, bomba 4%, dobro 6% | 100% (98%) | 100% | 24 | 0.00 | 0.00 |  |
-| 21 | 3 | 256 | 2–32 | coringa 4%, bomba 4%, dobro 6% | 100% (97%) | 100% | 39 | 0.06 | 0.00 |  |
-| 22 | 3 | 512 | 4–64 | coringa 4%, bomba 4%, dobro 6% | 94% (95%) | 100% | 43 | 0.16 | 0.06 |  |
-| 23 | 3 | 1024 | 8–128 | coringa 4%, bomba 4%, dobro 6% | 96% (93%) | 100% | 39 | 0.13 | 0.04 |  |
-| 24 | 3 | 2048 | 8–256 | coringa 4%, bomba 4%, dobro 6% | 96% (90%) | 100% | 57 | 0.17 | 0.04 |  |
-| 25 | 4 | 16 | 2–4 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (100%) | 100% | 5 | 0.00 | 0.00 | a carta x4 (o topo vezes 4, sem passar do 2048, e cascateia). Ela ajuda muito: o baralho e largo (6 valores), o descarte tem 2 lugares e o 1024 e o 2048 tem cartas grandes (do alvo/4 para baixo, 6 e 7 valores) |
-| 26 | 4 | 32 | 2–4 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (100%) | 100% | 9 | 0.00 | 0.00 |  |
-| 27 | 4 | 64 | 2–8 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (98%) | 100% | 12 | 0.00 | 0.00 |  |
-| 28 | 4 | 128 | 2–16 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (96%) | 100% | 18 | 0.01 | 0.00 |  |
-| 29 | 4 | 256 | 2–32 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (93%) | 100% | 31 | 0.01 | 0.00 |  |
-| 30 | 4 | 512 | 2–64 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 91% (90%) | 100% | 45 | 0.29 | 0.09 |  |
-| 31 | 4 | 1024 | 8–256 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 89% (85%) | 100% | 34 | 0.36 | 0.12 |  |
-| 32 | 4 | 2048 | 8–512 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 85% (80%) | 96% | 40 | 0.55 | 0.17 |  |
+| 1 | 1 | 16 | 2–4 | — | 100% (100%) | 100% | 2 | 0.00 | 0.00 | a abertura roteirizada (o 16 em 3 jogadas com cascata); o coringa entra no nivel 2 e a bomba no 4. Niveis curtos: cartas do alvo/4 para baixo e menos 2 no baralho (o Player Fit Test da 0.4.1 perdia 30% por nivel do 128 ao 512) |
+| 2 | 1 | 32 | 2–8 | coringa 5% | 100% (100%) | 100% | 9 | 0.00 | 0.00 |  |
+| 3 | 1 | 64 | 2–16 | coringa 5% | 100% (100%) | 100% | 12 | 0.00 | 0.00 |  |
+| 4 | 1 | 128 | 2–32 | coringa 5%, bomba 6% | 99% (99%) | 100% | 21 | 0.03 | 0.01 |  |
+| 5 | 1 | 256 | 4–64 | coringa 5%, bomba 6% | 99% (98%) | 100% | 22 | 0.04 | 0.01 |  |
+| 6 | 1 | 512 | 8–128 | coringa 5%, bomba 6% | 100% (97%) | 100% | 22 | 0.04 | 0.00 |  |
+| 7 | 1 | 1024 | 16–256 | coringa 5%, bomba 6% | 98% (96%) | 100% | 23 | 0.07 | 0.02 |  |
+| 8 | 1 | 2048 | 32–512 | coringa 5%, bomba 6% | 99% (94%) | 100% | 22 | 0.04 | 0.01 |  |
+| 9 | 2 | 16 | 2–4 | coringa 4%, bomba 4%, dobro 6% | 100% (100%) | 100% | 5 | 0.00 | 0.00 | o dobro (dobra o topo e cascateia). O 2048 tem o baralho largo (6 valores) |
+| 10 | 2 | 32 | 2–4 | coringa 4%, bomba 4%, dobro 6% | 100% (100%) | 100% | 10 | 0.00 | 0.00 |  |
+| 11 | 2 | 64 | 2–8 | coringa 4%, bomba 4%, dobro 6% | 100% (99%) | 100% | 18 | 0.00 | 0.00 |  |
+| 12 | 2 | 128 | 2–16 | coringa 4%, bomba 4%, dobro 6% | 99% (99%) | 100% | 26 | 0.01 | 0.01 |  |
+| 13 | 2 | 256 | 2–32 | coringa 4%, bomba 4%, dobro 6% | 100% (97%) | 100% | 38 | 0.04 | 0.00 |  |
+| 14 | 2 | 512 | 4–64 | coringa 4%, bomba 4%, dobro 6% | 98% (96%) | 100% | 38 | 0.09 | 0.02 |  |
+| 15 | 2 | 1024 | 8–128 | coringa 4%, bomba 4%, dobro 6% | 96% (94%) | 100% | 39 | 0.16 | 0.04 |  |
+| 16 | 2 | 2048 | 8–256 | coringa 4%, bomba 4%, dobro 6% | 95% (92%) | 100% | 59 | 0.23 | 0.06 |  |
+| 17 | 3 | 16 | 2–4 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (100%) | 100% | 5 | 0.00 | 0.00 | a carta x4 (o topo vezes 4, sem passar do 2048, e cascateia). Ela ajuda muito: o baralho e largo (6 valores) e o 1024 e o 2048 tem cartas grandes (do alvo/4 para baixo, 6 e 7 valores) |
+| 18 | 3 | 32 | 2–4 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (100%) | 100% | 9 | 0.00 | 0.00 |  |
+| 19 | 3 | 64 | 2–8 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (99%) | 100% | 13 | 0.00 | 0.00 |  |
+| 20 | 3 | 128 | 2–16 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (98%) | 100% | 19 | 0.00 | 0.00 |  |
+| 21 | 3 | 256 | 2–32 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (97%) | 100% | 26 | 0.02 | 0.00 |  |
+| 22 | 3 | 512 | 2–64 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 96% (95%) | 100% | 42 | 0.16 | 0.04 |  |
+| 23 | 3 | 1024 | 8–256 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 89% (93%) | 100% | 29 | 0.33 | 0.11 |  |
+| 24 | 3 | 2048 | 8–512 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 91% (90%) | 100% | 37 | 0.34 | 0.09 |  |
+| 25 | 4 | 16 | 2–4 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 100% (100%) | 100% | 5 | 0.00 | 0.00 | o descarte aperta (2 lugares por nivel), com todos os especiais. O baralho e largo (6 valores) e o 1024 e o 2048 tem cartas grandes |
+| 26 | 4 | 32 | 2–4 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 100% (100%) | 100% | 9 | 0.00 | 0.00 |  |
+| 27 | 4 | 64 | 2–8 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 100% (98%) | 100% | 14 | 0.00 | 0.00 |  |
+| 28 | 4 | 128 | 2–16 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 100% (96%) | 100% | 17 | 0.01 | 0.00 |  |
+| 29 | 4 | 256 | 2–32 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 99% (93%) | 100% | 31 | 0.03 | 0.01 |  |
+| 30 | 4 | 512 | 2–64 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 94% (90%) | 100% | 46 | 0.29 | 0.06 |  |
+| 31 | 4 | 1024 | 8–256 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 92% (85%) | 100% | 32 | 0.36 | 0.09 |  |
+| 32 | 4 | 2048 | 8–512 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 86% (80%) | 96% | 34 | 0.50 | 0.16 |  |
 | 33 | 5 | 16 | 2–4 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 100% (100%) | 100% | 5 | 0.00 | 0.00 | tudo junto em 3 colunas. O 1024 e o 2048 tem baralho largo de cartas grandes (do alvo/4 para baixo, 6 e 7 valores) |
 | 34 | 5 | 32 | 2–4 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 100% (99%) | 100% | 9 | 0.00 | 0.00 |  |
 | 35 | 5 | 64 | 2–8 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 100% (98%) | 100% | 15 | 0.01 | 0.00 |  |

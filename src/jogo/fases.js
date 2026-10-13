@@ -1,16 +1,24 @@
 // Mundos da Aventura: cada mundo e uma mesa continua de 8 niveis, a escada de
 // valores 16, 32, ... 2048. O nivel sobe quando a fusao cria o valor do nivel;
-// no 2048 a carta sai da mesa e o mundo termina. Uma novidade por mundo,
-// validada por simulacao em test/fases.test.js (ver docs/curadoria.md).
+// no 2048 a carta sai da mesa e o mundo termina. As novidades entram na ordem
+// dos mundos (o mundo 1 tem duas, cedo: o Player Fit Test da 0.4.1 mostrou que
+// 88% dos jogadores nunca chegavam ao mundo 2), validadas por simulacao em
+// test/fases.test.js (ver docs/curadoria.md).
 //
 //   { id, regras?, inicio: [[fundo..topo], ...], especiais: { tipo: { de, p } },
-//     novidade: { tipo, nivel }, faixa?: { div, larg }, niveis?: { n: { div?, larg? } }, semente }
+//     novidades: [{ tipo, nivel }], faixa?: { div, larg, forma? }, niveis?: { n: { div?, larg?, forma? } }, semente }
 //
 // Fase global N (1..40) = (mundo - 1) * 8 + nivel: o numero da telemetria e do mapa.
 // O baralho de cada nivel tem `larg` valores, de max(4, alvo/div) para baixo,
-// com os pesos de PESOS_PADRAO: cada nivel custa mais ou menos o mesmo. Ao
-// subir de nivel, as cartas abaixo do piso novo saem da mesa (graduar).
-// Recomecar um nivel abre o kit: [alvo/2] [alvo/4] e as outras colunas vazias.
+// com os pesos de `forma` (do menor para o maior; o padrao e a forma de
+// PESOS_PADRAO): cada nivel custa mais ou menos o mesmo. Ao subir de nivel,
+// as cartas abaixo do piso novo saem da mesa (graduar). Recomecar um nivel
+// abre o kit: [alvo/2] [alvo/4] e as outras colunas vazias.
+//
+// A mesa do nivel 1 do mundo 1 e uma abertura roteirizada: com a fila que a
+// semente da (2, 2, 4), o 16 sai em 3 jogadas com cascata, e cada jogada
+// ensina uma regra (igual funde; menor desce sob a maior; a fusao encadeia).
+// test/fases.test.js confere isso com o bot guloso, que e a mao de ajuda.
 
 export const POR_MUNDO = 8;
 
@@ -26,33 +34,38 @@ const sem = (id) => 2048 * 31 + id * 9973;
 
 /** Os 5 mundos, na ordem em que as novidades complicam. */
 export const MUNDOS = [
-  // 1: so cartas; o coringa entra no nivel 3 (64)
+  // 1: a abertura roteirizada (o 16 em 3 jogadas com cascata); o coringa entra
+  // no nivel 2 e a bomba no 4. Niveis curtos: cartas do alvo/4 para baixo e
+  // menos 2 no baralho (o Player Fit Test da 0.4.1 perdia 30% por nivel do 128 ao 512).
   {
-    id: 1, inicio: [[4], [], [2], []],
-    especiais: { coringa: { de: 3, p: 0.05 } },
-    novidade: { tipo: 'coringa', nivel: 3 }, semente: sem(1),
+    id: 1, inicio: [[8, 4], [], [2], []],
+    especiais: { coringa: { de: 2, p: 0.05 }, bomba: { de: 4, p: 0.06 } },
+    faixa: { div: 4, larg: 5, forma: [4, 4, 3, 2, 1.2] },
+    novidades: [{ tipo: 'coringa', nivel: 2 }, { tipo: 'bomba', nivel: 4 }], semente: sem(1),
   },
-  // 2: a bomba (destroi o topo da coluna escolhida)
+  // 2: o dobro (dobra o topo e cascateia). O 2048 tem o baralho largo (6 valores).
   {
     id: 2, inicio: [[8], [], [4], []],
-    especiais: { coringa: { de: 1, p: 0.04 }, bomba: { de: 1, p: 0.06 } },
-    novidade: { tipo: 'bomba', nivel: 1 }, semente: sem(2),
-  },
-  // 3: o dobro (dobra o topo e cascateia). O 2048 tem o baralho largo (6 valores).
-  {
-    id: 3, inicio: [[8], [], [4], []],
     especiais: { coringa: { de: 1, p: 0.04 }, bomba: { de: 1, p: 0.04 }, dobro: { de: 1, p: 0.06 } },
     niveis: { 8: { larg: 6 } },
-    novidade: { tipo: 'dobro', nivel: 1 }, semente: sem(3),
+    novidades: [{ tipo: 'dobro', nivel: 1 }], semente: sem(2),
   },
-  // 4: a carta x4 (o topo vezes 4, sem passar do 2048, e cascateia). Ela
-  // ajuda muito: o baralho e largo (6 valores), o descarte tem 2 lugares e o
-  // 1024 e o 2048 tem cartas grandes (do alvo/4 para baixo, 6 e 7 valores).
+  // 3: a carta x4 (o topo vezes 4, sem passar do 2048, e cascateia). Ela
+  // ajuda muito: o baralho e largo (6 valores) e o 1024 e o 2048 tem cartas
+  // grandes (do alvo/4 para baixo, 6 e 7 valores).
   {
-    id: 4, regras: { descarteMax: 2 }, inicio: [[8], [], [4], []],
+    id: 3, inicio: [[8], [], [4], []],
     especiais: { coringa: { de: 1, p: 0.04 }, bomba: { de: 1, p: 0.04 }, dobro: { de: 1, p: 0.03 }, quadruplo: { de: 1, p: 0.05 } },
     faixa: { div: 8, larg: 6 }, niveis: { 7: { div: 4, larg: 6 }, 8: { div: 4, larg: 7 } },
-    novidade: { tipo: 'quadruplo', nivel: 1 }, semente: sem(4),
+    novidades: [{ tipo: 'quadruplo', nivel: 1 }], semente: sem(3),
+  },
+  // 4: o descarte aperta (2 lugares por nivel), com todos os especiais. O
+  // baralho e largo (6 valores) e o 1024 e o 2048 tem cartas grandes.
+  {
+    id: 4, regras: { descarteMax: 2 }, inicio: [[8], [], [4], []],
+    especiais: { coringa: { de: 1, p: 0.04 }, bomba: { de: 1, p: 0.04 }, dobro: { de: 1, p: 0.04 }, quadruplo: { de: 1, p: 0.04 } },
+    faixa: { div: 8, larg: 6 }, niveis: { 7: { div: 4, larg: 6 }, 8: { div: 4, larg: 7 } },
+    novidades: [{ tipo: 'descarte', nivel: 1 }], semente: sem(4),
   },
   // 5: tudo junto em 3 colunas. O 1024 e o 2048 tem baralho largo de cartas
   // grandes (do alvo/4 para baixo, 6 e 7 valores).
@@ -60,9 +73,12 @@ export const MUNDOS = [
     id: 5, regras: { colunas: 3 }, inicio: [[8], [4], []],
     especiais: { coringa: { de: 1, p: 0.05 }, bomba: { de: 1, p: 0.05 }, dobro: { de: 1, p: 0.05 }, quadruplo: { de: 1, p: 0.04 } },
     niveis: { 7: { div: 4, larg: 6 }, 8: { div: 4, larg: 7 } },
-    novidade: { tipo: 'colunas', nivel: 1 }, semente: sem(5),
+    novidades: [{ tipo: 'colunas', nivel: 1 }], semente: sem(5),
   },
 ];
+
+/** Tipos de novidade que um mundo pode trazer (as cartas especiais, as 3 colunas e o descarte apertado). */
+export const NOVIDADES = ['coringa', 'bomba', 'dobro', 'quadruplo', 'colunas', 'descarte'];
 
 export const TOTAL_FASES = MUNDOS.length * POR_MUNDO;
 
@@ -71,8 +87,9 @@ export function pesosDoNivel(def, n) {
   const f = { ...FAIXA, ...(def.faixa || {}), ...((def.niveis || {})[n] || {}) };
   const vs = [];
   for (let v = Math.max(4, alvoDoNivel(n) / f.div); v >= 2 && vs.length < f.larg; v /= 2) vs.unshift(v);
+  const forma = f.forma || FORMA;
   const p = {};
-  vs.forEach((v, i) => { p[v] = FORMA[i]; });
+  vs.forEach((v, i) => { p[v] = forma[Math.min(i, forma.length - 1)]; });
   return p;
 }
 
@@ -150,5 +167,5 @@ export function alvoCasual(N) {
 export const FAIXA_CASUAL = 8;
 export const QUEDA_MAX = 12;
 
-/** Ritmo: jogadas por nivel (mediana do casual, com os recomecos) no maximo. */
-export const ritmoMax = (n) => (mundoDe(n) === 1 ? 60 : 80);
+/** Ritmo: jogadas por nivel (mediana do casual, com os recomecos) no maximo. O mundo 1 e curto de proposito (ver a nota dele). */
+export const ritmoMax = (n) => (mundoDe(n) === 1 ? 40 : 80);

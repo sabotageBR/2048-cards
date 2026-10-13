@@ -206,3 +206,28 @@ Pedidos do usuário: "A carta especial só pode ser usado 1x por carta (tem q ap
 
 **Build 0.4.0 e a thumb (mesmo dia).** Pedido: "gera a nova build da poki". A versão subiu para 0.4.0 (regra do projeto: uma versão por envio, para comparar no filtro Version). A thumb que ia junto era ainda a do Gosmo (do duelo); entre as 4 opções sem monstro, refeitas com as cartas da Floresta, o usuário escolheu a **cascata** (o 2048 sai voando do topo da pilha). Pacote: `dist-poki/2048-cards-0.4.0.zip` e `2048-cards-0.4.0-thumb.png`.
 - **0.4.1:** no inspetor da Poki (desktop, cerca de 850×475) a tela de pausa abria quase toda abaixo da tela (print do usuário). Causa: o `#menu` era um grid com a linha `auto`; a linha crescia até o conteúdo inteiro (a grade das 40 fases) e o cartão, centrado nela, descia; no celular também abria do meio para baixo. Virou flex, e o cartão fica centrado e rola por dentro em qualquer tamanho.
+
+## 2026-10-13 · Player Fit Test da 0.4.1 e a 0.4.2 (retenção)
+
+Pedido do usuário: "analise o player fit test do jogo [...] e analise como podemos melhorar a retenção". O teste **passou** (500 gameplays, média 4m05s, 38% dos jogadores acima de 3 min; a régua da Poki é 3 min e 25%). O que o painel mostrou (versão 0.4.1, 608 gameplays no filtro; detalhes no plano `~/.claude/plans/analise-o-player-fit-fluffy-lerdorf.md`):
+
+- Metade sai antes de 2 min; quem passa de 3 min fica (24% acima de 5 min).
+- **Nível 1:** 27% nunca fazem o 16. Em desktop, 21% saem no nível 1 e **25% nunca clicam no canvas** (celular: 5% e 7%).
+- **Níveis 4→5→6 (128, 256, 512):** retenção de 70% por nível, três vezes seguidas, depois de 82% no 3→4. É onde os níveis ficam longos (30, 43, 47 jogadas de mediana), nada novo acontece e entra o primeiro anúncio (fase 5).
+- 88% nunca viam a bomba (mundo 2); 11% somavam 3 recusas seguidas nos dois primeiros níveis; só 22 mesas cheias em 608 partidas (ninguém sai derrotado, sai entediado ou sem entender).
+- As gravações curtas (5 vistas): o jogador novo espalha 2 e 4 pelas 4 colunas e não chega ao 16; quem passa cai numa fila só de 2 com quatro 32 na mesa e o descarte 3/3.
+
+| Pergunta | Opções vistas | Escolha |
+|---|---|---|
+| Escada de novidades (88% nunca chegam à bomba) | coringa no nível 2 e bomba no nível 4 do mundo 1, deslocando os outros · manter uma novidade por mundo e só encurtar os níveis | **Coringa no 2 e bomba no 4 do mundo 1**: 2 dobro · 3 ×4 · 4 descarte com 2 lugares · 5 três colunas |
+| Primeiro anúncio (fase 5, onde a retenção cai de 82% para 70%) | adiar para a fase 7 ou 5 min, com espaçamento próprio · manter | **Adiar** (voltar depois do Web Fit se a receita pesar) |
+
+**Decisões minhas, para o usuário conferir:**
+- **Abertura roteirizada do nível 1:** mesa `[[8, 4], [], [2], []]`; com a fila da semente (2, 2, 4) o 16 sai em 3 jogadas, cada uma ensinando uma regra (igual funde; menor sob a maior; a fusão encadeia). A mão guiada volta 1 s depois de cada jogada até o primeiro 16, com uma frase no pé da mesa ("Números iguais fundem!", "A carta menor desce sob a maior", "Qualquer carta cabe na coluna vazia").
+- **Mundo 1 pela metade:** cartas do alvo/4 para baixo e menos 2 no baralho (`forma` `[4, 4, 3, 2, 1.2]`): 2, 9, 12, 21, 22, 22, 23, 22 jogadas por nível (eram 7, 15, 18, 30, 43, 47, 43, 47). O casual segue a 99–100% e o guloso a 100%; o ritmo do mundo 1 no teste caiu de 60 para 40 jogadas.
+- **Mundos 2 a 4 deslocados** sem mexer no piso da curva (94, 92, 90, 80, 70): o ×4 levou junto o baralho largo; o mundo 4 ficou com o descarte de 2 lugares e todos os especiais (2048 a 86% no casual, alvo 80). Partida salva da 0.4.1 é descartada (`VERSAO_ESTADO` 8).
+- **Primeiro minuto:** `gameLoadingFinished` só depois do primeiro quadro desenhado com a fonte (antes saía na avaliação do módulo, com o canvas ainda vazio); teclas e botões contam como primeiro toque; a recusa vibra e, na primeira "maior sobre menor", um aviso diz a regra; o aviso do coringa do mundo 1, que nunca aparecia jogando direto (só ao recarregar a mesa), agora sai na subida de nível.
+- **Anúncios:** primeiro na fase 7 ou com 5 min de jogo; entre dois, pelo menos 2 subidas de nível e 150 s de jogo.
+- **Neve:** os números das cartas ficaram mais escuros (o laranja e o amarelo estavam a 2.0–2.3 de contraste sobre o branco; agora o pior passa de 4.5).
+- **Telemetria nova:** `guia/N/feito` (as 5 primeiras jogadas da fase 1 de quem é novo), `regra/maior/first`, e `ajuda/N/*` medida por nível (antes, uma por mesa carregada).
+- **Metas para o próximo Player Fit Test (0.4.2):** nível 1 completo ≥ 85%, toque em desktop ≥ 85%, retenção 4→5→6 ≥ 80%, 3 min+ ≥ 45%.

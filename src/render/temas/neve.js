@@ -79,9 +79,12 @@ export default {
   },
   ...criarCartas({
     cores: CORES,
-    // porcelana: so o numero e um fio na cor do valor, cantos firmes
+    // porcelana: so o numero e um fio na cor do valor, cantos firmes. O numero
+    // vai escurecido: puro, o laranja e o amarelo ficavam a 2.0-2.3 de
+    // contraste sobre o branco; com 0.35 o pior passa de 4.5 (WCAG AA).
     corpo: () => ['#ffffff', '#eaf1fb'],
-    numMiolo: (c) => escurecer(c, 0.06),
+    numFaixa: (c) => escurecer(c, 0.35),
+    numMiolo: (c) => escurecer(c, 0.35),
     borda: () => '#9fbbe3',
     bordaLarg: 0.035,
     raio: 0.08,

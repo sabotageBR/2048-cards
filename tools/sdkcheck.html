@@ -75,6 +75,8 @@ if (cenario === 'bloqueado' || cenario === 'pendente') {
   conferir(ct().J.n > nivel, 'sem SDK a fase nao avancou');
 } else {
   conferir(nomes().includes('init'), 'init nao chamado');
+  // o loading termina depois do primeiro quadro desenhado (fonte pronta): no headless o rAF pode demorar
+  for (let i = 0; i < 16 && !nomes().includes('gameLoadingFinished'); i++) await espera(250);
   conferir(nomes().includes('gameLoadingFinished'), 'gameLoadingFinished nao chamado');
   conferir(!nomes().includes('gameplayStart'), 'gameplayStart antes de qualquer toque');
   await espera(1200);
@@ -109,21 +111,21 @@ if (cenario === 'bloqueado' || cenario === 'pendente') {
     await espera(300);
   } else conferir(ct().J.estado === 'jogando' && ct().J.e.continuacoes === 2, 'premio negado com rewarded true');
   conferir(!nomes().slice(nomes().lastIndexOf('rewardedBreak')).includes('gameplayStart') || cenario !== 'recusa', 'gameplayStart depois do rewarded sem toque');
-  // termina as fases 3 e 4 (sem intervalo) e entra na 5 (com intervalo)
+  // termina as fases 3 a 6 (sem intervalo) e entra na 7 (com intervalo)
   toque(3);
   ct().auto(120);
   await espera(3000);
-  await espera(19000);
-  conferir(ct().J.n >= 5, 'nao chegou a fase 5 (fase ' + ct().J.n + ')');
+  for (let i = 0; i < 160 && ct().J.n < 7; i++) await espera(250);
+  conferir(ct().J.n >= 7, 'nao chegou a fase 7 (fase ' + ct().J.n + ')');
   // para o automatico e deixa terminar o intervalo e a transicao que estiverem no meio
   ct().auto(0);
   for (let i = 0; i < 40 && ct().J.estado !== 'jogando'; i++) await espera(250);
   await espera(500);
   const cb = log.filter((l) => l[1] === 'commercialBreak');
   const iMedida = (m) => log.findIndex((l) => l[1] === 'measure' && l[2] === m);
-  conferir(cb.length >= 1, 'nenhum commercialBreak na entrada da fase 5');
-  // nada de intervalo antes: o primeiro vem entre o fim da 4 e o comeco da 5
-  conferir(cb.length && log.indexOf(cb[0]) > iMedida('level/4/complete') && log.indexOf(cb[0]) < iMedida('level/5/start'), 'primeiro commercialBreak fora da entrada da fase 5');
+  conferir(cb.length >= 1, 'nenhum commercialBreak na entrada da fase 7');
+  // nada de intervalo antes: o primeiro vem entre o fim da 6 e o comeco da 7
+  conferir(cb.length && log.indexOf(cb[0]) > iMedida('level/6/complete') && log.indexOf(cb[0]) < iMedida('level/7/start'), 'primeiro commercialBreak fora da entrada da fase 7');
   conferir(cb[0] && cb[0][2] === true, 'som nao estava mudo durante o commercialBreak');
   const iCb = log.indexOf(cb[0]);
   const stopAntes = log.slice(0, iCb).map((l) => l[1]).lastIndexOf('gameplayStop') > log.slice(0, iCb).map((l) => l[1]).lastIndexOf('gameplayStart');
@@ -132,7 +134,7 @@ if (cenario === 'bloqueado' || cenario === 'pendente') {
   conferir(!depoisCb.includes('gameplayStart'), 'gameplayStart depois do anuncio sem novo toque');
   const fimCb = log.find((l) => l[1] === 'fimCommercial');
   conferir(fimCb && fimCb[2] === true, 'som voltou antes do fim do anuncio');
-  conferir(fimCb && log.indexOf(fimCb) < iMedida('level/5/start'), 'a fase 5 nao comecou depois que o anuncio voltou');
+  conferir(fimCb && log.indexOf(fimCb) < iMedida('level/7/start'), 'a fase 7 nao comecou depois que o anuncio voltou');
   conferir(!window.__calado(), 'som nao voltou depois do anuncio');
   const medidas = log.filter((l) => l[1] === 'measure').map((l) => l[2]);
   conferir(medidas.includes('level/3/start') && medidas.includes('level/3/complete'), 'measure de fase faltando: ' + medidas.join(','));

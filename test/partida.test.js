@@ -261,8 +261,8 @@ test('escada: uma cascata sobe dois niveis de uma vez', () => {
 });
 
 test('escada: na subida, as cartas abaixo do piso saem da mesa com pontos', () => {
-  // nivel 5 (256) -> 6 (512): o baralho do 512 comeca no 4; os 2 saem
-  const e0 = naEscada(1, 5, [[128, 64, 32, 16, 8], [2], [4, 2], []], [8, 4, 4]);
+  // nivel 5 (256) -> 6 (512) do mundo 2 (baralho do alvo/8): o do 512 comeca no 4; os 2 saem
+  const e0 = naEscada(2, 5, [[128, 64, 32, 16, 8], [2], [4, 2], []], [8, 4, 4]);
   const r = jogar(e0, { tipo: 'colocar', c: 0, t: 0 });
   assert.equal(r.estado.nivel, 6);
   const piso = Math.min(...Object.keys(r.estado.baralho.pesos).map(Number));

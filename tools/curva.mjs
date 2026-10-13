@@ -10,13 +10,13 @@ import { servir, RAIZ } from './servir.mjs';
 import { MUNDOS, POR_MUNDO, FAIXA_CASUAL } from '../src/jogo/fases.js';
 import { medirMundo } from './medir.mjs';
 
-const NOMES = { coringa: 'só cartas (+ coringa)', bomba: '+ bomba', dobro: '+ dobro', quadruplo: '+ ×4', colunas: '3 colunas' };
+const NOMES = { coringa: 'coringa', bomba: 'bomba', dobro: 'dobro', quadruplo: '×4', colunas: '3 colunas', descarte: 'descarte ×2' };
 const saida = resolve(process.argv[2] || join(RAIZ, 'docs/escada/curva.png'));
 const niveis = MUNDOS.flatMap((m) => medirMundo(m.id).niveis);
 const d = {
   depois: niveis.map((nv) => nv.casual), alvo: niveis.map((nv) => nv.alvo), faixa: FAIXA_CASUAL,
   chefes: MUNDOS.map((m) => m.id * POR_MUNDO), jogadas: niveis.map((nv) => nv.jogadas),
-  mundos: MUNDOS.map((m) => `Mundo ${m.id} · ${NOMES[m.novidade.tipo]}`),
+  mundos: MUNDOS.map((m) => `Mundo ${m.id} · ${m.novidades.map((x) => NOMES[x.tipo]).join(' + ')}`),
 };
 
 const porta = 4353;

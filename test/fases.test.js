@@ -5,10 +5,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MUNDOS, FASES, CLASSICO, POR_MUNDO, TOTAL_FASES, faseDe, faseGlobal, mundoDe, posNoMundo, alvoDoNivel,
+  MUNDOS, NOVIDADES, FASES, CLASSICO, POR_MUNDO, TOTAL_FASES, faseDe, faseGlobal, mundoDe, posNoMundo, alvoDoNivel,
   pesosDoNivel, especiaisDoNivel, alvoCasual, FAIXA_CASUAL, QUEDA_MAX, ritmoMax,
 } from '../src/jogo/fases.js';
-import { jogarMundo, jogarSozinho, PERFIL_CASUAL } from '../src/jogo/bot.js';
+import { jogarMundo, jogarSozinho, melhorJogada, PERFIL_CASUAL } from '../src/jogo/bot.js';
+import { criarPartida, jogar } from '../src/jogo/partida.js';
 import { ESPECIAIS } from '../src/jogo/baralho.js';
 
 const SEMENTES = 25;
@@ -19,15 +20,20 @@ test('esquema dos mundos', () => {
   MUNDOS.forEach((m, i) => {
     assert.equal(m.id, i + 1);
     assert.ok(Number.isInteger(m.semente));
-    assert.ok(['coringa', 'bomba', 'dobro', 'quadruplo', 'colunas'].includes(m.novidade.tipo));
+    assert.ok(m.novidades.length >= 1, `mundo ${m.id}: sem novidade`);
+    for (const nv of m.novidades) {
+      assert.ok(NOVIDADES.includes(nv.tipo), `mundo ${m.id}: novidade ${nv.tipo}`);
+      if (ESPECIAIS.includes(nv.tipo)) assert.equal(m.especiais[nv.tipo].de, nv.nivel, `mundo ${m.id}: a novidade ${nv.tipo} entra no nivel em que a carta entra`);
+    }
     for (const t of Object.keys(m.especiais)) assert.ok(ESPECIAIS.includes(t), `mundo ${m.id}: especial ${t}`);
     for (let n = 1; n <= POR_MUNDO; n++) {
       const vs = Object.keys(pesosDoNivel(m, n)).map(Number);
       assert.ok(vs.length >= 2 && Math.min(...vs) >= 2 && Math.max(...vs) < alvoDoNivel(n), `mundo ${m.id} nivel ${n}: ${vs}`);
     }
   });
-  assert.deepEqual(especiaisDoNivel(MUNDOS[0], 2), {}, 'o coringa do mundo 1 entra no nivel 3');
-  assert.ok(especiaisDoNivel(MUNDOS[0], 3).coringa > 0);
+  assert.deepEqual(especiaisDoNivel(MUNDOS[0], 1), {}, 'o nivel 1 do mundo 1 e so cartas');
+  assert.ok(especiaisDoNivel(MUNDOS[0], 2).coringa > 0, 'o coringa do mundo 1 entra no nivel 2');
+  assert.ok(!especiaisDoNivel(MUNDOS[0], 3).bomba && especiaisDoNivel(MUNDOS[0], 4).bomba > 0, 'a bomba do mundo 1 entra no nivel 4');
   for (let N = 1; N <= TOTAL_FASES; N++) {
     const f = faseDe(N);
     assert.equal(f.id, N);
@@ -53,6 +59,38 @@ function medir(m, n, op = {}, desloc = 0) {
     return { pct: ch.length ? (ok / ch.length) * 100 : 0, jogadas: jog[Math.floor(jog.length / 2)] || 0, chegaram: ch.length };
   });
 }
+
+/**
+ * Joga a fase com o guloso (a mao de ajuda) ate sair do nivel 1 ou esgotar
+ * `max` jogadas. Devolve { jogadas, nivel, degrau } (o maior degrau de cascata).
+ */
+function abertura(tentativa, max) {
+  const f = faseDe(1, tentativa);
+  let e = criarPartida({}, f, f.semente);
+  let jogadas = 0, degrau = 0;
+  while (jogadas < max && e.nivel === 1 && !e.fim) {
+    const a = melhorJogada(e, jogadas * 900);
+    if (!a) break;
+    const r = jogar(e, { ...a, t: jogadas * 900 });
+    for (const ev of r.eventos) if (ev.tipo === 'fundir') degrau = Math.max(degrau, ev.degrau);
+    e = r.estado;
+    jogadas++;
+  }
+  return { jogadas, nivel: e.nivel, degrau };
+}
+
+test('abertura do mundo 1: a mao de ajuda faz o 16 em 3 jogadas com cascata', () => {
+  // a primeira entrada e roteirizada (semente fixa): igual funde, menor sob a maior, a fusao encadeia
+  const a = abertura(0, 3);
+  assert.equal(a.nivel, 2, `fechou em ${a.jogadas} jogadas`);
+  assert.equal(a.jogadas, 3);
+  assert.ok(a.degrau >= 2, 'a ultima jogada cascateia');
+  // recomecos do nivel 1 (semente nova): ainda curtos
+  for (let t = 1; t <= 4; t++) {
+    const r = abertura(t, 5);
+    assert.equal(r.nivel, 2, `recomeco ${t}: ${r.jogadas} jogadas sem fechar o 16`);
+  }
+});
 
 test('o guloso passa cada nivel sem recomecar', () => {
   for (const m of MUNDOS) {

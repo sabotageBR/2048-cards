@@ -326,8 +326,9 @@ export function criarPoki({
   }
 
   /**
-   * Intervalo comercial: so na volta de uma pausa natural (a partida dos trens), a partir do
-   * nivel 6 (quem decide e src/main.js). Sem cooldown proprio: a Poki decide a frequencia.
+   * Intervalo comercial: so na volta de uma pausa natural (a subida de nivel, o fim do mundo,
+   * o recomeco), a partir da fase 7 ou de 5 min de jogo, e com espaco do anterior (quem
+   * decide e src/main.js). Por cima disso a Poki ainda decide a frequencia.
    */
   async function commercialBreak() {
     if (!pronto || emAnuncio || !jaJogou) return false;

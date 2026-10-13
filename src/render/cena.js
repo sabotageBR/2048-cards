@@ -156,8 +156,20 @@ export function criarCena(canvas) {
     }
   }
 
+  /** A frase do guia da fase 1, no pe da mesa (a mesa comeca quase vazia; as colunas ficam no alto). */
+  function desenharTextoGuia(s) {
+    const tam = Math.round(Math.max(14, Math.min(21, L.cw * 0.2)));
+    const x = L.mesa.x + L.mesa.w / 2, y = L.mesa.y + L.mesa.h - tam * 1.3;
+    ctx.save();
+    ctx.font = `700 ${tam}px ${FONTE}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    ctx.lineWidth = tam * 0.24; ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.strokeText(s, x, y);
+    ctx.fillStyle = '#fff6d2'; ctx.fillText(s, x, y);
+    ctx.restore();
+  }
+
   /**
-   * @param {{ estado: any, agora: number, trans?: any, tEntrada?: number, arrasto?: any, destaque?: number, legal?: boolean, mao?: any, febre?: number, info?: any, semFila?: boolean, alvo?: string }} q
+   * @param {{ estado: any, agora: number, trans?: any, tEntrada?: number, arrasto?: any, destaque?: number, legal?: boolean, mao?: any, textoGuia?: string, febre?: number, info?: any, semFila?: boolean, alvo?: string }} q
    */
   function desenhar(q) {
     if (!L) return;
@@ -184,6 +196,7 @@ export function criarCena(canvas) {
     part.desenhar(ctx);
     if (q.mao && q.mao.de) desenharGuia(ctx, q.mao, tVis, dpr);
     else if (q.mao) desenharMao(ctx, q.mao.x, q.mao.y, tVis, '#fff');
+    if (q.textoGuia && q.mao) desenharTextoGuia(q.textoGuia);
     ctx.restore();
     frente(q.agora, !!q.febre);
     if (branco > 0) { ctx.fillStyle = `rgba(255,255,255,${branco})`; ctx.fillRect(0, 0, W, H); }
