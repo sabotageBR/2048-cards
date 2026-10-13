@@ -26,20 +26,25 @@
 //   ?folha=paisagem  os 5 mundos em 1280x720 (desktop)
 //   ?folha=cartas    a escada de cartas de cada tema (2..2048, especiais, marcada, pilha)
 //   ?folha=regras    o proibido, o contador do descarte e o video de esvaziar
+//   ?folha=explosoes a explosao de cada mundo (fusao, 2048 e a festa da subida), quadros deterministicos
+//   ?folha=festa     a subida de nivel sem pausa: o "16!" piscando enquanto o jogador joga (prints do jogo)
 import { TEMAS } from '../src/render/temas/index.js';
 import { definirRotulos } from '../src/render/temas/kit.js';
 import { desenharCarta, definirTema, limparCache } from '../src/render/cartas.js';
 import { proibido, rr } from '../src/render/desenho.js';
+import { criarParticulas } from '../src/render/particulas.js';
+import { tocarEfeito, registrarFormas } from '../src/render/efeitos.js';
+import { Transicoes as Tr } from '../src/render/transicoes.js';
 
 const q = new URLSearchParams(location.search);
 const folha = q.get('folha') || 'retrato';
 const $ = (id) => document.getElementById(id);
 const P = '../docs/mundos/prints/';
 const MUNDOS = [
-  { n: 1, nome: 'Floresta', nov: 'só cartas (+ coringa)', txt: 'Clareira de manhã, sol com raios, morros e árvores redondas, pólen e folhas no ar. Carta de marfim bem redonda, a faixa do número em onda. Mesa de madeira clara com feltro musgo.' },
-  { n: 2, nome: 'Oceano', nov: '+ bomba', txt: 'O mar visto de dentro d’água: feixes de luz, algas, corais e bolhas subindo. Carta de vidro tingido na cor do valor, número branco e borda de pérola. Mesa de vidro com aro aqua.' },
-  { n: 3, nome: 'Neve', nov: '+ dobro', txt: 'Noite de inverno: lua, aurora que ondula, montanhas e pinheiros, neve caindo. Carta de porcelana de cantos firmes: só o número e um fio na cor do valor. Mesa de gelo.' },
-  { n: 4, nome: 'Deserto', nov: '+ ×4', txt: 'Fim de tarde nas dunas: sol baixo, mesas de pedra, cactos e areia correndo com o vento. Carta de pergaminho como a de baralho (fio interno). Mesa de arenito.' },
+  { n: 1, nome: 'Floresta', nov: 'coringa no nível 2, bomba no 4', txt: 'Clareira de manhã, sol com raios, morros e árvores redondas, pólen e folhas no ar. Carta de marfim bem redonda, a faixa do número em onda. Mesa de madeira clara com feltro musgo.' },
+  { n: 2, nome: 'Oceano', nov: '+ dobro', txt: 'O mar visto de dentro d’água: feixes de luz, algas, corais e bolhas subindo. Carta de vidro tingido na cor do valor, número branco e borda de pérola. Mesa de vidro com aro aqua.' },
+  { n: 3, nome: 'Neve', nov: '+ ×4', txt: 'Noite de inverno: lua, aurora que ondula, montanhas e pinheiros, neve caindo. Carta de porcelana de cantos firmes: só o número e um fio na cor do valor. Mesa de gelo.' },
+  { n: 4, nome: 'Deserto', nov: 'descarte com 2 lugares', txt: 'Fim de tarde nas dunas: sol baixo, mesas de pedra, cactos e areia correndo com o vento. Carta de pergaminho como a de baralho (fio interno). Mesa de arenito.' },
   { n: 5, nome: 'Cosmos', nov: '3 colunas', txt: 'Espaço fundo: nebulosas, planeta com anel, estrelas que piscam e estrela cadente. Carta de vidro escuro com número e borda em neon, perto da referência. Mesa de vidro escuro com aro neon.' },
 ];
 
@@ -72,8 +77,8 @@ if (folha === 'retrato') {
   $('sub').textContent = 'Um especial por carta (o sinal de proibido), o descarte com lugares por nível (o contador) e o vídeo com prêmio.';
   const g = $('grade'); g.style.gridTemplateColumns = 'repeat(4, 390px)';
   g.appendChild(fig(`${P}regra-selo.png`, 'Especial na mão', 'O 8 já recebeu um especial: com o coringa, o dobro ou o ×4 na mão, ele mostra o proibido pequeno.'));
-  g.appendChild(fig(`${P}regra-recusa.png`, 'Tentou mesmo assim', 'A jogada é recusada: a coluna treme e o proibido salta. Na primeira vez, um aviso explica a regra.'));
-  g.appendChild(fig(`${P}regra-cheio.png`, 'Descarte cheio', 'O contador fica vermelho (3/3), aparece “cheio” e um aviso diz que esvazia no nível seguinte. Embaixo, o vídeo para esvaziar.'));
+  g.appendChild(fig(`${P}regra-recusa.png`, 'Tentou mesmo assim', 'A jogada é recusada: a coluna treme e o proibido salta. Nenhum texto explica; o sinal basta.'));
+  g.appendChild(fig(`${P}regra-cheio.png`, 'Descarte cheio', 'O contador fica vermelho (3/3) e aparece “cheio”; ele esvazia no nível seguinte. Embaixo, o vídeo para esvaziar.'));
   g.appendChild(fig(`${P}regra-video.png`, 'Depois do vídeo', 'A pilha volta a 0/3 e o botão some até o próximo nível. Há também “🎬 ★+1”: um coringa quando a mesa aperta.'));
   pronto();
 } else if (folha === 'cartas') {
@@ -103,6 +108,62 @@ if (folha === 'retrato') {
     ctx.fillStyle = tema.mesa.rotulo; ctx.font = '700 30px Fredoka, sans-serif'; ctx.fillText(`Mundo ${m.n} · ${m.nome}`, tx, 206);
     ctx.font = '600 17px Fredoka, sans-serif'; ctx.globalAlpha = 0.85; ctx.fillText(m.nov, tx, 234); ctx.globalAlpha = 1;
     g.appendChild(cv);
+  }
+  document.fonts.ready.then(() => { document.title = 'PRONTO'; });
+} else if (folha === 'festa') {
+  $('titulo').textContent = 'Subida de nível sem pausa: o valor feito pisca e o jogo segue';
+  $('sub').textContent = 'A abertura do nível 1 (as 3 jogadas que fazem o 16) e uma 4ª jogada durante a festa. Sem placa, sem trilha, sem bloqueio: o "16!" pisca sobre a mesa com o confete e a explosão do mundo, e a carta seguinte já entra.';
+  const g = $('grade'); g.style.gridTemplateColumns = 'repeat(4, 390px)';
+  g.appendChild(fig(`${P}festa-1.png`, '1. O 16 nasce', 'A 3ª jogada da abertura: o 4 sobre o 4 vira 8 e encadeia no 16 (cascata ×2). A barra enche.'));
+  g.appendChild(fig(`${P}festa-2.png`, '2. "16!" entra', 'Clarão suave, o valor feito entra piscando e a explosão da Floresta (folhas, pétalas e pólen) sai do meio da mesa.'));
+  g.appendChild(fig(`${P}festa-3.png`, '3. Festa cheia', 'Confete nas cores do mundo. O painel já diz "Faça um 32"; a fila continua livre.'));
+  g.appendChild(fig(`${P}festa-4.png`, '4. Jogando por baixo', 'O jogador já soltou a carta seguinte na coluna vazia enquanto o "16!" sobe e some.'));
+  pronto();
+} else if (folha === 'explosoes') {
+  await document.fonts.load('700 20px Fredoka');
+  definirRotulos({ bomba: 'BOMBA' });
+  $('titulo').textContent = 'A explosão de cada mundo';
+  $('sub').textContent = 'Quadros congelados (mesma semente: o mesmo quadro sempre) da fusão (0,22 s), da saída do 2048 (0,3 s) e da festa da subida de nível (0,45 s), sobre a mesa do mundo. As cores dos valores não mudam; muda o que voa: folhas, bolhas, flocos, areia, neon.';
+  $('sub').style.maxWidth = '1210px';
+  const g = $('grade'); g.style.gridTemplateColumns = '250px repeat(3, 300px)'; g.style.alignItems = 'center';
+  const C = 300, cw = 78, ch = 110, dpr = 2;
+  const EXPL = {
+    1: 'Folhas e pétalas saem, giram e caem devagar balançando; pólen no ar.',
+    2: 'Bolhas sobem balançando e estouram num anel; no 2048 e na festa, um jato de gotas.',
+    3: 'Flocos de seis braços caem devagar girando; cacos de gelo saltam e brilham.',
+    4: 'Grãos de areia baixos e rápidos que assentam, com a poeira subindo; no 2048, um gêiser.',
+    5: 'Faíscas de quatro pontas e riscos neon com rastro (mistura lighter); no 2048, a supernova de anéis.',
+  };
+  const QUADROS = [
+    { tipo: 'fusao', valor: 32, degrau: 2, t: 0.22, rotulo: 'Fusão (×2) · 0,22 s' },
+    { tipo: 'completar', valor: 2048, t: 0.3, rotulo: '2048 sai da mesa · 0,3 s' },
+    { tipo: 'festa', valor: 128, t: 0.45, rotulo: 'Festa da subida · 0,45 s' },
+  ];
+  for (const m of MUNDOS) {
+    const tema = TEMAS[m.n];
+    definirTema(tema); limparCache();
+    const cap = document.createElement('div');
+    cap.innerHTML = `<b style="display:block;font-size:22px">Mundo ${m.n} · ${m.nome}</b><span style="display:block;color:#cfc6da;font-size:14.5px;line-height:1.35;margin-top:6px">${EXPL[m.n]}</span>`;
+    g.appendChild(cap);
+    for (const q of QUADROS) {
+      const f = document.createElement('figure');
+      const cv = document.createElement('canvas');
+      cv.width = C * dpr; cv.height = C * dpr; cv.style.width = C + 'px'; cv.style.height = C + 'px';
+      const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+      tema.mesa.tabuleiro(ctx, { x: 4, y: 4, w: C - 8, h: C - 8 }, tema.paleta, 0, 0);
+      const cx = C / 2, cy = C * 0.56;
+      if (q.tipo !== 'completar') desenharCarta(ctx, { id: 1, tipo: 'normal', v: q.valor }, { x: cx - cw / 2, y: cy - ch / 2, w: cw, h: ch, dpr, t: 0.6 });
+      else desenharCarta(ctx, { id: 1, tipo: 'normal', v: 2048 }, { x: cx - cw / 2, y: cy - ch / 2 - ch * 0.5, w: cw, h: ch, dpr, t: 0.6, esc: 1.15, alpha: 0.6 });
+      const part = criarParticulas();
+      registrarFormas(part, tema);
+      tocarEfeito({ tipo: q.tipo, x: cx, y: cy, valor: q.valor, degrau: q.degrau }, { part, tema, esc: cw / 62, ch, textos: { combo: 'COMBO ×{n}' } });
+      for (let i = 0; i < Math.round(q.t * 60); i++) part.atualizar(1 / 60);
+      part.desenhar(ctx);
+      if (q.tipo === 'festa') Tr.festa(ctx, q.t, { W: C, H: C, texto: '128!', y: C * 0.26, cores: tema.paleta.festa, semente: 7 });
+      f.appendChild(cv);
+      const c = document.createElement('figcaption'); c.innerHTML = `<span>${q.rotulo}</span>`; f.appendChild(c);
+      g.appendChild(f);
+    }
   }
   document.fonts.ready.then(() => { document.title = 'PRONTO'; });
 }

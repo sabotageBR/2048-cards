@@ -99,7 +99,7 @@ body.sem-animacao *, body.sem-animacao *::before, body.sem-animacao *::after { a
 .painel.comEscada .barra { height: 10px; border-width: 1.5px; }
 .painel.comEscada #metaTxt { display: none; }
 
-/* aviso curto (bau, missao, novidade do mundo): no meio da mesa, no estilo do painel */
+/* aviso curto de premio (bau do mundo, missao feita): no meio da mesa, no estilo do painel */
 #aviso {
   position: fixed; left: 50%; top: var(--avisoY, 50%); transform: translate(-50%, -50%); z-index: 3; pointer-events: none;
   display: flex; flex-direction: column; align-items: center; gap: 2px; width: max-content; max-width: min(92vw, 440px);

@@ -4,6 +4,7 @@
 // clara com feltro musgo.
 import { circulo, elipse, rgba, escurecer, clarear } from '../desenho.js';
 import { criarCartas, criarMesa, medidasCena, faixaVertical, luz, onda, particulas, semente } from './kit.js';
+import { folha, petala } from '../formas.js';
 
 const CORES = ['#7cb342', '#3f8fd2', '#f57c00', '#8e63d6', '#e0435d', '#1fa38a', '#e6a100', '#c2408f', '#4560d8', '#10a5b8', '#e53935', '#d4a017'];
 
@@ -20,6 +21,22 @@ export default {
   id: 'floresta', nome: 'Floresta',
   paleta: {
     id: 'floresta', painelA: '#2f5d3a', painelB: '#1d3d26', fundo: '#bfe6ff', texto: '#ffffff', acento: '#ffd23f', secundario: '#ff7a59', hud: '#24442c',
+    festa: ['#ffd23f', '#7ab342', '#ff7a59', '#ffffff', '#e6a100', '#ffd0dc'], clarao: '#fff8dc',
+  },
+  formas: { folha, petala },
+  /** A explosao da Floresta: folhas e petalas saem, giram e caem devagar balancando; polen no ar. */
+  efeito(e, P, esc) {
+    const { x, y, cor } = e;
+    const folhas = (n, forca, op = {}) => P.estourar(x, y, [cor, '#7ab342', '#e6a100', '#9ab04a'], n, forca * esc, { forma: 'folha', tam: 9 * esc, g: 170, vida: 1.1, osc: 7 * esc, oscF: 6, arrasto: 0.96, vr: 5, ...op });
+    const petalas = (n, forca) => P.estourar(x, y, ['#ffd0dc', '#fff6d0', '#ffb3c6'], n, forca * esc, { forma: 'petala', tam: 7 * esc, g: 120, vida: 1.2, osc: 9 * esc, oscF: 5, arrasto: 0.95, vr: 4 });
+    const polen = (n, forca) => P.estourar(x, y, ['#fff6c8', '#ffe27a'], n, forca * esc, { forma: 'c', tam: 3 * esc, g: -30, vida: 0.8, arrasto: 0.97, osc: 4 * esc });
+    switch (e.tipo) {
+      case 'fusao': folhas(6 + e.degrau * 3, 0.6 + e.degrau * 0.1); polen(6, 0.5); P.anel(x, y, cor, (28 + e.degrau * 6) * esc); return true;
+      case 'completar': folhas(28, 1.4); petalas(14, 1.5); polen(10, 0.8); P.anel(x, y, '#ffe27a', 70 * esc); return true;
+      case 'graduar': folhas(6, 0.5, { g: -60, vida: 0.8 }); return true;
+      case 'festa': folhas(26, 1.5); petalas(14, 1.6); polen(14, 1); return true;
+      default: return false;
+    }
   },
   parado(ctx, W, H, L) {
     const { hy, u, retrato } = medidasCena(W, H, L);

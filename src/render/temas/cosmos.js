@@ -4,6 +4,7 @@
 // (perto da referencia de docs/referencia/); mesa de vidro escuro com aro neon.
 import { circulo, elipse, estrela, misturar } from '../desenho.js';
 import { criarCartas, criarMesa, medidasCena, faixaVertical, luz, semente } from './kit.js';
+import { luz4, risco, anelNeon } from '../formas.js';
 
 const CORES = ['#7dff6a', '#4db8ff', '#ff9a3d', '#b28cff', '#ff4f8b', '#2effc4', '#ffcf3c', '#ff5cf0', '#7f8cff', '#3df2ff', '#ff4646', '#ffe066'];
 
@@ -11,6 +12,23 @@ export default {
   id: 'cosmos', nome: 'Cosmos',
   paleta: {
     id: 'cosmos', painelA: '#2a1d5e', painelB: '#120c30', fundo: '#0b0820', texto: '#ffffff', acento: '#c084fc', secundario: '#38e8ff', hud: '#1a1240',
+    festa: ['#c084fc', '#38e8ff', '#ff5cf0', '#ffffff', '#ffe066', '#7dff6a'], clarao: '#e6d8ff',
+  },
+  formas: { luz4, risco, anelNeon },
+  /** A explosao do Cosmos: faiscas de quatro pontas e riscos neon com rastro (mistura 'lighter'); no 2048, a supernova de aneis. */
+  efeito(e, P, esc) {
+    const { x, y, cor } = e;
+    const NEON = [cor, '#38e8ff', '#ff5cf0', '#ffffff'];
+    const faiscas = (n, forca, op = {}) => P.estourar(x, y, NEON, n, forca * esc, { forma: 'luz4', tam: 9 * esc, g: 0, vida: 0.7, arrasto: 0.94, vr: 4, mistura: 'lighter', sobe: 0, ...op });
+    const riscos = (n, forca, op = {}) => P.estourar(x, y, NEON, n, forca * esc, { forma: 'risco', tam: 6 * esc, g: 0, vida: 0.55, arrasto: 0.93, semGiro: true, mistura: 'lighter', sobe: 0, ...op });
+    const anel = (tam, vida = 0.5) => P.add({ x, y, vida, tam, cor, forma: 'anelNeon', mistura: 'lighter' });
+    switch (e.tipo) {
+      case 'fusao': faiscas(5 + e.degrau * 2, 0.7 + e.degrau * 0.12); riscos(5 + e.degrau * 2, 0.9 + e.degrau * 0.12); anel((28 + e.degrau * 6) * esc); return true;
+      case 'completar': faiscas(22, 1.5); riscos(22, 1.8); anel(70 * esc, 0.6); anel(40 * esc, 0.9); return true;
+      case 'graduar': faiscas(6, 0.5, { g: -100 }); return true;
+      case 'festa': faiscas(24, 1.6, { vida: 0.9 }); riscos(20, 2, { vida: 0.7 }); anel(60 * esc, 0.7); anel(110 * esc, 1); return true;
+      default: return false;
+    }
   },
   parado(ctx, W, H, L) {
     const { hy, u, retrato } = medidasCena(W, H, L);

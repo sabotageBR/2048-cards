@@ -1,8 +1,9 @@
 // Folhas dos 5 mundos (render/temas/, Elementos) para revisar o visual: tira
 // os prints do jogo pelo Chrome headless em docs/mundos/prints/ (retrato,
-// paisagem e as regras na tela) e fotografa tools/mundos.html em
-// docs/mundos/<folha>.png.
-// Uso: node tools/mundos.mjs [retrato|paisagem|cartas|regras ...]   (padrao: todas)
+// paisagem, as regras na tela e a festa da subida de nivel) e fotografa
+// tools/mundos.html em docs/mundos/<folha>.png (a folha `festa` vai para
+// docs/escada/subida-de-nivel.png).
+// Uso: node tools/mundos.mjs [retrato|paisagem|cartas|regras|explosoes|festa ...]   (padrao: todas)
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,13 +12,17 @@ import { chrome, shot } from './shot.mjs';
 
 const PORTA = 5356;
 const PRINTS = join(RAIZ, 'docs/mundos/prints');
-const FOLHAS = { retrato: '2120x1130', paisagem: '2040x980', cartas: '1570x1700', regras: '1690x1090' };
+const FOLHAS = { retrato: '2120x1130', paisagem: '2040x980', cartas: '1570x1700', regras: '1690x1090', explosoes: '1300x1960', festa: '1690x1130' };
+/** Folhas que saem fora de docs/mundos/. */
+const SAIDA = { festa: 'docs/escada/subida-de-nivel.png' };
 const BASE = 'fixo&semanuncio&semanim&lang=pt';
 const MESA = 'vitrine&' + BASE;
 /** Fase global do comeco de cada mundo (o ?vitrine segue o mundo dela). */
 const INICIO = [1, 9, 17, 25, 33];
 /** Gestos das regras: tres descartes enchem a pilha (3/3); o video esvazia. */
 const ENCHER = 'nivel=2&semanuncio&semanim&lang=pt&gesto=key:d@600;key:d@1000;key:d@1400';
+/** A abertura do nivel 1 (o 16 em 3 jogadas, com cascata) e uma 4a jogada durante a festa da subida. */
+const ABERTURA = 'nivel=1&fixo&semanuncio&semanim&lang=pt&gesto=fila0>col2@400;fila0>col2@1000;fila0>col0@1600;fila0>col1@3300';
 
 const pedidas = process.argv.slice(2).filter((f) => FOLHAS[f]);
 const folhas = pedidas.length ? pedidas : Object.keys(FOLHAS);
@@ -36,6 +41,14 @@ function printsDe(folha) {
       [`${ENCHER};click:vDescarte@2000`, '390x844', 'regra-video.png', 14000],
     ];
   }
+  if (folha === 'festa') {
+    return [
+      [ABERTURA, '390x844', 'festa-1.png', 1900],
+      [ABERTURA, '390x844', 'festa-2.png', 2650],
+      [ABERTURA, '390x844', 'festa-3.png', 3100],
+      [ABERTURA, '390x844', 'festa-4.png', 3600],
+    ];
+  }
   return [];
 }
 
@@ -48,14 +61,14 @@ async function emLotes(tarefas, n) {
 async function fotografarFolha(folha) {
   const perfil = mkdtempSync(join(tmpdir(), 'c2-mundos-'));
   const [w, h] = FOLHAS[folha].split('x');
-  const saida = join(RAIZ, 'docs/mundos', `${folha}.png`);
+  const saida = join(RAIZ, SAIDA[folha] || `docs/mundos/${folha}.png`);
   await chrome([
     '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check', `--user-data-dir=${perfil}`,
     `--window-size=${w},${h}`, '--virtual-time-budget=5000', `--screenshot=${saida}`,
     `http://127.0.0.1:${PORTA}/tools/mundos.html?folha=${folha}`,
   ], 120000);
   rmSync(perfil, { recursive: true, force: true });
-  process.stdout.write(`docs/mundos/${folha}.png\n`);
+  process.stdout.write(`${SAIDA[folha] || `docs/mundos/${folha}.png`}\n`);
 }
 
 mkdirSync(PRINTS, { recursive: true });

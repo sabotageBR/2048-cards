@@ -1,6 +1,8 @@
 // Cena: canvas de tela cheia com o cenario do mundo (camada parada em cache),
-// a mesa com a linha do tempo, particulas, mao de ajuda, entrada de fase e
-// transicoes. Nao conhece a Poki nem o DOM alem do canvas.
+// a mesa com a linha do tempo, particulas (as explosoes de cada mundo saem de
+// efeitos.js e do tema), mao de ajuda, a festa da subida de nivel por cima
+// do jogo, entrada de mundo e a transicao de fim de mundo. Nao conhece a
+// Poki nem o DOM alem do canvas.
 // Um relogio so: o `agora` do main.js (ms) move a linha e os efeitos.
 import { calcularLayout } from './layout.js';
 import { desenharMesa, desenharMao, desenharGuia } from './mesa.js';
@@ -9,10 +11,10 @@ import { criarParticulas } from './particulas.js';
 import { temaDe } from './temas/index.js';
 import { definirRotulos } from './temas/kit.js';
 import { limparCache, definirTema } from './cartas.js';
-import { TINTA } from './desenho.js';
+import { rgba } from './desenho.js';
+import { tocarEfeito, registrarFormas } from './efeitos.js';
 import { Transicoes as Tr } from './transicoes.js';
 
-const FONTE = 'Fredoka, "Arial Rounded MT Bold", system-ui, sans-serif';
 /** Tela clara quando o 2048 sai da mesa (ms). */
 const CLARAO_MS = 420;
 
@@ -57,6 +59,7 @@ export function criarCena(canvas) {
   function escolherTema(n) {
     const t = temaDe(n);
     definirTema(t);
+    registrarFormas(part, t);
     limparCache();
     return t;
   }
@@ -96,38 +99,17 @@ export function criarCena(canvas) {
     linha.montar(eventos, L, agora, info);
   }
 
+  /** Escala dos efeitos pela largura da carta. */
+  const escala = () => Math.max(0.6, Math.min(1.4, L.cw / 62));
+
   function efeito(e, agora) {
-    const esc = Math.max(0.6, Math.min(1.4, L.cw / 62));
-    switch (e.tipo) {
-      case 'pouso':
-        part.estourar(e.x, e.y + L.ch * 0.3, ['#ffe27a', '#f6c453', '#fff3c2'], 9, 0.4 * esc, { g: 160, vida: 0.45, tam: 4 * esc, forma: 'c' });
-        break;
-      case 'fusao': {
-        const cor = tema.cor(e.valor);
-        part.estourar(e.x, e.y, [cor, '#ffe27a', '#ffffff'], 8 + e.degrau * 3, (0.7 + e.degrau * 0.12) * esc, { forma: 'estrela', tam: 8 * esc, g: 300 });
-        part.anel(e.x, e.y, cor, (28 + e.degrau * 6) * esc);
-        if (e.degrau > 1) part.texto(e.x, e.y - L.ch * 0.4, '×' + e.degrau, '#ffe27a', (22 + e.degrau * 2) * esc, TINTA);
-        break;
-      }
-      case 'completar':
-        part.estourar(e.x, e.y, ['#ffe27a', '#ffffff', '#12bfd2'], 30, 1.5 * esc, { forma: 'estrela', tam: 11 * esc });
-        part.anel(e.x, e.y, '#ffe27a', 70 * esc);
-        clarao = agora;
-        break;
-      case 'graduar':
-        // a carta pequena sai da mesa: brilho para cima, na cor dela
-        part.estourar(e.x, e.y, [tema.cor(e.valor), '#ffffff'], 8, 0.6 * esc, { forma: 'estrela', tam: 6 * esc, g: -120, vida: 0.6 });
-        break;
-      case 'explodir':
-        part.estourar(e.x, e.y, ['#ff8a3d', '#ffd23f', '#ff3b3b'], 22, 1.3 * esc, { forma: 'estrela', tam: 9 * esc });
-        part.subir(e.x, e.y, ['rgba(70,60,70,0.7)', 'rgba(120,110,120,0.6)'], 7, { tam: 16 * esc, vida: 0.8, larg: 30 * esc });
-        part.anel(e.x, e.y, '#ffd23f', 50 * esc);
-        break;
-      case 'combo':
-        if (e.n >= 2) part.texto(e.x, e.y - L.ch * 0.75, txt.combo.replace('{n}', String(e.n)), '#ff9f2f', (22 + Math.min(10, e.n * 2)) * esc, TINTA);
-        break;
-      default: break;
-    }
+    if (e.tipo === 'completar') clarao = agora;
+    tocarEfeito(e, { part, tema, esc: escala(), ch: L.ch, textos: txt });
+  }
+
+  /** A festa da subida de nivel (e do 2048 do mundo): a explosao grande do mundo em (x, y). */
+  function festejar(x, y, valor) {
+    tocarEfeito({ tipo: 'festa', x, y, valor }, { part, tema, esc: escala(), ch: L.ch, textos: txt });
   }
 
   /**
@@ -147,7 +129,7 @@ export function criarCena(canvas) {
   /** Por cima de tudo: clarao do 2048 e vinheta vermelha da febre. */
   function frente(agora, febre) {
     const u = (agora - clarao) / CLARAO_MS;
-    if (u >= 0 && u < 1) { ctx.fillStyle = `rgba(255,250,225,${0.75 * (1 - u) * (1 - u)})`; ctx.fillRect(0, 0, W, H); }
+    if (u >= 0 && u < 1) { ctx.fillStyle = rgba(tema.paleta.clarao || '#fffae1', 0.75 * (1 - u) * (1 - u)); ctx.fillRect(0, 0, W, H); }
     if (febre) {
       const k = 0.5 + 0.5 * Math.sin(agora / 125);
       const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
@@ -156,20 +138,8 @@ export function criarCena(canvas) {
     }
   }
 
-  /** A frase do guia da fase 1, no pe da mesa (a mesa comeca quase vazia; as colunas ficam no alto). */
-  function desenharTextoGuia(s) {
-    const tam = Math.round(Math.max(14, Math.min(21, L.cw * 0.2)));
-    const x = L.mesa.x + L.mesa.w / 2, y = L.mesa.y + L.mesa.h - tam * 1.3;
-    ctx.save();
-    ctx.font = `700 ${tam}px ${FONTE}`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
-    ctx.lineWidth = tam * 0.24; ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.strokeText(s, x, y);
-    ctx.fillStyle = '#fff6d2'; ctx.fillText(s, x, y);
-    ctx.restore();
-  }
-
   /**
-   * @param {{ estado: any, agora: number, trans?: any, tEntrada?: number, arrasto?: any, destaque?: number, legal?: boolean, mao?: any, textoGuia?: string, febre?: number, info?: any, semFila?: boolean, alvo?: string }} q
+   * @param {{ estado: any, agora: number, trans?: any, festa?: any, tEntrada?: number, arrasto?: any, destaque?: number, legal?: boolean, mao?: any, febre?: number, info?: any, semFila?: boolean, alvo?: string }} q
    */
   function desenhar(q) {
     if (!L) return;
@@ -179,7 +149,7 @@ export function criarCena(canvas) {
     tema.vivo(ctx, W, H, tVis, L);
     const pal = tema.paleta;
     const t = q.agora / 1000;
-    // entrada de fase e soco de camera da vitoria
+    // entrada de mundo e soco de camera do fim do mundo
     let zoom = 1, branco = 0;
     if (q.tEntrada !== undefined && q.tEntrada > -1e8) {
       const en = Tr.entrada((q.agora - q.tEntrada) / 1000);
@@ -196,20 +166,21 @@ export function criarCena(canvas) {
     part.desenhar(ctx);
     if (q.mao && q.mao.de) desenharGuia(ctx, q.mao, tVis, dpr);
     else if (q.mao) desenharMao(ctx, q.mao.x, q.mao.y, tVis, '#fff');
-    if (q.textoGuia && q.mao) desenharTextoGuia(q.textoGuia);
     ctx.restore();
+    // a festa da subida de nivel: por cima da mesa, sem zoom e sem bloquear (pode comecar no futuro, depois da cascata)
+    if (q.festa && q.agora >= q.festa.t0) {
+      Tr.festa(ctx, (q.agora - q.festa.t0) / 1000, { W, H, texto: q.festa.texto, y: L.mesa.y + L.mesa.h * 0.3, cores: pal.festa, semente: q.festa.semente });
+    }
     frente(q.agora, !!q.febre);
     if (branco > 0) { ctx.fillStyle = `rgba(255,255,255,${branco})`; ctx.fillRect(0, 0, W, H); }
     if (trans) {
-      Tr.desenhar(ctx, trans.tipo, (q.agora - trans.t0) / 1000, { W, H, fx: trans.fx, fy: trans.fy, texto: q.info && q.info.texto, textoMundo: q.info && q.info.textoMundo, pontos: [], corMundo: trans.corMundo, semente: trans.semente, trilha: trans.trilha });
+      Tr.desenhar(ctx, trans.tipo, (q.agora - trans.t0) / 1000, { W, H, fx: trans.fx, fy: trans.fy, texto: q.info && q.info.texto, textoMundo: q.info && q.info.textoMundo, corMundo: trans.corMundo, cores: pal.festa, semente: trans.semente });
     }
   }
 
   return {
-    redimensionar, definirRegras, definirReino, definirVisual, definirTextos, tocar, atualizar, desenhar, part, linha,
+    redimensionar, definirRegras, definirReino, definirVisual, definirTextos, tocar, atualizar, desenhar, festejar, part, linha,
     get L() { return L; }, get pal() { return tema.paleta; }, get reino() { return reino; },
     get W() { return W; }, get H() { return H; },
   };
 }
-
-export { FONTE };

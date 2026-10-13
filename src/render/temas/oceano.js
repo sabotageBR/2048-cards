@@ -4,6 +4,7 @@
 // numero branco; mesa de vidro com aro aqua.
 import { circulo, elipse, escurecer, clarear, rgba } from '../desenho.js';
 import { criarCartas, criarMesa, medidasCena, faixaVertical, luz, onda, particulas, semente } from './kit.js';
+import { bolha, gota } from '../formas.js';
 
 const CORES = ['#4fbf63', '#3a9cf5', '#ff8a3d', '#9b7bff', '#ff5778', '#17b89a', '#ffad1f', '#e45bbf', '#5878ff', '#13b7d6', '#ff4757', '#f5c518'];
 
@@ -20,6 +21,21 @@ export default {
   id: 'oceano', nome: 'Oceano',
   paleta: {
     id: 'oceano', painelA: '#0f4c7a', painelB: '#08304f', fundo: '#1a9cc4', texto: '#ffffff', acento: '#5ff0ff', secundario: '#ff7a8a', hud: '#0b3a5c',
+    festa: ['#5ff0ff', '#ffffff', '#ff7a8a', '#9be8ff', '#ffe27a', '#2bb5d6'], clarao: '#dffbff',
+  },
+  formas: { bolha, gota },
+  /** A explosao do Oceano: bolhas sobem balancando e estouram; no 2048 e na festa, um jato de gotas. */
+  efeito(e, P, esc) {
+    const { x, y, cor } = e;
+    const bolhas = (n, forca, op = {}) => P.estourar(x, y, ['#dffbff', '#9be8ff', cor], n, forca * esc, { forma: 'bolha', tam: 9 * esc, g: -160, vida: 1.1, osc: 5 * esc, oscF: 7, arrasto: 0.95, semGiro: true, sobe: 90, ...op });
+    const gotas = (n, forca) => P.estourar(x, y, ['#bfe8ff', '#5aa9e6', '#ffffff'], n, forca * esc, { forma: 'gota', tam: 7 * esc, g: 650, vida: 0.75, dir: -Math.PI / 2, abre: 1.3, sobe: 120, semGiro: true, arrasto: 0.99 });
+    switch (e.tipo) {
+      case 'fusao': bolhas(6 + e.degrau * 3, 0.5 + e.degrau * 0.1); P.anel(x, y, cor, (28 + e.degrau * 6) * esc); return true;
+      case 'completar': gotas(30, 1.6); bolhas(16, 1.2, { tam: 12 * esc }); P.anel(x, y, '#dffbff', 70 * esc); return true;
+      case 'graduar': bolhas(7, 0.4, { tam: 6 * esc }); return true;
+      case 'festa': bolhas(30, 1.5, { tam: 12 * esc, vida: 1.4 }); gotas(16, 1.2); return true;
+      default: return false;
+    }
   },
   parado(ctx, W, H, L) {
     const { hy, u, retrato } = medidasCena(W, H, L);

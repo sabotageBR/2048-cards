@@ -18,9 +18,11 @@ const falhas = [];
 const conferir = (ok, msg) => { if (!ok) falhas.push(msg); };
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// O intervalo comercial falso dura 2,5 s, mais que a sobra da transicao
-// (0,4 s depois da troca): com 400 ms um video de verdade travava o jogo na
-// passagem de fase e o banco passava assim mesmo.
+// O intervalo comercial falso dura 2,5 s, mais que a sobra da transicao de
+// fim de mundo (0,4 s depois da troca): com 400 ms um video de verdade
+// travava o jogo na passagem e o banco passava assim mesmo. Na subida de
+// nivel nao ha pausa: o start do nivel novo sai na hora e o intervalo vem
+// ~1,5 s depois da festa, fora de arrasto.
 const sdkFalso = `
 <script>
   const L = (...x) => parent.__anotar(...x);
@@ -117,15 +119,18 @@ if (cenario === 'bloqueado' || cenario === 'pendente') {
   await espera(3000);
   for (let i = 0; i < 160 && ct().J.n < 7; i++) await espera(250);
   conferir(ct().J.n >= 7, 'nao chegou a fase 7 (fase ' + ct().J.n + ')');
-  // para o automatico e deixa terminar o intervalo e a transicao que estiverem no meio
+  // para o automatico; a subida nao abre transicao nem pausa, e o intervalo vem ~1,5 s depois da festa
   ct().auto(0);
+  conferir(!ct().J.trans, 'a subida de nivel abriu uma transicao (devia ser so a festa)');
+  const iMedida = (m) => log.findIndex((l) => l[1] === 'measure' && l[2] === m);
+  conferir(iMedida('level/7/start') >= 0, 'level/7/start nao saiu na subida');
+  for (let i = 0; i < 24 && !nomes().includes('commercialBreak'); i++) await espera(250);
   for (let i = 0; i < 40 && ct().J.estado !== 'jogando'; i++) await espera(250);
   await espera(500);
   const cb = log.filter((l) => l[1] === 'commercialBreak');
-  const iMedida = (m) => log.findIndex((l) => l[1] === 'measure' && l[2] === m);
   conferir(cb.length >= 1, 'nenhum commercialBreak na entrada da fase 7');
-  // nada de intervalo antes: o primeiro vem entre o fim da 6 e o comeco da 7
-  conferir(cb.length && log.indexOf(cb[0]) > iMedida('level/6/complete') && log.indexOf(cb[0]) < iMedida('level/7/start'), 'primeiro commercialBreak fora da entrada da fase 7');
+  // nada de intervalo antes: o primeiro vem depois do fim da 6 e do start da 7 (o start sai na subida, antes do anuncio)
+  conferir(cb.length && iMedida('level/6/complete') < iMedida('level/7/start') && log.indexOf(cb[0]) > iMedida('level/7/start'), 'primeiro commercialBreak fora da entrada da fase 7');
   conferir(cb[0] && cb[0][2] === true, 'som nao estava mudo durante o commercialBreak');
   const iCb = log.indexOf(cb[0]);
   const stopAntes = log.slice(0, iCb).map((l) => l[1]).lastIndexOf('gameplayStop') > log.slice(0, iCb).map((l) => l[1]).lastIndexOf('gameplayStart');
@@ -134,7 +139,7 @@ if (cenario === 'bloqueado' || cenario === 'pendente') {
   conferir(!depoisCb.includes('gameplayStart'), 'gameplayStart depois do anuncio sem novo toque');
   const fimCb = log.find((l) => l[1] === 'fimCommercial');
   conferir(fimCb && fimCb[2] === true, 'som voltou antes do fim do anuncio');
-  conferir(fimCb && log.indexOf(fimCb) < iMedida('level/7/start'), 'a fase 7 nao comecou depois que o anuncio voltou');
+  conferir(fimCb && log.indexOf(fimCb) > iMedida('level/7/start'), 'o start da fase 7 devia sair na subida, antes do anuncio');
   conferir(!window.__calado(), 'som nao voltou depois do anuncio');
   const medidas = log.filter((l) => l[1] === 'measure').map((l) => l[2]);
   conferir(medidas.includes('level/3/start') && medidas.includes('level/3/complete'), 'measure de fase faltando: ' + medidas.join(','));

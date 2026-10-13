@@ -3,9 +3,13 @@
 //
 // Fluxo: o mundo entra (zoom recuando) -> o jogador arrasta ou toca para
 // jogar a carta da frente da fila numa coluna -> fusoes em cascata -> fez o
-// valor do nivel, o nivel sobe na mesma mesa: pausa curta com o valor feito e
-// a trilha do mundo, o intervalo comercial (a partir da fase 7, com espaco entre dois; a Poki decide
-// a frequencia) e o jogo segue. No 2048 o mundo termina e o proximo entra.
+// valor do nivel, o nivel sobe na mesma mesa sem parar o jogo: a festa (o
+// valor feito piscando, confete e a explosao do mundo) corre por cima da mesa
+// enquanto o jogador continua; o intervalo comercial, se for a hora (a partir
+// da fase 7, com espaco entre dois; a Poki decide a frequencia), vem logo
+// depois da festa e nunca no meio de um arrasto. No 2048 o mundo termina e o
+// proximo entra. Nenhum texto explica regra: o desenho, a mao guiada e a
+// animacao fazem isso.
 // Sem jogada legal e sem descarte: oferta de continuar (gratis 1x por nivel,
 // depois video) ou recomecar o nivel pela mesa pronta dele.
 
@@ -14,8 +18,7 @@ import { Transicoes as Tr } from './render/transicoes.js';
 import { criarPartida, jogar, desfazerPara, jogadasLegais, VERSAO_ESTADO } from './jogo/partida.js';
 import { melhorJogada } from './jogo/bot.js';
 import { ESPECIAIS } from './jogo/baralho.js';
-import { respeitaMarca } from './jogo/regras.js';
-import { MUNDOS, POR_MUNDO, TOTAL_FASES, faseDe, faseGlobal, mundoDe, posNoMundo, alvoDoNivel } from './jogo/fases.js';
+import { MUNDOS, POR_MUNDO, TOTAL_FASES, faseDe, faseGlobal, mundoDe, posNoMundo } from './jogo/fases.js';
 import { progressoDoNivel } from './jogo/metas.js';
 import { criarAudio } from './core/audio.js';
 import { criarArmazem } from './core/armazenamento.js';
@@ -44,7 +47,7 @@ const FASES_SEM_INTERVALO = 6;
 /** Ajuda gratis (mao) por ocio ou recusas seguidas, nos dois primeiros mundos. */
 const AJUDA_ATE = POR_MUNDO * 2;
 const OCIO_AJUDA = 6000;
-/** Jogador novo na fase 1, ate fazer o primeiro 16: o gesto guiado volta logo depois de cada jogada. */
+/** Jogador novo na fase 1 (ate o primeiro 16) e a carta nova do mundo na frente da fila: o gesto guiado volta logo depois de cada jogada. */
 const OCIO_GUIA = 1000;
 const RECUSAS_AJUDA = 3;
 // 2: a escada de valores (2026-10-13); o progresso da versao do duelo nao vale aqui
@@ -65,12 +68,14 @@ const MARCOS_MIN = [1, 2, 3, 5, 7, 10, 15];
 const J = {
   /** n: fase global (1..40) do nivel em jogo */
   n: 1, e: null, tJogo: 0, marco: 0, tocou: false,
-  /** 'jogando' | 'nivel' | 'vitoria' | 'chance' | 'fim' | 'anuncio' | 'menu' */
+  /** 'jogando' | 'vitoria' | 'chance' | 'fim' | 'anuncio' | 'menu' */
   estado: 'jogando',
-  hist: [], trans: null, tEntrada: -1e9, bloqueio: 0, agora: 0, tVis: 0,
+  /** trans: a transicao de fim de mundo (bloqueia); festa: a subida de nivel por cima do jogo (nao bloqueia); anuncio: o intervalo agendado para depois da festa */
+  hist: [], trans: null, festa: null, anuncio: null, tEntrada: -1e9, bloqueio: 0, agora: 0, tVis: 0,
   carregou: false, ultimaAcao: 0, mao: null, maoCalc: 0, arrasto: null, destaque: -1, legal: true,
-  tentativas: 0, autoProx: 0, congelado: false, febreAte: 0,
-  ajudaMedida: false, regraMaiorMedida: false, novidade: '', novidadeEspera: false, tChance: 0, itemPendente: '', bau: null, tAviso: 0,
+  tentativas: 0, autoProx: 0, febreAte: 0,
+  /** novidade: a carta especial nova do mundo, que a mao guiada mostra na primeira vez (sem texto) */
+  ajudaMedida: false, regraMaiorMedida: false, novidade: '', tChance: 0, itemPendente: '', bau: null, tAviso: 0,
   /** guia da fase 1: passos aceitos com a mao na tela (telemetria guia/N/feito) */
   guiaPassos: 0,
   /** intervalos comerciais pedidos; subidas de nivel e jogo ativo desde o ultimo (espacamento proprio) */
@@ -169,6 +174,7 @@ function prepararPartida(e, entrada) {
   J.estado = 'jogando';
   J.mao = null; J.maoCalc = 0; J.arrasto = null; J.destaque = -1;
   J.febreAte = 0; J.ajudaMedida = false;
+  J.festa = null; J.anuncio = null;
   J.ultimaAcao = J.agora; J.autoProx = J.agora + (dep.auto ? 700 : 0);
   J.tEntrada = entrada && !dep.fixo ? J.agora : -1e9;
   J.bloqueio = J.agora + (entrada && !dep.fixo ? 220 : 0);
@@ -191,7 +197,7 @@ function guardarPartida() {
  * nivel 1). Com `retomar`, a partida salva continua de onde parou (o mundo e
  * o nivel vem dela). Cada recomeco do mesmo nivel muda a semente.
  */
-function carregarFase(n, entrada = true, retomar = false, novidadeNaJogada = false) {
+function carregarFase(n, entrada = true, retomar = false) {
   n = Math.min(TOTAL_FASES, Math.max(1, n));
   if (n !== J.n) J.tentativas = 0;
   const salva = retomar && save.partida && save.partida.e && save.partida.e.v === VERSAO_ESTADO && !save.partida.e.fim ? save.partida : null;
@@ -208,94 +214,42 @@ function carregarFase(n, entrada = true, retomar = false, novidadeNaJogada = fal
   prepararPartida(e, entrada);
   save.fase = n;
   save.max = Math.max(save.max, n);
-  prepararNovidade(novidadeNaJogada);
+  prepararNovidade();
   guardarPartida();
   salvar();
   poki.measure('level', String(n), 'start');
 }
 
 /**
- * Novidades do mundo (coringa, bomba, dobro, x4, 3 colunas, descarte
- * apertado): na primeira vez de cada uma, um aviso curto com a dica. Roda
+ * Novidade do mundo (coringa, bomba, dobro, x4): na primeira vez de cada
+ * carta nova nao ha texto; a mao guiada mostra o gesto quando a carta chega
+ * a frente da fila e o jogador para 1 s (OCIO_GUIA, como no nivel 1). Roda
  * na entrada da mesa e a cada subida de nivel (o mundo 1 traz duas, nos
- * niveis 2 e 4). A carta especial espera aparecer na fila (avisarNovidade,
- * a cada jogada); a regra nova sai logo, ou, com `naJogada` (entrada de
- * mundo, junto do bau e do anuncio), na primeira jogada aceita do mundo.
- * Fica marcada em save.vistas so quando aparece.
+ * niveis 2 e 4). Fica marcada em save.vistas quando a carta e jogada numa
+ * coluna.
  */
-function prepararNovidade(naJogada = false) {
+function prepararNovidade() {
   J.novidade = '';
-  J.novidadeEspera = false;
   const m = MUNDOS[mundoDe(J.n) - 1];
   if (!m || dep.fixo || !J.e) return;
-  const nv = m.novidades.find((x) => J.e.nivel >= x.nivel && !save.vistas.includes('novidade:' + x.tipo));
-  if (!nv) return;
-  J.novidade = nv.tipo;
-  J.novidadeEspera = naJogada;
-  if (!naJogada) avisarNovidade(900);
+  const nv = m.novidades.find((x) => J.e.nivel >= x.nivel && ESPECIAIS.includes(x.tipo) && !save.vistas.includes('novidade:' + x.tipo));
+  if (nv) J.novidade = nv.tipo;
 }
 
-/** O aviso da novidade, se for a hora (a carta especial ja esta na fila). @returns {boolean} se avisou */
-function avisarNovidade(atraso = 0, porJogada = false) {
-  const tipo = J.novidade;
-  if (!tipo || !J.e || (J.novidadeEspera && !porJogada)) return false;
-  const carta = ESPECIAIS.includes(tipo);
-  if (carta && !J.e.fila.some((k) => k.tipo === tipo)) return false;
+/** A carta nova do mundo esta na frente da fila: a mao guia como no nivel 1. */
+const novidadeNaFrente = () => !!J.novidade && !!J.e && !!J.e.fila[0] && J.e.fila[0].tipo === J.novidade;
+
+/** O jogador jogou a carta nova numa coluna: a novidade esta vista. */
+function novidadeVista(carta) {
+  if (!J.novidade || !carta || carta.tipo !== J.novidade) return;
+  save.vistas = [...save.vistas, 'novidade:' + J.novidade];
   J.novidade = '';
-  J.novidadeEspera = false;
-  save.vistas = [...save.vistas, 'novidade:' + tipo];
-  salvar();
-  const [titulo, texto] = T.novidade[tipo] || ['', ''];
-  setTimeout(() => avisar(titulo, texto, 4200), atraso);
-  return true;
-}
-
-/**
- * Regras que aparecem jogando, na primeira vez (save.vistas): um especial
- * por carta (o topo marcado com coringa, dobro ou x4 na mao) e o descarte
- * cheio (esvazia na subida de nivel).
- */
-function avisarRegras() {
-  if (!J.e || dep.fixo || J.novidade) return;
-  const ver = (chave, [titulo, texto]) => {
-    if (save.vistas.includes(chave)) return false;
-    save.vistas = [...save.vistas, chave];
-    avisar(titulo, texto, 4200);
-    return true;
-  };
-  if (respeitaMarca(J.e.fila[0]) && J.e.colunas.some((col) => col.length && col[col.length - 1].esp) && ver('regra:especial', T.regraEspecial)) return;
-  if (J.e.regras.descarteMax > 0 && J.e.descarteCarga <= 0) ver('regra:descarte', T.descarteCheio);
-}
-
-/**
- * Recusa "maior sobre menor": a regra estrita, dita uma vez por jogador
- * (save.vistas) e medida uma vez por sessao. No Player Fit Test da 0.4.1,
- * 11% dos jogadores somavam 3 recusas seguidas nos dois primeiros niveis.
- */
-function avisarRecusa(eventos) {
-  if (!eventos.some((ev) => ev.tipo === 'recusar' && ev.motivo === 'maior')) return;
-  if (!J.regraMaiorMedida) { J.regraMaiorMedida = true; poki.measure('regra', 'maior', 'first'); }
-  if (dep.fixo || save.vistas.includes('regra:maior')) return;
-  save.vistas = [...save.vistas, 'regra:maior'];
-  salvar();
-  avisar(T.regraMaior[0], T.regraMaior[1], 3200);
 }
 
 /** A fase 1 de quem nunca passou dela: o gesto guiado volta a cada jogada ate o primeiro 16. */
 const emGuia = () => J.n === 1 && save.max <= 1;
 
-/** A frase do guia, pela jogada que a mao mostra: igual funde; menor sob a maior; a coluna vazia aceita tudo. */
-function textoDoGuia() {
-  const a = J.mao;
-  if (!a || !J.e || a.tipo !== 'colocar' || !emGuia() || J.estado !== 'jogando' || J.arrasto) return '';
-  const col = J.e.colunas[a.c], carta = J.e.fila[a.k || 0];
-  if (!col || !carta) return '';
-  const t = col[col.length - 1];
-  if (!t) return T.guiaVazia;
-  return t.v === carta.v ? T.guiaIgual : T.guiaMenor;
-}
-
-// ------------------------------------------------------------- acoes// ------------------------------------------------------------- acoes
+// ------------------------------------------------------------- acoes
 /**
  * Aplica uma acao do jogador. origem = retangulo de onde a carta saiu (fila ou arrasto).
  * @returns {boolean} se a jogada foi aceita
@@ -309,13 +263,16 @@ function aplicar(acao, origem) {
   // a febre pode expirar na mesma acao: o primeiro evento nem sempre e a recusa
   const recusada = r.eventos.some((ev) => ev.tipo === 'recusar');
   cena.linha.acelerar(J.agora);
+  // jogou de novo durante a espera da festa: ela nao fica esperando a cascata cortada
+  if (J.festa && !J.festa.disparada) J.festa.t0 = Math.min(J.festa.t0, J.agora + 100);
   if (recusada) {
     J.e = r.estado;
     if (r.eventos.some((ev) => ev.tipo === 'febre' && !ev.ligada)) hud.febre(false);
     cena.tocar(r.eventos, J.agora, { antes, depois: r.estado, origem, carta });
     audio.recusa();
     vibrar(10);
-    avisarRecusa(r.eventos);
+    // a regra estrita (maior sobre menor), medida uma vez por sessao; sem texto: o proibido e o tremor explicam
+    if (!J.regraMaiorMedida && r.eventos.some((ev) => ev.tipo === 'recusar' && ev.motivo === 'maior')) { J.regraMaiorMedida = true; poki.measure('regra', 'maior', 'first'); }
     J.ultimaAcao = J.agora;
     return false;
   }
@@ -323,6 +280,7 @@ function aplicar(acao, origem) {
   if (emGuia() && acao.tipo === 'colocar' && J.guiaPassos < 5) { J.guiaPassos++; poki.measure('guia', String(J.guiaPassos), 'feito'); }
   J.hist = [antes];
   J.e = r.estado;
+  if (acao.tipo === 'colocar') novidadeVista(carta);
   cena.tocar(r.eventos, J.agora, { antes, depois: r.estado, origem, carta });
   J.ultimaAcao = J.agora;
   J.mao = null; J.maoCalc = 0;
@@ -333,26 +291,28 @@ function aplicar(acao, origem) {
     if (ev.tipo === 'martelo') audio.explodir();
   }
   J.itemPendente = '';
-  // missoes de sessao: premio em item na hora
+  // missoes de sessao: premio em item na hora (o aviso espera o valor feito piscar, se a jogada subiu de nivel)
   const pm = progredir(save.missoes, r.eventos, J.e);
   if (pm.estado !== save.missoes) {
     save.missoes = pm.estado;
+    const atraso = r.eventos.some((ev) => ev.tipo === 'nivel') ? 2200 : 0;
     for (const m of pm.concluidas) {
       J.e = { ...J.e, itens: { ...J.e.itens, [m.premio]: (J.e.itens[m.premio] || 0) + 1 } };
-      avisar(T.missaoFeita, `${textoMissao(T, m)} · ${ICONES[m.premio]}+1`);
+      const titulo = T.missaoFeita, texto = `${textoMissao(T, m)} · ${ICONES[m.premio]}+1`;
+      if (atraso) setTimeout(() => avisar(titulo, texto), atraso); else avisar(titulo, texto);
       // fora do funil de progresso (start/complete/fail): cai em Other Events
       poki.measure('missao', m.tipo, 'feita');
     }
     if (pm.concluidas.length) save.missoes = renovar(save.missoes);
   }
-  // nivel vencido: complete na hora; o start do nivel novo sai no fim da pausa
-  // (seguirNivel), depois do intervalo comercial. Uma cascata que pula um
-  // nivel inteiro comeca e termina ele aqui mesmo.
+  // nivel vencido: complete do nivel feito e start do novo na hora (o jogo
+  // nao para; e o measure fica calado durante o anuncio). Uma cascata que
+  // pula um nivel inteiro comeca e termina ele aqui mesmo.
   const niveis = r.eventos.filter((ev) => ev.tipo === 'nivel');
-  niveis.forEach((ev, i) => {
-    if (i > 0) poki.measure('level', String(J.n), 'start');
+  niveis.forEach((ev) => {
     poki.measure('level', String(J.n), 'complete');
     J.n = faseGlobal(J.e.mundo, ev.n);
+    poki.measure('level', String(J.n), 'start');
   });
   if (niveis.length) {
     J.tentativas = 0;
@@ -364,15 +324,14 @@ function aplicar(acao, origem) {
     save.max = Math.max(save.max, J.n);
     prepararNovidade();
   }
-  if (!avisarNovidade(0, true)) avisarRegras();
   atualizarHud();
   guardarPartida();
   salvar();
-  if (J.e.fim === 'venceu') {
-    if (niveis.length) poki.measure('level', String(J.n), 'start'); // o 2048 veio na mesma cascata
-    vencer();
-  } else if (niveis.length) subirNivel(niveis);
-  else if (J.e.fim) terminar(J.e.fim);
+  if (J.e.fim === 'venceu') vencer();
+  else {
+    if (niveis.length) subirNivel(niveis);
+    if (J.e.fim) terminar(J.e.fim);
+  }
   return true;
 }
 
@@ -403,6 +362,8 @@ const CARENCIA_MS = 300000;
 /** Entre dois intervalos: pelo menos 2 subidas de nivel e 150 s de jogo ativo (a Poki ainda decide a frequencia). */
 const ESPACO_SUBIDAS = 2;
 const ESPACO_MS = 150000;
+/** O intervalo da subida de nivel vem depois do valor feito piscar (ms depois do comeco da festa), fora de arrasto. */
+const ANUNCIO_DEPOIS_MS = 1500;
 const espacoOk = () => J.intervalos === 0 || (J.subidasDesdeIntervalo >= ESPACO_SUBIDAS && J.tJogo - J.tJogoIntervalo >= ESPACO_MS);
 /** Intervalo comercial na subida de nivel e no fim do mundo: so depois da carencia (fase 7 ou 5 min de jogo) e com espaco do anterior. */
 const podeIntervalo = () => !dep.semAnuncio && (J.n > FASES_SEM_INTERVALO || J.tJogo >= CARENCIA_MS) && espacoOk();
@@ -411,44 +372,25 @@ const podeIntervaloDeNovo = () => !dep.semAnuncio && J.tJogo >= CARENCIA_MS && e
 /** Um intervalo foi pedido: o espacamento conta a partir dele. */
 function marcarIntervalo() { J.intervalos++; J.subidasDesdeIntervalo = 0; J.tJogoIntervalo = J.tJogo; }
 
-/** A trilha do mundo na transicao: os 8 valores, o vencido acendendo, o proximo alvo. */
-function trilhaDe(pos) {
-  const valores = [];
-  for (let k = 1; k <= POR_MUNDO; k++) valores.push(alvoDoNivel(k));
-  return { pos, total: POR_MUNDO, valores, rotulo: T.proximo, nome: pos < POR_MUNDO ? String(alvoDoNivel(pos + 1)) : '' };
-}
-
 /**
- * Subida de nivel (o motor ja trocou o baralho e a meta): pausa curta com o
- * valor feito e a trilha, na mesma mesa, depois da cascata. O intervalo
- * comercial, se for a hora, vem no fim da pausa.
+ * Subida de nivel (o motor ja trocou o baralho e a meta): a festa por cima
+ * da mesa, depois da cascata, sem parar o jogo: o valor feito piscando,
+ * confete e a explosao do mundo. Uma cascata que sobe dois niveis festeja o
+ * ultimo. O intervalo comercial, se for a hora, fica agendado para depois da
+ * festa (ver atualizar), nunca no meio de um arrasto.
  */
 function subirNivel(niveis) {
-  J.estado = 'nivel';
-  poki.gameplayStop();
   const ult = niveis[niveis.length - 1];
   const L = cena.L;
   const espera = Math.min(1200, Math.max(0, cena.linha.fim - J.agora) + 120);
-  J.trans = {
-    tipo: 'nivel', t0: J.agora + espera, trocou: false, anuncio: false, parada: -1, festa: false, fimMundo: false,
-    fx: L.mesa.x + L.mesa.w / 2, fy: L.mesa.y + L.mesa.h / 2, semente: J.n * 31 + 7, corMundo: cena.pal.acento,
-    texto: `${ult.antes}!`, trilha: trilhaDe(ult.n - 1),
-  };
-}
-
-/** Fim da pausa da subida de nivel: o jogo segue (ou a mesa cheia que veio junto aparece). */
-function seguirNivel() {
-  J.trans.trocou = true;
-  if (J.estado !== 'nivel') return;
-  poki.measure('level', String(J.n), 'start');
-  J.estado = 'jogando';
-  J.ultimaAcao = J.agora;
-  if (J.e.fim) terminar(J.e.fim);
+  J.festa = { t0: J.agora + espera, valor: ult.antes, texto: `${ult.antes}!`, fx: L.mesa.x + L.mesa.w / 2, fy: L.mesa.y + L.mesa.h / 2, semente: J.n * 31 + 7, disparada: false };
+  if (!J.anuncio && podeIntervalo()) J.anuncio = { em: J.festa.t0 + ANUNCIO_DEPOIS_MS };
 }
 
 /** O 2048 do mundo: fim do mundo, bau e a transicao para o proximo. */
 function vencer() {
   J.estado = 'vitoria';
+  J.festa = null; J.anuncio = null; // o "2048!" e o intervalo do fim do mundo tomam o lugar
   poki.gameplayStop();
   poki.measure('level', String(J.n), 'complete');
   J.subidasDesdeIntervalo++;
@@ -470,17 +412,15 @@ function vencer() {
   const espera = Math.min(1600, Math.max(0, cena.linha.fim - J.agora) + 200);
   J.trans = {
     tipo: 'mundo', t0: J.agora + espera, trocou: false, anuncio: false, parada: -1, festa: false,
-    fx: L.mesa.x + L.mesa.w / 2, fy: L.mesa.y + L.mesa.h / 2, semente: J.n * 31 + 7, corMundo: cena.pal.acento, fimMundo: true,
-    texto: '2048!', trilha: null,
+    fx: L.mesa.x + L.mesa.w / 2, fy: L.mesa.y + L.mesa.h / 2, semente: J.n * 31 + 7, corMundo: cena.pal.acento,
+    texto: '2048!',
   };
 }
 
 /** Troca para o proximo mundo no meio da transicao (com intervalo, se for a hora). */
 function trocar() {
   J.trans.trocou = true;
-  if (J.trans.tipo === 'nivel') { seguirNivel(); return; }
-  // a novidade do mundo novo espera a primeira jogada: o bau (e o anuncio) ja ocupam a entrada
-  carregarFase(J.n >= TOTAL_FASES ? 1 : J.n + 1, true, false, true);
+  carregarFase(J.n >= TOTAL_FASES ? 1 : J.n + 1, true);
   if (J.bau) { avisar(T.bau, Object.entries(J.bau).filter(([, n]) => n > 0).map(([k, n]) => `${ICONES[k]}×${n}`).join('  ')); J.bau = null; }
 }
 
@@ -506,6 +446,7 @@ const temGratis = () => !!J.e && J.e.continuacoes === 0;
  */
 function terminar(motivo, medida = false) {
   poki.gameplayStop();
+  J.festa = null; J.anuncio = null; // o cartao da mesa cheia tem o proprio fluxo (e o proprio intervalo)
   if (!medida) {
     poki.measure('mesa', rotuloMedida(), 'cheia');
     if (mundoDe(J.n) === 1 && temGratis()) {
@@ -553,7 +494,7 @@ function atualizar(dt) {
   if (J.trans && J.trans.parada >= 0) J.trans.t0 = J.agora - J.trans.parada;
   const efeitos = cena.atualizar(dt / 1000, J.agora);
   // na subida de nivel a barra fica cheia ate a festa comecar; depois, a do nivel novo
-  if (J.e) hud.progresso(J.trans && J.trans.tipo === 'nivel' && J.agora < J.trans.t0 + 500 ? 1 : progressoDoNivel(J.e));
+  if (J.e) hud.progresso(J.festa && J.agora < J.festa.t0 + 500 ? 1 : progressoDoNivel(J.e));
   for (const e of efeitos) {
     switch (e.tipo) {
       case 'pouso': audio.pouso(); break;
@@ -563,6 +504,16 @@ function atualizar(dt) {
       case 'explodir': audio.explodir(); break;
       default: break;
     }
+  }
+  // a festa da subida de nivel e funcao do tempo: fecha mesmo sob o menu ou o anuncio
+  if (J.festa) {
+    const t = (J.agora - J.festa.t0) / 1000;
+    if (t >= 0 && !J.festa.disparada) {
+      J.festa.disparada = true;
+      cena.festejar(J.festa.fx, J.festa.fy, J.festa.valor);
+      if (J.estado === 'jogando') { audio.yes(false); vibrar([18, 50, 24]); }
+    }
+    if (t >= Tr.FESTA_FIM) J.festa = null;
   }
   if (J.estado === 'anuncio' || J.estado === 'menu') return;
   if (J.estado === 'jogando' && J.tocou) {
@@ -578,13 +529,25 @@ function atualizar(dt) {
     // a febre expira pelo relogio das acoes; aqui so o HUD apaga
     hud.febre(false);
   }
+  // o intervalo da subida de nivel: depois da festa, nunca no meio de um arrasto
+  if (J.anuncio && J.estado === 'jogando' && !J.arrasto && J.agora >= J.anuncio.em) {
+    J.anuncio = null;
+    J.estado = 'anuncio';
+    marcarIntervalo();
+    const voltar = () => {
+      if (J.estado === 'anuncio') J.estado = 'jogando';
+      J.ultimaAcao = J.agora;
+      atualizarHud();
+    };
+    poki.commercialBreak().then(voltar, voltar);
+  }
+  // fim do mundo: a transicao bloqueia ate o mundo novo entrar
   if (J.trans) {
     const t = (J.agora - J.trans.t0) / 1000;
     if (t >= 0 && !J.trans.festa) {
       J.trans.festa = true;
-      cena.part.estourar(J.trans.fx, J.trans.fy, '#ffd84a', 30, 1.5, 1);
-      audio.yes(J.trans.fimMundo);
-      if (J.trans.tipo === 'nivel') vibrar([18, 50, 24]);
+      cena.festejar(J.trans.fx, J.trans.fy, 2048);
+      audio.yes(true);
     }
     if (!J.trans.trocou && !J.trans.anuncio && t >= Tr.TROCA[J.trans.tipo]) {
       if (podeIntervalo()) {
@@ -601,16 +564,17 @@ function atualizar(dt) {
     }
     if (J.trans && t >= Tr.FIM[J.trans.tipo] + 0.4) J.trans = null;
   }
-  // mao de ajuda: ocio ou recusas seguidas, nos primeiros mundos (fora da mesa de demonstracao)
+  // mao de ajuda: ocio ou recusas seguidas, nos primeiros mundos (fora da mesa de demonstracao);
+  // o guia da fase 1 e a carta nova do mundo (novidade) voltam com 1 s de ocio, em qualquer mundo
   if (J.estado === 'jogando' && J.e && !J.arrasto && !dep.vitrine) {
     const parado = J.agora - J.ultimaAcao;
     const porRecusa = J.e.recusas >= RECUSAS_AJUDA;
-    const guiaInicial = emGuia();
-    const precisa = (J.n <= AJUDA_ATE && parado > (guiaInicial ? OCIO_GUIA : OCIO_AJUDA)) || porRecusa;
+    const guia = emGuia() || novidadeNaFrente();
+    const precisa = ((J.n <= AJUDA_ATE || guia) && parado > (guia ? OCIO_GUIA : OCIO_AJUDA)) || porRecusa;
     if (precisa && J.agora - J.maoCalc > 800) {
       J.maoCalc = J.agora;
-      // uma medida por nivel: o jogador travou (parado) ou nao entendeu a regra (recusas); o guia da fase 1 nao conta
-      if (!J.ajudaMedida && !guiaInicial) { J.ajudaMedida = true; poki.measure('ajuda', rotuloMedida(), porRecusa ? 'recusa' : 'ocio'); }
+      // uma medida por nivel: o jogador travou (parado) ou nao entendeu a regra (recusas); o guia (fase 1, carta nova) nao conta
+      if (!J.ajudaMedida && !guia) { J.ajudaMedida = true; poki.measure('ajuda', rotuloMedida(), porRecusa ? 'recusa' : 'ocio'); }
       // guarda a jogada; a posicao sai do layout de cada quadro (maoNaTela)
       const a = melhorJogada(J.e, J.agora);
       J.mao = a && (a.tipo === 'colocar' || a.tipo === 'descartar') ? a : null;
@@ -642,8 +606,8 @@ function quadro() {
   const tr = J.trans;
   const info = { texto: (tr && tr.texto) || T.yes, textoMundo: `${T.mundo} ${mundoDe(Math.min(TOTAL_FASES, J.n + (tr && tr.trocou ? 0 : 1)))}` };
   cena.desenhar({
-    estado: J.e, agora: J.agora, trans: J.trans, tEntrada: J.tEntrada, arrasto: J.arrasto, destaque: J.destaque, legal: J.legal, alvo: J.itemPendente || '',
-    mao: maoNaTela(), textoGuia: textoDoGuia(), febre: J.e && J.e.febre && J.agora < J.e.febreAte ? 1 : 0, info, semFila: false,
+    estado: J.e, agora: J.agora, trans: J.trans, festa: J.festa, tEntrada: J.tEntrada, arrasto: J.arrasto, destaque: J.destaque, legal: J.legal, alvo: J.itemPendente || '',
+    mao: maoNaTela(), febre: J.e && J.e.febre && J.agora < J.e.febreAte ? 1 : 0, info, semFila: false,
   });
 }
 
@@ -702,7 +666,7 @@ function tocar() {
 
 canvas.addEventListener('pointerdown', (e) => {
   audio.iniciar();
-  if (dep.quadro < 0 && !dep.filme) J.agora = Math.max(J.agora, performance.now());
+  J.agora = Math.max(J.agora, performance.now());
   if (J.estado !== 'jogando' || J.agora < J.bloqueio || !J.e) return;
   tocar();
   const L = cena.L;
@@ -872,7 +836,7 @@ botao('bMenu', abrirMenu);
 botao('bPausa', abrirMenu);
 
 document.addEventListener('visibilitychange', () => audio.pausarAba(document.hidden));
-addEventListener('resize', () => { layout(); if (J.congelado) quadro(); });
+addEventListener('resize', layout);
 
 // ------------------------------------------------------------- init
 poki.onAdStart = () => audio.mudoParaAnuncio();
@@ -958,7 +922,7 @@ function fazerGesto(g) {
 function resumo() {
   const e = J.e;
   return JSON.stringify({
-    estado: J.estado, menu: menus.aberto, fimAberto: menus.fimAberto, pontos: e.pontos, n: e.n, recusas: e.recusas, hist: J.hist.length,
+    estado: J.estado, festa: !!J.festa, anuncio: !!J.anuncio, menu: menus.aberto, fimAberto: menus.fimAberto, pontos: e.pontos, n: e.n, recusas: e.recusas, hist: J.hist.length,
     colunas: e.colunas.map((c) => c.map((k) => k.tipo === 'normal' ? k.v : k.tipo)), fila: e.fila.map((k) => k.tipo === 'normal' ? k.v : k.tipo),
     descarte: e.descarte ? e.descarte.v : null, carga: e.descarteCarga, fim: e.fim, fase: J.n, mundo: e.mundo, nivel: e.nivel, barra: $('barra').style.width, progresso: Number(progressoDoNivel(e).toFixed(3)),
     poki: { jogando: poki.jogando, jaJogou: poki.jaJogou },

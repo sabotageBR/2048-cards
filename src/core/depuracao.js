@@ -6,8 +6,6 @@
 //   ?semanuncio      nao pede intervalo comercial (prints e testes longos)
 //   ?lang=pt         forca o idioma (en, pt, es)
 //   ?regras={"colunas":5}     regras do laboratorio (JSON)
-//   ?quadro=900      joga ate vencer e congela a transicao no instante dado (ms)
-//   ?filme=12&dur=6000&larg=360   quadros JPEG em <pre id="filme"> (GIFs)
 //   ?gesto=fila0>col2@300;tap:col1@900;tap:desc@1200;key:z@1500   gestos simulados (ms)
 //   ?vitrine         mesa de demonstracao (todos os valores e os especiais)
 //   ?semhud          esconde o HUD (thumb)
@@ -22,7 +20,7 @@
 export function lerDepuracao() {
   const base = {
     local: false, ganchos: false, nivel: 0, auto: 0, fixo: false, semAnuncio: false, lang: '',
-    regras: null, quadro: -1, filme: 0, dur: 0, larg: 0, semHud: false, menu: false, gesto: '', vitrine: false, visual: '', semAnim: false,
+    regras: null, semHud: false, menu: false, gesto: '', vitrine: false, visual: '', semAnim: false,
   };
   let local = false;
   try {
@@ -45,13 +43,9 @@ export function lerDepuracao() {
     nivel: q.has('nivel') ? Math.max(1, parseInt(q.get('nivel') || '1', 10) || 1) : 0,
     auto: q.has('auto') ? Math.max(120, num('auto', 700)) : 0,
     fixo: q.has('fixo'),
-    semAnuncio: q.has('semanuncio') || q.has('quadro') || q.has('filme'),
+    semAnuncio: q.has('semanuncio'),
     lang: q.get('lang') || '',
     regras,
-    quadro: q.has('quadro') ? Number(q.get('quadro')) || 0 : -1,
-    filme: num('filme', 12),
-    dur: num('dur', 6000),
-    larg: num('larg', 360),
     semHud: q.has('semhud'),
     menu: q.has('menu'),
     gesto: q.get('gesto') || '',

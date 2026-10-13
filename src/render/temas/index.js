@@ -4,12 +4,17 @@
 // Contrato de um tema:
 //   { id, nome, paleta, parado(ctx, W, H, L), vivo(ctx, W, H, t, L),
 //     carta(ctx, carta, r), temBrilho(carta), brilho(ctx, carta, r, t), cor(v), raio(w),
-//     mesa: { tabuleiro, tapete, vazio, descarte, rotulo, rotuloContorno } }
+//     mesa: { tabuleiro, tapete, vazio, descarte, rotulo, rotuloContorno },
+//     formas?: { nome: (ctx, p, u) => void },   // formas de particula do mundo (formas.js)
+//     efeito?(e, part, esc) => boolean }        // a explosao do mundo (true = tratou)
 // `paleta` pinta o painel e a tela: painelA/B (viram --roxoA/B), fundo,
-// texto, acento, secundario e hud. `carta` pinta a parte parada da carta num
+// texto, acento, secundario e hud; `festa` e a lista do confete e `clarao` a
+// cor da tela clara do 2048. `carta` pinta a parte parada da carta num
 // retangulo centrado na origem (vai para a cache de cartas.js); `brilho` anda
-// por cima a cada quadro. `cartas` e `mesa` saem de kit.js. O tempo entra so
-// por `t` (s), nunca por performance.now().
+// por cima a cada quadro. `cartas` e `mesa` saem de kit.js. `efeito` recebe
+// e = { tipo: 'fusao'|'completar'|'graduar'|'festa', x, y, valor?, degrau?,
+// cor } e o emissor de particulas (efeitos.js tem o padrao e os textos).
+// O tempo entra so por `t` (s), nunca por performance.now().
 import floresta from './floresta.js';
 import oceano from './oceano.js';
 import neve from './neve.js';

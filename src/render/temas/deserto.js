@@ -4,6 +4,7 @@
 // interno) com a faixa de cor; mesa de arenito.
 import { circulo, rgba, escurecer } from '../desenho.js';
 import { criarCartas, criarMesa, medidasCena, faixaVertical, luz, particulas, semente } from './kit.js';
+import { grao } from '../formas.js';
 
 const CORES = ['#6aa33a', '#2f86d1', '#ea6a1f', '#7f5bd0', '#d93a55', '#139a85', '#e09400', '#c0438e', '#4258c9', '#0f9ab0', '#c92a2a', '#c9920e'];
 
@@ -32,6 +33,23 @@ export default {
   id: 'deserto', nome: 'Deserto',
   paleta: {
     id: 'deserto', painelA: '#7a3e2a', painelB: '#4e2618', fundo: '#f2a65a', texto: '#ffffff', acento: '#ffd166', secundario: '#2ec4b6', hud: '#5a2e1f',
+    festa: ['#ffd166', '#2ec4b6', '#ffffff', '#f2a65a', '#ff7a59', '#c46a58'], clarao: '#fff0c8',
+  },
+  formas: { grao },
+  /** A explosao do Deserto: graos de areia baixos e rapidos que assentam, com a poeira subindo; no 2048, um geiser. */
+  efeito(e, P, esc) {
+    const { x, y, cor } = e;
+    // claros e escuros alternados: os claros aparecem na mesa, os escuros sobre a carta de pergaminho
+    const AREIA = ['#fff1d0', '#b4783c', '#f2d29b', '#9c6a3a', '#ffffff', '#c9a06a'];
+    const graos = (n, forca, op = {}) => P.estourar(x, y, AREIA, n, forca * esc, { forma: 'grao', tam: 10 * esc, g: 820, vida: 0.8, dir: -Math.PI / 2, abre: 2.6, sobe: 40, arrasto: 0.985, vr: 8, ...op });
+    const poeira = (n, op = {}) => P.subir(x, y, ['rgba(226,196,150,0.45)', 'rgba(240,215,170,0.35)'], n, { tam: 11 * esc, vida: 0.8, larg: 30 * esc, forca: 0.6, ...op });
+    switch (e.tipo) {
+      case 'fusao': poeira(3); graos(10 + e.degrau * 3, 0.8 + e.degrau * 0.1); P.anel(x, y, cor, (28 + e.degrau * 6) * esc); return true;
+      case 'completar': poeira(8, { larg: 50 * esc, tam: 16 * esc, vida: 1.1 }); graos(44, 1.3, { abre: 0.9, sobe: 90, g: 900, vida: 0.9 }); P.anel(x, y, '#ffd166', 70 * esc); return true;
+      case 'graduar': poeira(3); graos(8, 0.6, { g: 500 }); return true;
+      case 'festa': poeira(10, { larg: 60 * esc, tam: 18 * esc, vida: 1.2 }); graos(40, 1.4, { abre: 1.6, sobe: 80, g: 900, vida: 1 }); return true;
+      default: return false;
+    }
   },
   parado(ctx, W, H, L) {
     const { hy, u, retrato } = medidasCena(W, H, L);

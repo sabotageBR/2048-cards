@@ -4,6 +4,7 @@
 // azul-noite.
 import { circulo, elipse, escurecer } from '../desenho.js';
 import { criarCartas, criarMesa, medidasCena, faixaVertical, luz, particulas, semente } from './kit.js';
+import { floco, caco } from '../formas.js';
 
 const CORES = ['#5cb860', '#4a9ff0', '#ff9045', '#9b82ff', '#f05a75', '#2fb59a', '#f2a72e', '#d360bd', '#5f78f2', '#2ab6cc', '#ec4848', '#e0ae17'];
 
@@ -37,6 +38,21 @@ export default {
   id: 'neve', nome: 'Neve',
   paleta: {
     id: 'neve', painelA: '#2b3d6e', painelB: '#18244a', fundo: '#1d2a55', texto: '#ffffff', acento: '#9fe3ff', secundario: '#ff8fb1', hud: '#1e2c55',
+    festa: ['#ffffff', '#9fe3ff', '#ff8fb1', '#c9d8ff', '#ffe27a', '#5e7fb8'], clarao: '#eaf6ff',
+  },
+  formas: { floco, caco },
+  /** A explosao da Neve: flocos de seis bracos caem devagar girando e balancando; cacos de gelo saltam. */
+  efeito(e, P, esc) {
+    const { x, y, cor } = e;
+    const flocos = (n, forca, op = {}) => P.estourar(x, y, ['#ffffff', '#dff2ff', '#b9dcff'], n, forca * esc, { forma: 'floco', tam: 8 * esc, g: 70, vida: 1.3, osc: 8 * esc, oscF: 3.5, arrasto: 0.95, vr: 2.5, ...op });
+    const cacos = (n, forca) => P.estourar(x, y, [cor, '#cfe6ff', '#ffffff'], n, forca * esc, { forma: 'caco', tam: 8 * esc, g: 520, vida: 0.7, vr: 9 });
+    switch (e.tipo) {
+      case 'fusao': flocos(6 + e.degrau * 3, 0.6 + e.degrau * 0.1); cacos(4 + e.degrau, 0.7); P.anel(x, y, cor, (28 + e.degrau * 6) * esc); return true;
+      case 'completar': flocos(30, 1.4); cacos(12, 1.4); P.anel(x, y, '#ffffff', 70 * esc); return true;
+      case 'graduar': flocos(6, 0.5, { g: -60, vida: 0.8 }); return true;
+      case 'festa': flocos(30, 1.5, { vida: 1.6 }); cacos(10, 1.3); return true;
+      default: return false;
+    }
   },
   parado(ctx, W, H, L) {
     const { hy, u, retrato } = medidasCena(W, H, L);
