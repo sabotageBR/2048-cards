@@ -33,7 +33,7 @@ html, body {
   top: 0; left: 0; right: 0; flex-direction: column; align-items: stretch;
   padding: calc(env(safe-area-inset-top, 0px) + 8px) calc(env(safe-area-inset-right, 0px) + 10px) 0 calc(env(safe-area-inset-left, 0px) + 10px);
 }
-/* retrato: botoes nos cantos da arena, logo abaixo do painel */
+/* retrato: botoes logo abaixo do painel, nos cantos */
 #topo .botoes { display: flex; gap: 8px; pointer-events: none; }
 #topo .botoes > * { pointer-events: auto; }
 #topo .botoes .vao { flex: 1; pointer-events: none; }
@@ -60,36 +60,46 @@ html, body {
 @keyframes pulsar { 50% { transform: scale(1.12); } }
 button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 body.sem-anuncio .anuncio { display: none !important; }
+/* prints (?semanim, so local): sem animacao CSS */
+body.sem-animacao *, body.sem-animacao *::before, body.sem-animacao *::after { animation: none !important; transition: none !important; }
+/* rewarded na barra de baixo: pilula roxa com o selo do video */
+.btn.video {
+  width: auto; padding: 0 14px 0 10px; gap: 6px; display: flex; align-items: center; font: inherit; font-size: 17px; color: #fff;
+  background: linear-gradient(#9a6bff, #6a3fd6); animation: chamar 2.4s ease-in-out infinite;
+}
+.btn.video .selo-video { font-style: normal; font-size: 18px; }
+@keyframes chamar { 0%, 80%, 100% { transform: none; } 88% { transform: scale(1.07); } }
 
-/* painel do duelo: fase e monstro, vida, metas e dano */
+/* painel: mundo e nivel, pontos e a barra do nivel (o valor que falta) */
 .painel {
   position: relative; display: flex; flex-direction: column; gap: 5px; padding: 8px 12px 7px; border-radius: 14px; min-width: 0;
   background: linear-gradient(var(--roxoA), var(--roxoB)); border: 2.5px solid var(--ouro);
   box-shadow: 0 3px 10px rgba(20, 6, 24, 0.4), inset 0 0 0 2px var(--roxoB), inset 0 0 0 3px rgba(232, 184, 74, 0.45);
 }
-.contorno, .painel #rotulo, .painel #pontos, .painel #vidaTxt {
+.contorno, .painel #rotulo, .painel #pontos, .painel #metaTxt {
   text-shadow: 2px 0 0 var(--tintaDuelo), -2px 0 0 var(--tintaDuelo), 0 2px 0 var(--tintaDuelo), 0 -2px 0 var(--tintaDuelo),
     1.4px 1.4px 0 var(--tintaDuelo), -1.4px 1.4px 0 var(--tintaDuelo), 1.4px -1.4px 0 var(--tintaDuelo), -1.4px -1.4px 0 var(--tintaDuelo);
 }
 .painel .linha1 { display: flex; align-items: center; gap: 8px; line-height: 1.1; }
 .painel #rotulo { flex: 1; min-width: 0; font-size: 16px; color: #ffe9b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 2px; }
-.painel .dano { display: flex; align-items: center; gap: 5px; flex: none; }
-.painel .dano small { font-size: 11px; color: #d9b9e0; letter-spacing: 0.5px; }
-.painel .espada { width: 18px; height: 18px; stroke: var(--tintaDuelo); stroke-width: 1.3; stroke-linejoin: round; }
+.painel .placar { display: flex; align-items: center; gap: 5px; flex: none; }
+.painel .placar small { font-size: 11px; color: #d9b9e0; letter-spacing: 0.5px; text-transform: uppercase; }
 .painel #pontos { font-size: 18px; color: #fff; transition: transform 0.12s; display: inline-block; }
 .painel #pontos.pula { transform: scale(1.18); }
-.painel .vida { position: relative; padding-left: 12px; }
-.painel .coracao { position: absolute; left: -2px; top: 50%; width: 26px; height: 24px; transform: translateY(-50%); z-index: 1; fill: #ff3b5c; stroke: var(--tintaDuelo); stroke-width: 1.6; }
+.painel .progresso { position: relative; }
 .painel .barra { position: relative; height: 24px; border-radius: 12px; background: #1a0b1d; border: 2px solid var(--ouro); overflow: hidden; }
-.painel .barra i { position: absolute; left: 2px; top: 2px; bottom: 2px; width: calc(100% - 4px); border-radius: 9px; }
-.painel #barraVis { background: #fff1c2; }
-.painel #barra { background: linear-gradient(#ff6b6b, #c81d3a); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.28); }
-.painel #vidaTxt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 14px; color: #fff; line-height: 1; }
-.painel .meta { display: flex; justify-content: center; gap: 10px; font-size: 12px; color: #f0dff2; white-space: nowrap; overflow: hidden; }
-.painel .meta small { opacity: 0.8; }
-.painel.semMeta .vida, .painel.semMeta #metaTxt { display: none; }
+.painel .barra i { position: absolute; left: 2px; top: 2px; bottom: 2px; width: 0; border-radius: 9px; transition: width 0.35s ease-out; }
+.painel #barra { background: linear-gradient(#ffe27a, #e0a100); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.35); }
+.painel #metaTxt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 14px; color: #fff; line-height: 1; white-space: nowrap; }
+/* opcao visual em teste (?visual=escada): os 8 valores do mundo no painel, o alvo em destaque e a barra fina embaixo */
+.painel .escada { display: flex; justify-content: space-between; align-items: center; gap: 3px; }
+.painel .escada i { font-style: normal; flex: 1; text-align: center; font-size: 12px; line-height: 20px; border-radius: 7px; color: rgba(255, 255, 255, 0.5); background: rgba(0, 0, 0, 0.25); }
+.painel .escada i.feito { color: #1c3a12; background: #9be07a; }
+.painel .escada i.alvo { flex: 1.5; font-size: 17px; line-height: 26px; color: var(--tintaDuelo); background: linear-gradient(#ffe27a, #e0a100); box-shadow: 0 0 0 2px #fff; }
+.painel.comEscada .barra { height: 10px; border-width: 1.5px; }
+.painel.comEscada #metaTxt { display: none; }
 
-/* aviso curto (bau, missao, feitico novo): no meio da mesa, no estilo do painel */
+/* aviso curto (bau, missao, novidade do mundo): no meio da mesa, no estilo do painel */
 #aviso {
   position: fixed; left: 50%; top: var(--avisoY, 50%); transform: translate(-50%, -50%); z-index: 3; pointer-events: none;
   display: flex; flex-direction: column; align-items: center; gap: 2px; width: max-content; max-width: min(92vw, 440px);
@@ -111,7 +121,6 @@ body.sem-anuncio .anuncio { display: none !important; }
 .missao .mp { opacity: 0.7; font-size: 13px; }
 .missao .mi { font-size: 16px; }
 .missao.feita { background: #d8f5e3; }
-.modos .acao { font-size: 14px; padding: 9px 6px; }
 
 /* febre */
 #febre {
@@ -122,9 +131,11 @@ body.sem-anuncio .anuncio { display: none !important; }
 @keyframes febre { from { transform: translateX(-50%) scale(2); opacity: 0; } }
 
 /* menu e fim: cartoes */
-#menu, #fim { position: fixed; inset: 0; z-index: 4; display: grid; place-items: center; background: rgba(10, 6, 24, 0.6); padding: 16px; }
+/* flex, nao grid: no grid a linha auto cresce ate o conteudo inteiro (a grade das 40 fases) e o cartao,
+   centrado nela, ia parar abaixo da tela; no flex a altura e definida e o max-height em % vale */
+#menu, #fim { position: fixed; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center; background: rgba(10, 6, 24, 0.6); padding: 16px; }
 .cartao {
-  width: min(400px, 100%); max-height: min(640px, calc(100% - 24px)); display: flex; flex-direction: column; gap: 12px;
+  width: min(400px, 100%); max-height: min(640px, calc(100% - 12px)); display: flex; flex-direction: column; gap: 12px;
   background: var(--creme); color: var(--tinta); border-radius: 26px; padding: 18px; box-shadow: 0 10px 0 var(--sombra);
   border: 4px solid var(--tinta);
 }
@@ -152,6 +163,8 @@ body.sem-anuncio .anuncio { display: none !important; }
 }
 .fase small { font-size: 12px; letter-spacing: 1px; color: #e3a400; }
 .fase.atual { background: #ffc93c; }
+.fase.feita { background: #d8f5e3; }
+.mundoTitulo { grid-column: 1 / -1; margin-top: 4px; font-size: 15px; text-align: left; opacity: 0.8; }
 .fase:disabled { background: #ece4d6; color: #b9ad9b; box-shadow: none; cursor: default; }
 .placarFim { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
 .placarFim b { font-size: 44px; }
@@ -170,14 +183,15 @@ body.sem-anuncio .anuncio { display: none !important; }
   #topo .botoes { display: contents; }
   #topo .botoes .vao { display: none; }
   #bMenu { order: 0; }
-  #painel { order: 1; flex: 1; display: grid; grid-template-columns: minmax(90px, auto) 1fr auto; grid-template-areas: 'nome vida dano' 'nome meta dano'; column-gap: 14px; row-gap: 4px; align-items: center; }
+  #painel { order: 1; flex: 1; display: grid; grid-template-columns: minmax(90px, auto) 1fr auto; grid-template-areas: 'nome barra placar'; column-gap: 14px; align-items: center; }
   #bDesfazer, #bPausa { order: 2; }
   .painel .linha1 { display: contents; }
   .painel #rotulo { grid-area: nome; white-space: normal; font-size: 17px; line-height: 1.15; }
-  .painel .dano { grid-area: dano; }
+  .painel .placar { grid-area: placar; }
   .painel #pontos { font-size: 24px; }
-  .painel .vida { grid-area: vida; width: min(520px, 100%); justify-self: center; }
-  .painel .meta { grid-area: meta; }
+  .painel .progresso { grid-area: barra; width: min(520px, 100%); justify-self: center; }
+  #painel.comEscada { grid-template-areas: 'nome escada placar' 'nome barra placar'; row-gap: 4px; }
+  .painel .escada { grid-area: escada; width: min(520px, 100%); justify-self: center; }
 }
 @media (orientation: landscape) and (max-height: 520px) {
   .btn { width: 42px; height: 42px; border-radius: 13px; }
@@ -185,7 +199,7 @@ body.sem-anuncio .anuncio { display: none !important; }
   #topo { gap: 6px; padding-top: calc(env(safe-area-inset-top, 0px) + 6px); }
   .painel { padding: 6px 10px 5px; }
   .painel .barra { height: 20px; }
-  .painel #vidaTxt { font-size: 12px; }
+  .painel #metaTxt { font-size: 12px; }
   .painel #pontos { font-size: 20px; }
 }
 @media (prefers-reduced-motion: reduce) { .btn.pulsar, #febre { animation: none; } }

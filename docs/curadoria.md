@@ -1,15 +1,76 @@
-# Curadoria das fases
+# Curadoria dos mundos
 
-Toda fase foi ajustada à mão e conferida pelo simulador (`npm run simular`; a tabela abaixo sai de `node tools/curadoria.mjs`, e o gráfico `docs/duelo/curva.png` de `node tools/curva.mjs`). São duas réguas (`tools/medir.mjs`):
+Cada mundo foi ajustado e conferido pelo simulador (`npm run simular`; a tabela abaixo sai de `node tools/curadoria.mjs`, e o gráfico `docs/escada/curva.png` de `node tools/curva.mjs`). O bot joga **o mundo inteiro numa mesa só** (`jogarMundo` em `bot.js`): o nível sobe na mesma mesa; na mesa cheia vem o "Continuar" grátis do nível e, sem ele, o recomeço pela mesa pronta do nível (`[alvo/2] [alvo/4]`, semente nova). São duas réguas (`tools/medir.mjs`):
 
-- **Guloso** (25 sementes): prova que a fase é vencível por quem joga bem. Piso: 82% de vitórias (78% na última do mundo); nenhuma fase trivial (mediana ≥ 5 jogadas).
-- **Casual** (`PERFIL_CASUAL` em `bot.js`, 160 partidas em duas séries de sementes): erra 1 em 5 jogadas, não prevê o feitiço e usa o "Continuar" grátis. Mede a curva: as vitórias dele ficam a até 8 pontos de `alvoCasual(n)` (`fases.js`) e nenhuma fase tem mais de 12 pontos a menos que a anterior.
+- **Guloso** (25 partidas por mundo): prova que cada nível é passável por quem joga bem. Piso: passa o nível sem recomeçar em 82% das partidas que chegaram a ele (78% no 2048).
+- **Casual** (`PERFIL_CASUAL` em `bot.js`, 160 partidas em duas séries de sementes): erra 1 em 5 jogadas e usa o "Continuar" grátis. Mede a curva: em quantas partidas ele passa o nível sem recomeçar fica a até 8 pontos de `alvoCasual(N)` (`fases.js`), nenhum nível tem mais de 12 pontos a menos que o anterior, e a mediana de jogadas do nível (com os recomeços) fica dentro de `ritmoMax` (60 no mundo 1, 80 nos outros).
 
-Estrelas: 2★ = 70% da pontuação mediana do guloso, 3★ = a mediana (o guloso joga melhor que um jogador casual, então 3★ é raro e 2★ é a meta de quem joga bem).
+## 2026-10-13 · a escada de valores (branch `so-cartas`)
 
-Regra de curva (vault): uma novidade por fase, nunca junto com salto de dificuldade; os 3 primeiros minutos sem derrota (fases 1–3 têm baralho finito pequeno e meta única).
+Pedido do usuário: tirar os monstros e deixar só o jogo de cartas, com a fase subindo a cada valor novo (ver `docs/autoria.md`). O que as medidas mostraram e o que mudou por causa delas:
 
-## 2026-10-09 · calibração inicial
+- **Baralho que acompanha o nível.** Com o baralho dinâmico de antes, numa mesa contínua o casual levava 558 jogadas até o 2048 e, recomeçando da mesa pronta, passava o 2048 em só 15%. Com 5 valores do alvo/8 para baixo (o 2048 usa cartas de 16 a 256), cada nível custa mais ou menos o mesmo: cerca de 40 a 55 jogadas nos níveis do 256 em diante.
+- **Limpeza na subida (`graduar`).** As cartas abaixo do piso do baralho novo saem da mesa: sem isso, um 2 esquecido no topo trava a coluna, e a mesa cheia no 2048 aparecia 5 vezes mais (20 contra 4 em 40 mundos).
+- **A curva virou uma rampa por mundo.** A reta de 100 a 55 das fases do duelo não serve à escada: os níveis do 16 ao 128 duram 5 a 30 jogadas e ninguém perde neles. Cada mundo vai de 100 no 16 ao piso dele no 2048 (`PISO_CURVA`: 94, 92, 90, 80, 70). Bomba, dobro e ×4 ajudam, então os mundos 2 a 4 são de folga, para brincar com a carta nova; o desafio fica nas 3 colunas.
+- **Piso do guloso por nível**, como era por fase: no mundo inteiro sem recomeçar ele faz 64% no mundo 5, porque a conta acumula os 8 níveis.
+
+## 2026-10-13 · um especial por carta, o descarte por nível e a carta ×4
+
+Pedidos do usuário depois de jogar a 0.3.0 (ver `docs/autoria.md`): a carta que recebeu um coringa ou um dobro não recebe outro até fundir de novo; o descarte vira uma pilha com lugares por nível e um contador; os naipes saem ("difícil de entender") e o mundo 4 ganha a carta ×4.
+
+- **A marca do especial tirou força de todos os mundos**, mais dos que dependiam de encadear especiais. O 2048 do mundo 3 ficou no teto da faixa (100%): ganhou o baralho de 6 valores.
+- **Descarte:** antes era 1 carga que voltava a cada 12 cartas (na prática, 5 a 7 descartes por nível, e um furo: com a carga cheia, descartar saía de graça). Agora são 3 lugares por nível (2 no mundo 4), sem recarga. O casual usa em média 1 a 3 descartes por nível nos níveis do 256 em diante (a coluna `desc` do `npm run simular`).
+- **Mundo 4 (×4).** A carta ×4 sozinha deixava o mundo inteiro em 96 a 100%. O que segurou: baralho largo (6 valores), 2 lugares no descarte e, no 1024 e no 2048, cartas grandes em baralho largo (do alvo/4 para baixo, 6 e 7 valores). O piso foi de 70 para 80: sem naipes, o mundo 4 é de folga como o 2 e o 3.
+- **Mundo 5 (3 colunas, tudo junto, agora com o ×4).** Com o 2048 a 60%, o guloso caía abaixo do piso (68% nas sementes do teste); o piso foi para 70 e o 1024 e o 2048 têm o mesmo baralho largo de cartas grandes do mundo 4.
+
+<!-- tabela -->
+| Fase | Mundo | Nível | Baralho | Especiais | Casual (alvo) | Guloso | Jogadas casual | Mesas cheias | Recomeços | Novidade / ajuste |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 1 | 16 | 2–4 | — | 100% (100%) | 100% | 7 | 0.00 | 0.00 | so cartas; o coringa entra no nivel 3 (64) |
+| 2 | 1 | 32 | 2–4 | — | 100% (100%) | 100% | 15 | 0.00 | 0.00 |  |
+| 3 | 1 | 64 | 2–8 | coringa 5% | 100% (100%) | 100% | 18 | 0.00 | 0.00 |  |
+| 4 | 1 | 128 | 2–16 | coringa 5% | 100% (99%) | 100% | 30 | 0.00 | 0.00 |  |
+| 5 | 1 | 256 | 2–32 | coringa 5% | 99% (98%) | 100% | 43 | 0.07 | 0.01 |  |
+| 6 | 1 | 512 | 4–64 | coringa 5% | 93% (97%) | 100% | 47 | 0.21 | 0.07 |  |
+| 7 | 1 | 1024 | 8–128 | coringa 5% | 96% (96%) | 100% | 43 | 0.15 | 0.04 |  |
+| 8 | 1 | 2048 | 16–256 | coringa 5% | 93% (94%) | 100% | 47 | 0.26 | 0.07 |  |
+| 9 | 2 | 16 | 2–4 | coringa 4%, bomba 6% | 100% (100%) | 100% | 5 | 0.00 | 0.00 | a bomba (destroi o topo da coluna escolhida) |
+| 10 | 2 | 32 | 2–4 | coringa 4%, bomba 6% | 100% (100%) | 100% | 13 | 0.00 | 0.00 |  |
+| 11 | 2 | 64 | 2–8 | coringa 4%, bomba 6% | 100% (99%) | 100% | 24 | 0.01 | 0.00 |  |
+| 12 | 2 | 128 | 2–16 | coringa 4%, bomba 6% | 100% (99%) | 100% | 32 | 0.01 | 0.00 |  |
+| 13 | 2 | 256 | 2–32 | coringa 4%, bomba 6% | 100% (97%) | 100% | 47 | 0.04 | 0.00 |  |
+| 14 | 2 | 512 | 4–64 | coringa 4%, bomba 6% | 96% (96%) | 100% | 50 | 0.18 | 0.04 |  |
+| 15 | 2 | 1024 | 8–128 | coringa 4%, bomba 6% | 99% (94%) | 100% | 54 | 0.10 | 0.01 |  |
+| 16 | 2 | 2048 | 16–256 | coringa 4%, bomba 6% | 99% (92%) | 100% | 54 | 0.13 | 0.01 |  |
+| 17 | 3 | 16 | 2–4 | coringa 4%, bomba 4%, dobro 6% | 100% (100%) | 100% | 5 | 0.00 | 0.00 | o dobro (dobra o topo e cascateia). O 2048 tem o baralho largo (6 valores) |
+| 18 | 3 | 32 | 2–4 | coringa 4%, bomba 4%, dobro 6% | 100% (100%) | 100% | 12 | 0.00 | 0.00 |  |
+| 19 | 3 | 64 | 2–8 | coringa 4%, bomba 4%, dobro 6% | 100% (99%) | 100% | 17 | 0.00 | 0.00 |  |
+| 20 | 3 | 128 | 2–16 | coringa 4%, bomba 4%, dobro 6% | 100% (98%) | 100% | 24 | 0.00 | 0.00 |  |
+| 21 | 3 | 256 | 2–32 | coringa 4%, bomba 4%, dobro 6% | 100% (97%) | 100% | 39 | 0.06 | 0.00 |  |
+| 22 | 3 | 512 | 4–64 | coringa 4%, bomba 4%, dobro 6% | 94% (95%) | 100% | 43 | 0.16 | 0.06 |  |
+| 23 | 3 | 1024 | 8–128 | coringa 4%, bomba 4%, dobro 6% | 96% (93%) | 100% | 39 | 0.13 | 0.04 |  |
+| 24 | 3 | 2048 | 8–256 | coringa 4%, bomba 4%, dobro 6% | 96% (90%) | 100% | 57 | 0.17 | 0.04 |  |
+| 25 | 4 | 16 | 2–4 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (100%) | 100% | 5 | 0.00 | 0.00 | a carta x4 (o topo vezes 4, sem passar do 2048, e cascateia). Ela ajuda muito: o baralho e largo (6 valores), o descarte tem 2 lugares e o 1024 e o 2048 tem cartas grandes (do alvo/4 para baixo, 6 e 7 valores) |
+| 26 | 4 | 32 | 2–4 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (100%) | 100% | 9 | 0.00 | 0.00 |  |
+| 27 | 4 | 64 | 2–8 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (98%) | 100% | 12 | 0.00 | 0.00 |  |
+| 28 | 4 | 128 | 2–16 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (96%) | 100% | 18 | 0.01 | 0.00 |  |
+| 29 | 4 | 256 | 2–32 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (93%) | 100% | 31 | 0.01 | 0.00 |  |
+| 30 | 4 | 512 | 2–64 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 91% (90%) | 100% | 45 | 0.29 | 0.09 |  |
+| 31 | 4 | 1024 | 8–256 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 89% (85%) | 100% | 34 | 0.36 | 0.12 |  |
+| 32 | 4 | 2048 | 8–512 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 85% (80%) | 96% | 40 | 0.55 | 0.17 |  |
+| 33 | 5 | 16 | 2–4 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 100% (100%) | 100% | 5 | 0.00 | 0.00 | tudo junto em 3 colunas. O 1024 e o 2048 tem baralho largo de cartas grandes (do alvo/4 para baixo, 6 e 7 valores) |
+| 34 | 5 | 32 | 2–4 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 100% (99%) | 100% | 9 | 0.00 | 0.00 |  |
+| 35 | 5 | 64 | 2–8 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 100% (98%) | 100% | 15 | 0.01 | 0.00 |  |
+| 36 | 5 | 128 | 2–16 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 100% (94%) | 100% | 20 | 0.01 | 0.00 |  |
+| 37 | 5 | 256 | 2–32 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 95% (90%) | 100% | 35 | 0.20 | 0.06 |  |
+| 38 | 5 | 512 | 4–64 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 83% (85%) | 88% | 42 | 0.52 | 0.17 |  |
+| 39 | 5 | 1024 | 8–256 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 81% (78%) | 84% | 44 | 0.68 | 0.19 |  |
+| 40 | 5 | 2048 | 8–512 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 70% (70%) | 84% | 55 | 1.18 | 0.44 |  |
+<!-- /tabela -->
+
+## Histórico: o duelo contra monstros (`master`)
+
+### 2026-10-09 · calibração inicial
 
 2026-10-10: a pilha passou de 5 para 6 cartas (fase 34: de 6 para 7) e a tabela foi regenerada. Mudou pouco, porque o bot raramente enche uma coluna; a fase 12 caiu de 92% para 84%.
 
@@ -17,52 +78,9 @@ Regra de curva (vault): uma novidade por fase, nunca junto com salto de dificuld
 
 2026-10-11: **curva gradual** (ver a seção abaixo). A tabela ganhou as colunas do casual: "Casual (alvo)" (vitórias e o alvo da curva; ⚠ quando sai da faixa ou cai demais) e "Jogadas casual" (mediana, vitórias e derrotas). "Guloso" é a taxa do bot guloso.
 
-<!-- tabela -->
-| Fase | Mundo | Casual (alvo) | Jogadas casual | Guloso | Jogadas (med) | Pontos q25 / med / q75 | 2★ / 3★ | Ataque | Feitiços (med) | Derrotas após feitiço | Novidade / ajuste |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 1 | 100% (100%) | 8 | 100% | 6 | 52 / 76 / 92 | 50 / 80 | — | — | — | colocar e fundir (2 + 2). Meta: fazer um 16 |
-| 2 | 1 | 100% (99%) | 10 | 100% | 8 | 120 / 160 / 208 | 110 / 160 | — | — | — | menor sob maior. Meta: fazer um 32 |
-| 3 | 1 | 93% (98%) | 8 | 100% | 6 | 14664 / 14720 / 15704 | 10300 / 14700 | — | — | — | cascata ate o 2048 (o golpe especial): a coluna 1 ja tem a escada, falta o 128 |
-| 4 | 1 | 99% (97%) | 12 | 100% | 10 | 652 / 868 / 1028 | 610 / 870 | — | — | — | cascata longa: o 32 sobre o 64 pede 16, 8, 4... Meta: fazer um 128 |
-| 5 | 1 | 100% (95%) | 7 | 100% | 6 | 288 / 2176 / 2760 | 1500 / 2200 | — | — | — | coringa (sai do baralho). Meta: cascata x3 |
-| 6 | 1 | 93% (94%) | 10 | 100% | 8 | 12712 / 15312 / 16080 | 10700 / 15300 | — | — | — | o monte sem a escada pronta (falta um 256, a coluna 2 ajuda), com coringa e duas cargas de descarte |
-| 7 | 1 | 96% (98%) | 7 | 100% | 8 | 14656 / 14800 / 20288 | 10400 / 14800 | lodo / 6 | 1 | 0 | o monstro ataca: a cada 6 jogadas o Gosmo cobre uma pilha com lodo (carta da metade do topo). A escada ja conhecida, do outro lado |
-| 8 | 1 | 90% (86%) | 28 | 100% | 12 | 11216 / 14648 / 15228 | 10300 / 14600 | lodo / 7 (fúria 4) | 1 | 0 | chefe do mundo 1: um monte com baralho dinamico (falta um 256); o Rei Gosmo fica furioso |
-| 9 | 2 | 99% (96%) | 14 | 100% | 14 | 328 / 704 / 1228 | 490 / 700 | lodo / 5 | 2 | 0 | a pedra. Cada fusao na coluna tira 1; quebre-a |
-| 10 | 2 | 96% (95%) | 26 | 100% | 23 | 1520 / 1972 / 2456 | 1400 / 2000 | pedra, lodo / 5 | 4 | 0 | o Golem lanca pedras no fundo das colunas. Pedra mais dura e um 256 |
-| 11 | 2 | 90% (88%) | 26 | 92% | 22 | 936 / 1316 / 1888 | 920 / 1300 | pedra, lodo / 4 | 5 | 0 | a bomba (sai do baralho) contra duas pedras duras, sem martelo |
-| 12 | 2 | 83% (87%) | 20 | 100% | 13 | 14656 / 15544 / 18644 | 11000 / 15500 | pedra, lodo / 5 | 2 | 0 | um monte com pedra na coluna alta |
-| 13 | 2 | 89% (86%) | 34 | 100% | 25 | 2600 / 3260 / 3956 | 2300 / 3300 | pedra, lodo / 5 | 4 | 0 | pedras em duas colunas e pontos |
-| 14 | 2 | 86% (85%) | 17 | 96% | 14 | 6312 / 6868 / 9180 | 4600 / 6500 | pedra, lodo / 4 | 3 | 0 | cascata de 4 com uma pedra embaixo (a escada tem 3: falta o 64) |
-| 15 | 2 | 81% (84%) | 28 | 100% | 14 | 23148 / 25888 / 28016 | 18000 / 26000 | pedra, lodo / 6 | 2 | 0 | dois montes (as duas escadas esperam um 256), bomba e pedra |
-| 16 | 2 | 75% (77%) | 99 | 100% | 42 | 12204 / 16604 / 24668 | 11500 / 16500 | pedra, lodo / 6 (fúria 3) | 8 | 0 | chefe do mundo 2: um monte (falta um 512) com duas pedras |
-| 17 | 3 | 88% (87%) | 27 | 100% | 19 | 792 / 1060 / 1356 | 740 / 1100 | pedra, lodo / 5 | 3 | 0 | o gelo: a carta congelada so funde depois de uma fusao na coluna |
-| 18 | 3 | 77% (85%) | 25 | 84% | 20 | 1208 / 1316 / 1540 | 910 / 1300 | gelo, lodo / 5 | 3 | 1 | o Yeti congela topos. Duas cartas de gelo |
-| 19 | 3 | 78% (79%) | 21 | 96% | 9 | 1380 / 1440 / 2344 | 980 / 1400 | gelo, pedra / 5 | 1 | 1 | o dobro (sai do baralho) |
-| 20 | 3 | 82% (78%) | 11 | 100% | 7 | 18568 / 19132 / 20880 | 13500 / 19000 | gelo, lodo / 8 | 0 | 0 | um monte com gelo na coluna alta |
-| 21 | 3 | 81% (77%) | 32 | 92% | 25 | 2208 / 2680 / 3328 | 1900 / 2700 | gelo, pedra / 5 | 4 | 0 | gelo e pedra juntos |
-| 22 | 3 | 83% (76%) | 25 | 88% | 27 | 2652 / 6184 / 7248 | 4300 / 6200 | gelo, lodo / 6 | 4 | 0 | cascata de 4 com gelo no meio (a escada sobe ate 256: falta o 128) |
-| 23 | 3 | 76% (75%) | 42 | 96% | 24 | 27068 / 30592 / 37076 | 21500 / 31000 | gelo, pedra, lodo / 6 | 3 | 0 | dois montes com dobro (as duas escadas esperam um 256) |
-| 24 | 3 | 66% (67%) | 32 | 92% | 8 | 29204 / 29240 / 30140 | 20500 / 29000 | gelo, pedra / 9 (fúria 6) | 0 | 0 | chefe do mundo 3: 4096 (o 2048 fica na mesa; a escada espera um 256) |
-| 25 | 4 | 74% (77%) | 34 | 88% | 30 | 2076 / 2132 / 2392 | 1500 / 2100 | gelo, pedra, lodo / 4 | 7 | 0 | cinco colunas |
-| 26 | 4 | 75% (71%) | 33 | 96% | 24 | 1408 / 2124 / 2680 | 1500 / 2100 | pedra, lodo / 5 | 4 | 0 | o cadeado: a coluna abre ao fazer um 64. Meta: um 256 |
-| 27 | 4 | 78% (70%) | 29 | 84% | 32 | 1468 / 2016 / 3220 | 1400 / 2000 | gelo, lodo / 5 | 6 | 4 | cadeado por fusoes e uma pedra |
-| 28 | 4 | 74% (74%) | 41 | 96% | 26 | 16028 / 19488 / 24656 | 14500 / 20500 | corrente, lodo / 7 | 3 | 1 | o Espectro tranca colunas com corrente. Um monte atras do cadeado |
-| 29 | 4 | 66% (68%) | 29 | 88% | 18 | 3328 / 3568 / 4640 | 2500 / 3600 | corrente, gelo / 4 | 4 | 1 | gelo e cadeado |
-| 30 | 4 | 73% (67%) | 23 | 84% | 13 | 18576 / 18720 / 18944 | 13500 / 19000 | corrente, pedra / 5 | 2 | 1 | cascata de 5 |
-| 31 | 4 | 72% (65%) | 40 | 100% | 25 | 25700 / 29488 / 31852 | 20500 / 29500 | corrente, lodo, gelo / 5 | 4 | 0 | dois montes com tudo (uma escada espera um 256; a outra, um 128) |
-| 32 | 4 | 61% (58%) | 116 | 96% | 29 | 21524 / 23332 / 33852 | 16500 / 23500 | corrente, pedra / 4 (fúria 3) | 8 | 1 | chefe do mundo 4: 4096 com cinco colunas e cadeado (a escada espera um 512) |
-| 33 | 5 | 71% (68%) | 34 | 84% | 31 | 3900 / 4572 / 5788 | 3200 / 4600 | lodo, pedra, gelo / 3 | 10 | 3 | o Dragao estreia (lodo, pedra e gelo a cada 3 jogadas) contra pedras e gelo. Meta: as pedras e um 512 |
-| 34 | 5 | 66% (62%) | 25 | 100% | 21 | 15240 / 17192 / 24160 | 12000 / 17000 | lodo, pedra, gelo, corrente / 5 | 4 | 0 | pilha de 7 em cinco colunas |
-| 35 | 5 | 65% (61%) | 48 | 96% | 32 | 4044 / 4296 / 4784 | 3100 / 4400 | lodo, pedra, gelo / 5 | 6 | 1 | baralho cheio de especiais, pontos altos |
-| 36 | 5 | 66% (60%) | 34 | 84% | 14 | 1484 / 2312 / 3412 | 1600 / 2300 | lodo, gelo, corrente / 7 | 1 | 1 | dois cadeados |
-| 37 | 5 | 65% (58%) | 31 | 88% | 25 | 18840 / 19844 / 23164 | 14000 / 20000 | lodo, pedra, gelo / 4 | 6 | 0 | cascata de 5 com pedras duras e sem coluna de apoio |
-| 38 | 5 | 61% (57%) | 47 | 96% | 25 | 26672 / 28044 / 35208 | 19500 / 27500 | lodo, pedra, gelo / 7 | 3 | 1 | dois montes com gelo e pedra (a segunda escada espera um 512), com duas cargas de descarte |
-| 39 | 5 | 52% (56%) | 96 | 100% | 45 | 33300 / 39520 / 45880 | 27500 / 39500 | lodo, pedra, gelo, corrente / 5 | 8 | 0 | tres montes |
-| 40 | 5 | 48% (49%) | 85 | 88% | 18 | 21524 / 22524 / 23920 | 16000 / 22500 | lodo, pedra, gelo, corrente / 8 (fúria 4) | 3 | 1 | chefe final: 4096 com pedra, gelo e cadeado (a escada espera um 512; o 256 esta na coluna 3) |
-<!-- /tabela -->
+(A tabela das 40 fases do duelo está na `master`.)
 
-## Lições desta rodada
+### Lições desta rodada
 
 - **Mesa cheia** era a derrota dominante nas fases de "primeiro monte": o descarte só recarregava ao completar um monte. Passou a recarregar também a cada 12 cartas (`REGRAS_PADRAO.descarteRecarga`), e as fases 20 e 23 têm 2 cargas.
 - **Chefes triviais:** mesa preparada em escada + item coringa = vitória em 1 jogada. Chefes não dão coringa de item e a mesa inicial fica a mais de um passo do teto.
@@ -70,7 +88,7 @@ Regra de curva (vault): uma novidade por fase, nunca junto com salto de dificuld
 - **Gelo (fases 17–24, 29, 31, 33, 38, 40):** carta igual empilhava sobre a congelada e, ao descongelar, a maior ficava sobre a menor: coluna morta. Agora carta igual sobre gelo é recusada; descongela-se fundindo uma menor embaixo (`regras.js`).
 - **Cascata x5 (fase 30):** com a escada de 5 cartas pronta a fase vencia em 4 jogadas; agora a escada tem 4 e o jogador precisa de duas cartas 64.
 
-## 2026-10-10 · o monstro ataca
+### 2026-10-10 · o monstro ataca
 
 - **Lodo de 2 matava a coluna:** com a colocação estrita, um 2 em cima de uma pilha faz a coluna aceitar só 2. Mesmo 1 lodo a cada 16 jogadas derrubava as fases 7, 8 e 12 para menos de 30%. O lodo passou a ser **uma carta da metade do topo**, só sobre topos de 8 a 256 (nunca em coluna vazia): atrapalha, mas tem conserto (e às vezes vira cascata).
 - **Faixas de valor poupam a escada do monte:** o gelo só congela topos de 8 a 128; a pedra entra no fundo e não conta para a meta "quebre as pedras" (senão a vida do monstro subiria).
@@ -79,7 +97,7 @@ Regra de curva (vault): uma novidade por fase, nunca junto com salto de dificuld
 - **Fúria dos chefões:** a vida medida pelo trabalho caía quase toda na cascata final, e a fúria (com metade da vida) quase nunca chegava. A vida das metas de carta e de monte passou a usar a raiz do trabalho (cai mais nos primeiros golpes), e o limiar da fúria é por fase: 0,6 nas lutas longas (8, 16) e 0,9 nas curtas (24, 32, 40, que o bot vence em 10 a 20 jogadas). Com isso a fúria aparece em 50% a 90% das partidas do bot.
 - **Varredura:** para cada fase, o menor `cada` que passa o piso (com 2 pontos de folga) nas duas séries de sementes. A maioria ficou em 5; 7 (dois montes) em 7, 20 em 8, 24 (chefe curto) em 9.
 
-## 2026-10-10 · Clássico e Diário em cadeia
+### 2026-10-10 · Clássico e Diário em cadeia
 
 Sem monstro que ataca, o bot jogava o Clássico sem fim (mais de 1500 jogadas, 280 mil pontos). Com a cadeia (`nivelCadeia` em `monstro.js`: vida 400·1,5^(n−1), contagem `max(4, 9 − n/2)`, feitiços dos reinos visitados, Rei com fúria a cada 5) e 16 sementes:
 
@@ -90,7 +108,7 @@ Sem monstro que ataca, o bot jogava o Clássico sem fim (mais de 1500 jogadas, 2
 
 O primeiro monstro cai por volta da jogada 22 e os seguintes a cada ~20 até o sexto; depois o ritmo alonga (o 10º na jogada ~345). Jogadores reais devem ficar abaixo do bot (que olha uma jogada à frente e vê o feitiço).
 
-## 2026-10-11 · curva gradual
+### 2026-10-11 · curva gradual
 
 O usuário travou na fase 7 ("impossível de matar o monstro"). Pelo guloso ela passava (84%), mas o guloso joga melhor que uma pessoa. O jogador casual mostrou um serrote: a fase 7 com 43% depois de três fases quase garantidas; 15, 24, 31, 32 e 40 entre 33% e 43%; e fases do meio do jogo (9–11, 13, 14, 25, 26, 33) quase sempre vencidas. O gráfico `docs/duelo/curva.png` mostra o antes e o depois.
 
@@ -107,7 +125,7 @@ O usuário travou na fase 7 ("impossível de matar o monstro"). Pelo guloso ela 
 
 Próxima rodada: medir com jogadores reais (Player Fit Test) e comparar a perda por fase (1 − Completed) com estas taxas.
 
-## 2026-10-12 · mundo 1 depois do Player Fit Test
+### 2026-10-12 · mundo 1 depois do Player Fit Test
 
 A parcial do Player Fit Test da Poki (0.1.0, 393 partidas) mostrou que quase ninguém perde nas primeiras fases: o jogador fecha o jogo no meio da fase. Saíram 26% na fase 3 e 34% na fase 4, contra 2% a 5% de derrotas. A análise completa está em `docs/autoria.md`. O mundo 1 foi refeito para pôr o golpe especial no primeiro minuto e tirar o ataque do monstro dos ~3 primeiros minutos:
 

@@ -1,29 +1,33 @@
-// Simulador de dificuldade (medir.mjs): o bot guloso joga cada fase 25 vezes
-// e o casual 40. O relatorio mostra vitorias, jogadas, pontos (mediana e
-// quartis), feiticos do monstro por partida (mediana), derrotas que vieram
-// ate 2 jogadas depois de um feitico e, do casual, vitorias contra o alvo da
-// curva e jogadas. Falha se alguma fase ficar abaixo do piso do guloso (82%,
-// 78% na ultima do mundo), for trivial, sair da faixa do casual (PAREDE ou
-// FACIL) ou cair mais que QUEDA_MAX em relacao a anterior (QUEDA).
-// Uso: node tools/simular.mjs [fase...]
-import { FASES } from '../src/jogo/fases.js';
-import { medirFase, problemas } from './medir.mjs';
+// Simulador de dificuldade (medir.mjs): o bot guloso joga cada mundo 25 vezes
+// e o casual 160, sempre numa mesa so (o nivel sobe na mesma mesa; na mesa
+// cheia vem o "Continuar" gratis do nivel e, sem ele, o recomeco pelo kit).
+// Por nivel: em quantas partidas o guloso e o casual passaram o nivel sem
+// recomecar, o alvo da curva, as jogadas do casual (mediana, com os
+// recomecos), os descartes do casual (media, com os recomecos; o limite e o
+// descarteMax do mundo por nivel), mesas cheias e recomecos por partida. Falha se algum nivel
+// ficar abaixo do piso do guloso (82%; 78% no 2048), sair da faixa do casual (PAREDE ou
+// FACIL), cair mais que QUEDA_MAX em relacao ao anterior (QUEDA) ou passar do
+// ritmo (LENTO).
+// Uso: node tools/simular.mjs [mundo...]
+import { MUNDOS, POR_MUNDO } from '../src/jogo/fases.js';
+import { normalizarRegras } from '../src/jogo/regras.js';
+import { medirMundo, problemas } from './medir.mjs';
 
 const so = process.argv.slice(2).map(Number).filter(Boolean);
 const p = (x, n) => String(x).padStart(n);
 let ok = true;
-process.stdout.write('fase  mundo  vit%  jogadas  pontos(q25/med/q75)    estrelas[2,3]  ataques  apos  casual alvo  jog.c   nota\n');
-let ant = null;
-for (const f of FASES) {
-  const quer = !so.length || so.includes(f.id);
-  // a queda compara com a fase anterior, entao ela e medida mesmo fora da lista
-  if (!quer && !so.includes(f.id + 1)) { ant = null; continue; }
-  const m = medirFase(f);
-  if (quer) {
-    const nota = problemas(m, ant);
+for (const def of MUNDOS) {
+  if (so.length && !so.includes(def.id)) continue;
+  const mm = medirMundo(def.id);
+  process.stdout.write(`\nmundo ${def.id} (${def.novidade.tipo}): o casual completa ${Math.round(mm.completou * 100)}% em ${mm.jogadasCasual} jogadas (mediana); o guloso, sem recomecar, ${Math.round(mm.gulosoLimpo * 100)}% em ${mm.jogadasGuloso}\n`);
+  process.stdout.write(`fase nivel valor  guloso  casual alvo  jogadas  desc/${String(normalizarRegras(def.regras).descarteMax).padEnd(2)} cheias recomecos   nota\n`);
+  let ant = null;
+  for (const nv of mm.niveis) {
+    const nota = problemas(nv, ant);
     if (nota.length) ok = false;
-    process.stdout.write(`${p(f.id, 4)}  ${p(f.mundo, 5)}  ${p(Math.round(m.vitorias * 100), 4)}  ${p(m.jogadas, 7)}  ${p(m.pontos[0], 7)}/${p(m.pontos[1], 6)}/${p(m.pontos[2], 6)}   ${p(f.estrelas[1], 6)},${p(f.estrelas[2], 6)}  ${p(m.ataques, 7)}  ${p(m.apos, 4)}  ${p(m.casual, 5)}% ${p(m.alvo, 3)}  ${p(m.jogadasCasual, 5)}   ${nota.join(' ')}${nota.length ? ' ' + JSON.stringify(m.fins) : ''}\n`);
+    process.stdout.write(`${p(nv.N, 4)} ${p(nv.n, 5)} ${p(nv.alvoValor, 5)}  ${p(nv.guloso, 5)}%  ${p(nv.casual, 5)}% ${p(nv.alvo, 3)}  ${p(nv.jogadas, 7)}  ${p(nv.descartes.toFixed(1), 6)}  ${p(nv.cheias.toFixed(2), 6)} ${p(nv.recomecos.toFixed(2), 9)}   ${nota.join(' ')}\n`);
+    ant = nv;
   }
-  ant = m;
 }
+process.stdout.write(`\n${POR_MUNDO} niveis por mundo; ${ok ? 'tudo dentro da curva' : 'HA PROBLEMAS'}\n`);
 process.exit(ok ? 0 : 1);

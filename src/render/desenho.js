@@ -78,3 +78,18 @@ export function estrela(ctx, x, y, r, ri, n = 5, rot = -Math.PI / 2) {
   }
   ctx.closePath();
 }
+
+/** Sinal de proibido (disco branco, anel vermelho e a barra), centrado em (x, y), raio r. */
+export function proibido(ctx, x, y, r, alpha = 1) {
+  if (alpha <= 0 || r <= 0) return;
+  ctx.save();
+  ctx.globalAlpha *= Math.min(1, alpha);
+  ctx.shadowColor = 'rgba(20,6,24,0.5)'; ctx.shadowBlur = r * 0.5; ctx.shadowOffsetY = r * 0.12;
+  circulo(ctx, x, y, r); ctx.fillStyle = '#ffffff'; ctx.fill();
+  ctx.shadowColor = 'transparent';
+  const e = r * 0.22, ra = r * 0.9 - e / 2, k = ra * Math.SQRT1_2;
+  ctx.lineWidth = e; ctx.strokeStyle = '#e5243b';
+  circulo(ctx, x, y, ra); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x - k, y - k); ctx.lineTo(x + k, y + k); ctx.stroke();
+  ctx.restore();
+}

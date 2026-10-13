@@ -1,27 +1,22 @@
-// Grafico da curva de dificuldade em docs/duelo/curva.png: mede as 40 fases
-// com o jogador casual (medir.mjs) e desenha tools/curva.html pelo Chrome
-// headless, com a curva de antes do ajuste de 2026-10-11 (ANTES) para
-// comparar. Uso: node tools/curva.mjs [saida.png]
+// Grafico da curva de dificuldade em docs/escada/curva.png: mede os 40 niveis
+// (5 mundos x 8, cada mundo numa mesa so) com o jogador casual (medir.mjs) e
+// desenha tools/curva.html pelo Chrome headless.
+// Uso: node tools/curva.mjs [saida.png]
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { servir, RAIZ } from './servir.mjs';
-import { FASES, POR_MUNDO, posNoMundo, FAIXA_CASUAL } from '../src/jogo/fases.js';
-import { medirFase } from './medir.mjs';
+import { MUNDOS, POR_MUNDO, FAIXA_CASUAL } from '../src/jogo/fases.js';
+import { medirMundo } from './medir.mjs';
 
-/**
- * Vitorias do casual (%) antes do ajuste (2026-10-11, 40 partidas por fase,
- * tentativas 0..39): o serrote com a parede na fase 7 que o usuario achou.
- */
-const ANTES = [100, 100, 100, 93, 78, 100, 43, 53, 98, 83, 100, 75, 98, 95, 43, 70, 95, 98, 65, 80,
-  80, 90, 65, 35, 100, 100, 85, 63, 85, 83, 40, 40, 95, 70, 90, 78, 83, 48, 50, 33];
-
-const saida = resolve(process.argv[2] || join(RAIZ, 'docs/duelo/curva.png'));
-const medidas = FASES.map((f) => medirFase(f));
+const NOMES = { coringa: 'só cartas (+ coringa)', bomba: '+ bomba', dobro: '+ dobro', quadruplo: '+ ×4', colunas: '3 colunas' };
+const saida = resolve(process.argv[2] || join(RAIZ, 'docs/escada/curva.png'));
+const niveis = MUNDOS.flatMap((m) => medirMundo(m.id).niveis);
 const d = {
-  antes: ANTES, depois: medidas.map((m) => m.casual), alvo: medidas.map((m) => m.alvo), faixa: FAIXA_CASUAL,
-  chefes: FASES.filter((f) => posNoMundo(f.id) === POR_MUNDO).map((f) => f.id), jogadas: medidas.map((m) => m.jogadasCasual),
+  depois: niveis.map((nv) => nv.casual), alvo: niveis.map((nv) => nv.alvo), faixa: FAIXA_CASUAL,
+  chefes: MUNDOS.map((m) => m.id * POR_MUNDO), jogadas: niveis.map((nv) => nv.jogadas),
+  mundos: MUNDOS.map((m) => `Mundo ${m.id} · ${NOMES[m.novidade.tipo]}`),
 };
 
 const porta = 4353;

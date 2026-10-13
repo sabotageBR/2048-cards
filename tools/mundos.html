@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>mundos</title>
+<style>
+  @font-face { font-family: 'Fredoka'; src: url('../src/ui/fontes/fredoka-latin-700-normal.woff2') format('woff2'); font-weight: 700; }
+  @font-face { font-family: 'Fredoka'; src: url('../src/ui/fontes/fredoka-latin-600-normal.woff2') format('woff2'); font-weight: 600; }
+  html, body { margin: 0; background: #17131f; color: #f4efe6; font-family: Fredoka, system-ui, sans-serif; overflow: hidden; }
+  body { padding: 28px 32px 36px; width: max-content; }
+  h1 { margin: 0 0 4px; font-size: 32px; }
+  .sub { margin: 0 0 22px; color: #bdb3c9; font-size: 17px; max-width: 1900px; }
+  .grade { display: grid; gap: 18px 22px; }
+  figure { margin: 0; }
+  figure img, figure canvas { display: block; border-radius: 22px; box-shadow: 0 6px 24px rgba(0,0,0,.45); }
+  figcaption { margin-top: 10px; max-width: 390px; }
+  figcaption b { display: block; font-size: 20px; }
+  figcaption span { display: block; color: #cfc6da; font-size: 14.5px; line-height: 1.35; margin-top: 3px; }
+  .cartas canvas { border-radius: 16px; }
+</style></head>
+<body>
+<h1 id="titulo"></h1><p class="sub" id="sub"></p>
+<div class="grade" id="grade"></div>
+<script type="module">
+// Folhas dos 5 mundos (Elementos, aprovados em 2026-10-13) para revisar o
+// visual (tools/mundos.mjs tira os prints em docs/mundos/prints/ e fotografa
+// esta pagina):
+//   ?folha=retrato   os 5 mundos em 390x844
+//   ?folha=paisagem  os 5 mundos em 1280x720 (desktop)
+//   ?folha=cartas    a escada de cartas de cada tema (2..2048, especiais, marcada, pilha)
+//   ?folha=regras    o proibido, o contador do descarte e o video de esvaziar
+import { TEMAS } from '../src/render/temas/index.js';
+import { definirRotulos } from '../src/render/temas/kit.js';
+import { desenharCarta, definirTema, limparCache } from '../src/render/cartas.js';
+import { proibido, rr } from '../src/render/desenho.js';
+
+const q = new URLSearchParams(location.search);
+const folha = q.get('folha') || 'retrato';
+const $ = (id) => document.getElementById(id);
+const P = '../docs/mundos/prints/';
+const MUNDOS = [
+  { n: 1, nome: 'Floresta', nov: 'só cartas (+ coringa)', txt: 'Clareira de manhã, sol com raios, morros e árvores redondas, pólen e folhas no ar. Carta de marfim bem redonda, a faixa do número em onda. Mesa de madeira clara com feltro musgo.' },
+  { n: 2, nome: 'Oceano', nov: '+ bomba', txt: 'O mar visto de dentro d’água: feixes de luz, algas, corais e bolhas subindo. Carta de vidro tingido na cor do valor, número branco e borda de pérola. Mesa de vidro com aro aqua.' },
+  { n: 3, nome: 'Neve', nov: '+ dobro', txt: 'Noite de inverno: lua, aurora que ondula, montanhas e pinheiros, neve caindo. Carta de porcelana de cantos firmes: só o número e um fio na cor do valor. Mesa de gelo.' },
+  { n: 4, nome: 'Deserto', nov: '+ ×4', txt: 'Fim de tarde nas dunas: sol baixo, mesas de pedra, cactos e areia correndo com o vento. Carta de pergaminho como a de baralho (fio interno). Mesa de arenito.' },
+  { n: 5, nome: 'Cosmos', nov: '3 colunas', txt: 'Espaço fundo: nebulosas, planeta com anel, estrelas que piscam e estrela cadente. Carta de vidro escuro com número e borda em neon, perto da referência. Mesa de vidro escuro com aro neon.' },
+];
+
+function fig(src, titulo, texto, larg) {
+  const f = document.createElement('figure');
+  const img = new Image(); img.src = src; if (larg) img.width = larg;
+  f.appendChild(img);
+  const c = document.createElement('figcaption');
+  c.innerHTML = `<b>${titulo}</b>${texto ? `<span>${texto}</span>` : ''}`;
+  if (larg) c.style.maxWidth = larg + 'px';
+  f.appendChild(c);
+  return f;
+}
+const pronto = () => Promise.all([...document.images].map((i) => (i.complete ? 1 : new Promise((ok) => { i.onload = ok; i.onerror = ok; })))).then(() => { document.title = 'PRONTO'; });
+
+if (folha === 'retrato') {
+  $('titulo').textContent = 'Um visual por mundo: Elementos (retrato 390×844)';
+  $('sub').textContent = 'Mesma mesa de demonstração em todos: todos os valores, um topo que já recebeu especial com o sinal de proibido, a pilha do descarte em 2 lugares e os especiais na mão.';
+  const g = $('grade'); g.style.gridTemplateColumns = 'repeat(5, 390px)';
+  for (const m of MUNDOS) g.appendChild(fig(`${P}${m.n}-retrato.png`, `Mundo ${m.n} · ${m.nome} (${m.nov})`, m.txt));
+  pronto();
+} else if (folha === 'paisagem') {
+  $('titulo').textContent = 'Elementos no computador (paisagem 1280×720)';
+  $('sub').textContent = 'Os mesmos mundos na tela grande da Poki.';
+  const g = $('grade'); g.style.gridTemplateColumns = 'repeat(3, 640px)';
+  for (const m of MUNDOS) g.appendChild(fig(`${P}${m.n}-paisagem.png`, `Mundo ${m.n} · ${m.nome}`, '', 640));
+  pronto();
+} else if (folha === 'regras') {
+  $('titulo').textContent = 'Regras novas na tela';
+  $('sub').textContent = 'Um especial por carta (o sinal de proibido), o descarte com lugares por nível (o contador) e o vídeo com prêmio.';
+  const g = $('grade'); g.style.gridTemplateColumns = 'repeat(4, 390px)';
+  g.appendChild(fig(`${P}regra-selo.png`, 'Especial na mão', 'O 8 já recebeu um especial: com o coringa, o dobro ou o ×4 na mão, ele mostra o proibido pequeno.'));
+  g.appendChild(fig(`${P}regra-recusa.png`, 'Tentou mesmo assim', 'A jogada é recusada: a coluna treme e o proibido salta. Na primeira vez, um aviso explica a regra.'));
+  g.appendChild(fig(`${P}regra-cheio.png`, 'Descarte cheio', 'O contador fica vermelho (3/3), aparece “cheio” e um aviso diz que esvazia no nível seguinte. Embaixo, o vídeo para esvaziar.'));
+  g.appendChild(fig(`${P}regra-video.png`, 'Depois do vídeo', 'A pilha volta a 0/3 e o botão some até o próximo nível. Há também “🎬 ★+1”: um coringa quando a mesa aperta.'));
+  pronto();
+} else if (folha === 'cartas') {
+  await document.fonts.load('700 20px Fredoka');
+  definirRotulos({ bomba: 'BOMBA' });
+  $('titulo').textContent = 'As cartas de cada mundo';
+  $('sub').textContent = 'Todos os valores, os especiais (coringa, bomba, ×2, ×4) e uma pilha como fica na mesa. As cores dos valores são as mesmas em todos os mundos (o 8 é sempre laranja), muda o material.';
+  const g = $('grade'); g.style.gridTemplateColumns = '1fr'; g.classList.add('cartas');
+  const W = 1500, cw = 78, ch = 110, gap = 10;
+  for (const m of MUNDOS) {
+    const tema = TEMAS[m.n];
+    definirTema(tema); limparCache();
+    const cv = document.createElement('canvas');
+    const H = 290, dpr = 2;
+    cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+    // fundo: o miolo da mesa do tema
+    tema.mesa.tabuleiro(ctx, { x: 4, y: 4, w: W - 8, h: H - 8 }, tema.paleta, 0, 0);
+    const vals = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048];
+    vals.forEach((v, i) => desenharCarta(ctx, { id: i, tipo: 'normal', v }, { x: 26 + i * (cw + gap), y: 24, w: cw, h: ch, dpr, t: 0.6 }));
+    ['coringa', 'bomba', 'dobro', 'quadruplo'].forEach((tipo, i) => desenharCarta(ctx, { id: 50 + i, tipo, v: 0 }, { x: 26 + i * (cw + gap), y: 154, w: cw, h: ch, dpr, t: 0.6 }));
+    // pilha como na mesa, depois do 2048: 256, 128, 64 e o 32 que recebeu especial (com o selo)
+    const px = 26 + 11 * (cw + gap) + 34, py = 24, passo = ch * 0.3;
+    [256, 128, 64, 32].forEach((v, i) => desenharCarta(ctx, { id: 80 + i, tipo: 'normal', v, esp: v === 32 }, { x: px, y: py + i * passo, w: cw, h: ch, dpr, t: 0.6 }));
+    proibido(ctx, px + cw - cw * 0.16 * 0.85, py + 3 * passo + cw * 0.16 * 0.85, cw * 0.16);
+    const tx = 26 + 4 * (cw + gap) + 30;
+    ctx.fillStyle = tema.mesa.rotulo; ctx.font = '700 30px Fredoka, sans-serif'; ctx.fillText(`Mundo ${m.n} · ${m.nome}`, tx, 206);
+    ctx.font = '600 17px Fredoka, sans-serif'; ctx.globalAlpha = 0.85; ctx.fillText(m.nov, tx, 234); ctx.globalAlpha = 1;
+    g.appendChild(cv);
+  }
+  document.fonts.ready.then(() => { document.title = 'PRONTO'; });
+}
+</script>
+</body></html>

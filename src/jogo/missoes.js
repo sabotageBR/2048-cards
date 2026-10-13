@@ -10,7 +10,7 @@ const MODELOS = [
   { tipo: 'fusoes', alvos: [15, 30, 60] },
   { tipo: 'cascata', alvos: [2, 3, 4] },
   { tipo: 'cartas', v: [64, 128, 256, 512], alvos: [1, 2, 3] },
-  { tipo: 'montes', alvos: [1, 2, 3] },
+  { tipo: 'montes', alvos: [1] },
   { tipo: 'combo', alvos: [3, 5, 7] },
   { tipo: 'descartes', alvos: [2, 4] },
   { tipo: 'pontos', alvos: [1500, 4000, 10000] },

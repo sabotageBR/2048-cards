@@ -1,12 +1,15 @@
-// Mesa do duelo: grimorio de madeira com friso dourado, runas nos espacos
-// vazios, cartas (com as poses da linha do tempo), correntes nas colunas
-// trancadas, fantasmas, descarte em lapide e a fila num tapete de couro.
-// Nao tem estado proprio. As cores vem da paleta da arena (arena.js).
+// Mesa: o tabuleiro, os espacos vazios, o tapete da fila e o lugar do
+// descarte vem do tema do mundo (temas/kit.js, criarMesa); aqui ficam as
+// cartas (com as poses da linha do tempo), os fantasmas, a pilha do descarte
+// do nivel com o contador "n/N", a fila e o sinal de proibido (no topo que ja
+// recebeu um especial, com coringa, dobro ou x4 na mao; na coluna ilegal sob
+// o arrasto; na jogada recusada). Nao tem estado proprio.
 import { desenharCarta } from './cartas.js';
-import { TINTA, OURO, rr, circulo, elipse, estrela, texto } from './desenho.js';
+import { TINTA, FONTE, rr, texto, proibido } from './desenho.js';
+import { respeitaMarca } from '../jogo/regras.js';
 
-/** Tapete de couro sob a fila, com o rotulo "na mao". */
-function tapete(ctx, L, pal, rotulo) {
+/** Tapete do tema sob a fila, com o rotulo "na mao" (em pe, na paisagem, o rotulo vai dentro, embaixo). */
+function tapete(ctx, L, rotulo, m) {
   const f = L.fila;
   let x, y, w, h;
   const folga = Math.max(8, L.gap * 1.4);
@@ -16,108 +19,34 @@ function tapete(ctx, L, pal, rotulo) {
     x = Math.min(p0.x, p2.x) - folga * 1.4; w = Math.max(p0.x + p0.w, p2.x + p2.w) + folga * 1.4 - x;
     y = p0.y - folga; h = p0.h + folga * 2;
   }
-  ctx.save();
-  ctx.shadowColor = 'rgba(20,6,24,0.45)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
-  rr(ctx, x, y, w, h, 14);
-  const g = ctx.createLinearGradient(0, y, 0, y + h);
-  g.addColorStop(0, pal.tapeteA); g.addColorStop(1, pal.tapeteB);
-  ctx.fillStyle = g; ctx.fill();
-  ctx.restore();
-  rr(ctx, x + 5, y + 5, w - 10, h - 10, 10);
-  ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(255,226,170,0.7)'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
-  rr(ctx, x, y, w, h, 14); ctx.lineWidth = 2; ctx.strokeStyle = '#3a1e0e'; ctx.stroke();
-  if (rotulo) {
-    const tam = Math.max(11, Math.min(15, L.cw * 0.2));
-    // em pe (paisagem) o rotulo vai dentro do tapete, embaixo, onde sobra espaco
-    if (f.vertical) texto(ctx, rotulo, x + w / 2, y + h - tam * 1.1, tam, '#fff3d6', { contorno: TINTA, espessura: 3, max: w - 12 });
-    else texto(ctx, rotulo, L.filaPos(0).x + L.filaPos(0).w / 2, y - tam * 0.75, tam, '#fff3d6', { contorno: TINTA, espessura: 3 });
-  }
+  m.tapete(ctx, { x, y, w, h });
+  if (!rotulo) return;
+  const tam = Math.max(11, Math.min(15, L.cw * 0.2));
+  const op = m.rotuloContorno ? { contorno: m.rotuloContorno, espessura: 3, max: w - 12 } : { max: w - 12 };
+  if (f.vertical) texto(ctx, rotulo, x + w / 2, y + h - tam * 1.1, tam, m.rotulo, op);
+  else texto(ctx, rotulo, L.filaPos(0).x + L.filaPos(0).w / 2, y - tam * 0.75, tam, m.rotulo, op);
 }
 
-/** Grimorio: madeira escura com friso dourado e estrelas nos cantos. */
-function grimorio(ctx, s, pal, febre, agora) {
+/** Contador pequeno do descarte ("n/N") no canto de cima do lugar; vermelho com a pilha cheia. */
+function contador(ctx, d, rotulo, cheio) {
+  const tam = Math.max(10, Math.round(d.w * 0.2));
   ctx.save();
-  ctx.shadowColor = febre > 0 ? '#ffd84a' : 'rgba(15,5,15,0.5)'; ctx.shadowBlur = febre > 0 ? 26 : 14; ctx.shadowOffsetY = febre > 0 ? 0 : 5;
-  rr(ctx, s.x, s.y, s.w, s.h, 16);
-  const g = ctx.createLinearGradient(0, s.y, 0, s.y + s.h);
-  g.addColorStop(0, pal.madeiraA); g.addColorStop(1, pal.madeiraB);
-  ctx.fillStyle = g; ctx.fill();
+  ctx.font = `700 ${tam}px ${FONTE}`;
+  const w = ctx.measureText(rotulo).width + tam * 0.9, h = tam * 1.4;
+  const x = d.x + d.w - w * 0.75, y = d.y - h * 0.35;
+  ctx.shadowColor = 'rgba(20,6,24,0.45)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1.5;
+  rr(ctx, x, y, w, h, h / 2); ctx.fillStyle = cheio ? '#e5243b' : '#2a1630'; ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.lineWidth = 1.5; ctx.strokeStyle = cheio ? '#ffd0d6' : 'rgba(255,255,255,0.55)'; ctx.stroke();
   ctx.restore();
-  rr(ctx, s.x + 5, s.y + 5, s.w - 10, s.h - 10, 12); ctx.fillStyle = pal.miolo; ctx.fill();
-  rr(ctx, s.x + 5, s.y + 5, s.w - 10, s.h - 10, 12); ctx.lineWidth = 2;
-  ctx.strokeStyle = febre > 0 ? `rgba(255,216,74,${0.6 + 0.4 * Math.abs(Math.sin(agora / 120))})` : pal.friso; ctx.stroke();
-  rr(ctx, s.x, s.y, s.w, s.h, 16); ctx.lineWidth = 2; ctx.strokeStyle = '#1a0c08'; ctx.stroke();
-  for (const [cx, cy] of [[s.x + 5, s.y + 5], [s.x + s.w - 5, s.y + 5], [s.x + 5, s.y + s.h - 5], [s.x + s.w - 5, s.y + s.h - 5]]) {
-    estrela(ctx, cx, cy, 7, 2.6, 4, 0); ctx.fillStyle = OURO; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = '#6b4a10'; ctx.stroke();
-  }
-}
-
-/** Espaco vazio com runa que pulsa. */
-function runa(ctx, r, pal, t, c, forte) {
-  rr(ctx, r.x + 2, r.y + 2, r.w - 4, r.h - 4, 8);
-  ctx.setLineDash([5, 4]); ctx.strokeStyle = `rgba(${pal.runa},${forte ? 0.95 : 0.55})`; ctx.lineWidth = 1.6; ctx.stroke(); ctx.setLineDash([]);
-  const cx = r.x + r.w / 2, cy = r.y + r.h / 2, r0 = r.w * 0.24;
-  circulo(ctx, cx, cy, r0); ctx.strokeStyle = `rgba(${pal.runa},${0.35 + 0.2 * Math.sin(t * 2 + c)})`; ctx.lineWidth = 1.5; ctx.stroke();
-  estrela(ctx, cx, cy, r0 * 0.7, r0 * 0.28, 4, t * 0.3 + c); ctx.fillStyle = `rgba(${pal.runa},0.35)`; ctx.fill();
-}
-
-/** Coluna trancada: sombra, correntes em X e cadeado dourado (com as jogadas que faltam, se for por tempo). */
-function correntes(ctx, a, s, resta = 0, monstro = false) {
-  ctx.save();
-  rr(ctx, a.x - 3, a.y - 3, a.w + 6, a.h + 6, 10); ctx.fillStyle = 'rgba(20,8,24,0.45)'; ctx.fill();
-  const elo = (x0, y0, x1, y1) => {
-    const n = Math.max(4, Math.round(Math.hypot(x1 - x0, y1 - y0) / (11 * s)));
-    const ang = Math.atan2(y1 - y0, x1 - x0);
-    for (let i = 0; i <= n; i++) {
-      const k = i / n, x = x0 + (x1 - x0) * k, y = y0 + (y1 - y0) * k;
-      ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
-      if (i % 2) { elipse(ctx, 0, 0, 7 * s, 2.6 * s); ctx.fillStyle = '#8b93a3'; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = '#2b2f38'; ctx.stroke(); }
-      else { elipse(ctx, 0, 0, 7 * s, 4.5 * s); ctx.lineWidth = 3 * s; ctx.strokeStyle = '#2b2f38'; ctx.stroke(); ctx.lineWidth = 1.6 * s; ctx.strokeStyle = '#c3cad6'; ctx.stroke(); }
-      ctx.restore();
-    }
-  };
-  elo(a.x - 2, a.y + 6, a.x + a.w + 2, a.y + a.h - 6);
-  elo(a.x + a.w + 2, a.y + 6, a.x - 2, a.y + a.h - 6);
-  const cx = a.x + a.w / 2, cy = a.y + a.h / 2;
-  ctx.strokeStyle = '#2b2f38'; ctx.lineWidth = 5 * s; ctx.beginPath(); ctx.arc(cx, cy - 6 * s, 8 * s, Math.PI, 0); ctx.stroke();
-  ctx.strokeStyle = '#c3cad6'; ctx.lineWidth = 2.5 * s; ctx.stroke();
-  if (monstro) { ctx.shadowColor = '#b89cff'; ctx.shadowBlur = 12 * s; }
-  rr(ctx, cx - 12 * s, cy - 6 * s, 24 * s, 19 * s, 4 * s); ctx.fillStyle = monstro ? '#b89cff' : OURO; ctx.fill(); ctx.shadowBlur = 0; ctx.lineWidth = 1.8; ctx.strokeStyle = TINTA; ctx.stroke();
-  if (resta > 0) texto(ctx, String(resta), cx, cy + 3.8 * s, 14 * s, TINTA);
-  else { ctx.fillStyle = TINTA; circulo(ctx, cx, cy + 1.5 * s, 2.6 * s); ctx.fill(); ctx.fillRect(cx - s, cy + 2 * s, 2 * s, 6 * s); }
-  ctx.restore();
-}
-
-/** Descarte: lapide rachada com a seta de recarga (acesa com carga). */
-function lapide(ctx, r, carga, t, rotulo) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(r.x + 2, r.y + r.h - 2);
-  ctx.lineTo(r.x + 2, r.y + r.w * 0.5);
-  ctx.arc(r.x + r.w / 2, r.y + r.w * 0.5, r.w / 2 - 2, Math.PI, 0);
-  ctx.lineTo(r.x + r.w - 2, r.y + r.h - 2);
-  ctx.closePath();
-  const g = ctx.createLinearGradient(r.x, r.y, r.x + r.w, r.y + r.h);
-  g.addColorStop(0, '#8d919b'); g.addColorStop(1, '#5b5f69');
-  ctx.fillStyle = g; ctx.globalAlpha = carga ? 1 : 0.55; ctx.fill();
-  ctx.lineWidth = 2; ctx.strokeStyle = TINTA; ctx.stroke();
-  ctx.strokeStyle = '#33353d'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(r.x + r.w * 0.62, r.y + r.h * 0.18); ctx.lineTo(r.x + r.w * 0.52, r.y + r.h * 0.34); ctx.lineTo(r.x + r.w * 0.64, r.y + r.h * 0.48); ctx.stroke();
-  const cx = r.x + r.w / 2, cy = r.y + r.h * 0.58, ra = r.w * 0.2;
-  if (carga) { ctx.shadowColor = '#7fe3ff'; ctx.shadowBlur = 10 + 4 * Math.sin(t * 3); }
-  ctx.strokeStyle = carga ? '#bff1ff' : '#3a3c44'; ctx.lineWidth = Math.max(2, r.w * 0.045); ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.arc(cx, cy, ra, -Math.PI * 0.15, Math.PI * 1.35); ctx.stroke();
-  const a = Math.PI * 1.35, ax = cx + Math.cos(a) * ra, ay = cy + Math.sin(a) * ra, p = ra * 0.45;
-  ctx.beginPath(); ctx.moveTo(ax - p, ay - p * 0.15); ctx.lineTo(ax, ay); ctx.lineTo(ax + p * 0.15, ay - p); ctx.stroke();
-  ctx.restore();
-  if (rotulo) texto(ctx, rotulo, cx, r.y + r.h - r.h * 0.1, Math.max(8, r.w * 0.15), carga ? '#ffffff' : '#c9c9c9', { contorno: TINTA, espessura: 2.5, max: r.w - 4 });
+  texto(ctx, rotulo, x + w / 2, y + h / 2 + 0.5, tam, '#ffffff');
 }
 
 /**
  * @param {CanvasRenderingContext2D} ctx
  * @param {any} estado
  * @param {any} L layout
- * @param {{ pal: any, agora: number, t?: number, dpr?: number, linha?: any, arrasto?: any, destaque?: number, legal?: boolean, semFila?: boolean, febre?: number, alvo?: string, textos?: any }} op
+ * @param {{ pal: any, mesa: any, agora: number, t?: number, dpr?: number, linha?: any, arrasto?: any, destaque?: number, legal?: boolean, semFila?: boolean, febre?: number, alvo?: string, textos?: any }} op
  */
 export function desenharMesa(ctx, estado, L, op) {
   const { pal, agora } = op;
@@ -130,16 +59,19 @@ export function desenharMesa(ctx, estado, L, op) {
   const tremor = (c) => (linha ? linha.tremor(c, agora) : 0);
   const febre = op.febre || 0;
 
-  if (!op.semFila) tapete(ctx, L, pal, txt.naMao);
-  grimorio(ctx, L.mesa, pal, febre, agora);
+  // mesa do tema do mundo (temas/kit.js)
+  const m = op.mesa;
+  if (!op.semFila) tapete(ctx, L, txt.naMao, m);
+  m.tabuleiro(ctx, L.mesa, pal, febre, agora);
 
   // espacos vazios, alvo do item e destaque do arrasto
   for (let c = 0; c < L.colunas; c++) {
     const col = estado.colunas[c];
     const s = L.carta(c, 0);
     const dx = tremor(c);
-    if (!col.length) runa(ctx, { ...s, x: s.x + dx }, pal, t, c, op.destaque === c);
-    if (op.alvo && (op.alvo === 'coringa' || col.length) && !estado.cadeados[c]) {
+    if (!col.length) m.vazio(ctx, { ...s, x: s.x + dx }, pal, t, c, op.destaque === c);
+    const marcado = col.length > 0 && !!col[col.length - 1].esp;
+    if (op.alvo && (op.alvo === 'coringa' ? !marcado : col.length)) {
       const area = L.coluna(c);
       ctx.save();
       rr(ctx, area.x + dx - L.gap * 0.4, area.y - L.gap * 0.4, area.w + L.gap * 0.8, area.h + L.gap * 0.8, L.gap);
@@ -156,16 +88,13 @@ export function desenharMesa(ctx, estado, L, op) {
     }
   }
 
-  // fantasmas do fundo da pilha (pedra que quebra) vao sob as cartas da coluna
   const fantasmas = linha ? linha.fantasmas(agora) : [];
   const fantasma = (g) => desenharCarta(ctx, g.carta, { x: g.x, y: g.y, w: g.w, h: g.h, dpr, t, esc: g.esc, alpha: g.alpha, rot: g.rot });
-  for (const g of fantasmas) if (g.baixo) fantasma(g);
 
   // cartas das colunas (as que voam vao por cima, no fim). As que deslizam
-  // (pedra que quebra ou entra) ficam na ordem da pilha, sob os fantasmas:
-  // senao a carta que vem da fila e funde passa por baixo do topo.
+  // ficam na ordem da pilha, sob os fantasmas: senao a carta que vem da fila
+  // e funde passa por baixo do topo.
   const flutuantes = [];
-  const sCorrente = L.cw / 62;
   for (let c = 0; c < L.colunas; c++) {
     const col = estado.colunas[c];
     const dx = tremor(c);
@@ -177,32 +106,69 @@ export function desenharMesa(ctx, estado, L, op) {
       const r = p && p.x !== undefined ? p : base;
       desenharCarta(ctx, carta, { x: r.x + dx, y: r.y, w: r.w, h: r.h, dpr, t, esc: p ? p.esc : 1, escY: p ? p.escY : 1 });
     });
-    const cad = estado.cadeados[c];
-    if (cad) {
-      const area = L.coluna(c);
-      correntes(ctx, { x: area.x + dx, y: area.y, w: area.w, h: area.h }, sCorrente, cad.tipo === 'jogadas' ? Math.max(1, cad.n - estado.n) : 0, !!cad.monstro);
-    }
   }
 
   // fantasmas
-  for (const g of fantasmas) if (!g.baixo) fantasma(g);
+  for (const g of fantasmas) fantasma(g);
   for (const f of flutuantes) {
     const p = f.p;
     desenharCarta(ctx, f.carta, { x: p.x !== undefined ? p.x : f.base.x, y: p.y !== undefined ? p.y : f.base.y, w: p.w || f.base.w, h: p.h || f.base.h, dpr, t, esc: p.esc, alpha: p.alpha });
   }
 
-  // descarte
+  // proibido: centro do topo da coluna c (ou do espaco vazio)
+  const topoDe = (c) => {
+    const col = estado.colunas[c];
+    const r = L.carta(c, Math.max(0, col.length - 1));
+    return { x: r.x + r.w / 2 + tremor(c), y: r.y + r.h / 2, w: r.w };
+  };
+  // um especial por carta: o topo marcado mostra o selo enquanto o especial esta na mao
+  const naMao = op.arrasto ? estado.fila.find((k) => k.id === op.arrasto.id) : estado.fila[0];
+  if (op.alvo === 'coringa' || respeitaMarca(naMao)) {
+    const pulsa = 0.85 + 0.15 * Math.sin(agora / 220);
+    for (let c = 0; c < L.colunas; c++) {
+      const col = estado.colunas[c];
+      if (!col.length || !col[col.length - 1].esp) continue;
+      const r = L.carta(c, col.length - 1);
+      const ra = r.w * 0.16;
+      proibido(ctx, r.x + r.w - ra * 0.85 + tremor(c), r.y + ra * 0.85, ra * pulsa);
+    }
+  }
+  // sob o arrasto, na coluna que nao aceita a carta
+  if (op.destaque >= 0 && op.legal === false && op.destaque < L.colunas) {
+    const p = topoDe(op.destaque);
+    proibido(ctx, p.x, p.y, p.w * 0.3, 0.92);
+  }
+
+  // descarte: a pilha do nivel (n de N lugares) e o contador
   const d = L.descarte;
   const dxD = tremor(-1);
-  const temCarga = estado.descarteCarga > 0;
-  lapide(ctx, { ...d, x: d.x + dxD }, temCarga, t, estado.descarte ? '' : (temCarga ? txt.descartar : txt.semCarga));
+  const max = estado.regras.descarteMax;
+  const n = Math.max(0, max - estado.descarteCarga);
+  const cheio = estado.descarteCarga <= 0;
+  m.descarte(ctx, { ...d, x: d.x + dxD }, !cheio, t, estado.descarte ? '' : (cheio ? txt.semCarga : txt.descartar));
   if (estado.descarte) {
     const p = pose(estado.descarte.id);
     if (p && p.x !== undefined) desenharCarta(ctx, estado.descarte, { x: p.x, y: p.y, w: p.w, h: p.h, dpr, t, esc: p.esc });
-    else desenharCarta(ctx, estado.descarte, { x: d.x + dxD, y: d.y, w: d.w, h: d.h, dpr, t, alpha: 0.5, esc: 0.9 });
+    else {
+      // as cartas de baixo da pilha: bordas que descem um pouco
+      const ew = d.w * 0.9, eh = d.h * 0.9, ex = d.x + dxD + (d.w - ew) / 2, ey = d.y + (d.h - eh) / 2;
+      for (let k = Math.min(n, 4) - 1; k >= 1; k--) {
+        rr(ctx, ex, ey + k * 3, ew, eh, Math.max(5, ew * 0.11));
+        ctx.fillStyle = 'rgba(214,206,228,0.55)'; ctx.fill();
+        ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(42,22,48,0.6)'; ctx.stroke();
+      }
+      desenharCarta(ctx, estado.descarte, { x: d.x + dxD, y: d.y, w: d.w, h: d.h, dpr, t, alpha: cheio ? 0.45 : 0.6, esc: 0.9 });
+    }
+    if (cheio) texto(ctx, txt.semCarga, d.x + d.w / 2 + dxD, d.y + d.h * 0.86, Math.max(8, d.w * 0.15), '#ffffff', { contorno: TINTA, espessura: 2.5, max: d.w - 4 });
   }
-  if (estado.descarteCarga > 1) {
-    texto(ctx, '×' + estado.descarteCarga, d.x + d.w / 2 + dxD, d.y - d.h * 0.08, Math.round(d.h * 0.18), '#bff1ff', { contorno: TINTA, espessura: 3 });
+  if (max > 0) contador(ctx, { ...d, x: d.x + dxD }, `${n}/${max}`, cheio);
+
+  // jogada recusada: o proibido aparece com um salto e some
+  for (const p of linha ? linha.proibidos(agora) : []) {
+    const esc = p.u < 0.25 ? 0.6 + (p.u / 0.25) * 0.5 : p.u < 0.4 ? 1.1 - ((p.u - 0.25) / 0.15) * 0.1 : 1;
+    const alpha = p.u < 0.7 ? 1 : 1 - (p.u - 0.7) / 0.3;
+    if (p.c < 0) proibido(ctx, d.x + d.w / 2 + dxD, d.y + d.h / 2, d.w * 0.3 * esc, alpha);
+    else if (p.c < L.colunas) { const q = topoDe(p.c); proibido(ctx, q.x, q.y, q.w * 0.3 * esc, alpha); }
   }
 
   // fila: previas primeiro (na vertical, a de tras por cima da de baixo), a frente por ultimo

@@ -1,22 +1,20 @@
-// Menu de pausa (continuar, recomecar, som, modos, fases) e tela de fim.
-import { POR_MUNDO } from '../jogo/fases.js';
+// Menu de pausa (continuar, recomecar, som, missoes e a escada de cada mundo) e tela de fim.
+import { POR_MUNDO, alvoDoNivel } from '../jogo/fases.js';
 
 /**
- * @param {{ T: any, $: (id: string) => HTMLElement, acoes: any, onFechar?: () => void }} p
+ * @param {{ T: any, $: (id: string) => HTMLElement, acoes: any }} p
  */
 export function criarMenus({ T, $, acoes }) {
   const menu = $('menu'), fim = $('fim');
   let aberto = false;
   $('menuTitulo').textContent = T.pausa;
   $('bContinuar').textContent = T.continuar;
-  $('bRecomecar').textContent = T.recomecar;
-  $('bAventura').textContent = T.aventura;
-  $('bClassico').textContent = T.classico;
+  $('bRecomecar').textContent = T.recomecarNivel;
   $('missoesTitulo').textContent = T.missoes;
   $('fimTitulo').textContent = T.semJogadas;
   $('bFimContinuar').textContent = `${T.continuar} · ${T.gratis}`;
   $('txtFimVideo').textContent = T.continuarVideo;
-  $('bFimDeNovo').textContent = T.jogarDeNovo;
+  $('bFimDeNovo').textContent = T.recomecarNivel;
 
   function somIcone() {
     $('bSom').classList.toggle('mudo', acoes.mudo());
@@ -25,26 +23,28 @@ export function criarMenus({ T, $, acoes }) {
     svg.querySelector('.desligado').style.display = acoes.mudo() ? '' : 'none';
   }
 
+  /** A escada de cada mundo: os 8 valores; os alcancados recomecam dali (pelo kit). */
   function montarFases() {
     const g = $('gradeFases');
     g.innerHTML = '';
     const total = acoes.totalFases();
     const max = acoes.maxFase();
     for (let n = 1; n <= total; n++) {
+      const pos = ((n - 1) % POR_MUNDO) + 1;
+      if (pos === 1) {
+        const h = document.createElement('div');
+        h.className = 'mundoTitulo';
+        h.textContent = `${T.mundoRotulo} ${Math.floor((n - 1) / POR_MUNDO) + 1}`;
+        g.appendChild(h);
+      }
       const b = document.createElement('button');
-      b.className = 'fase' + (n === acoes.faseAtual() && acoes.modo() === 'aventura' ? ' atual' : '');
+      b.className = 'fase' + (n === acoes.faseAtual() ? ' atual' : n < max ? ' feita' : '');
       b.disabled = n > max;
-      const est = acoes.estrelas(n);
-      b.innerHTML = `${n}<small>${est ? '★'.repeat(est) : (n > max ? '🔒' : '')}</small>`;
+      b.innerHTML = `${alvoDoNivel(pos)}<small>${n > max ? '🔒' : n < max ? '✓' : ''}</small>`;
+      b.setAttribute('aria-label', `${T.mundoRotulo} ${Math.floor((n - 1) / POR_MUNDO) + 1} · ${T.nivel} ${pos}`);
       b.addEventListener('click', () => { if (!b.disabled) acoes.irPara(n); });
       g.appendChild(b);
     }
-    $('bAventura').setAttribute('aria-pressed', String(acoes.modo() === 'aventura'));
-    $('bClassico').setAttribute('aria-pressed', String(acoes.modo() === 'classico'));
-    $('bAventura').textContent = `${T.aventura} · ${T.mundo} ${Math.floor((max - 1) / POR_MUNDO) + 1}`;
-    $('bDiario').setAttribute('aria-pressed', String(acoes.modo() === 'diario'));
-    const hoje = acoes.diarioHoje();
-    $('bDiario').textContent = `${T.diario}${hoje >= 0 ? ' · ' + hoje : ''}`;
     const lm = $('listaMissoes');
     lm.innerHTML = '';
     for (const m of acoes.missoes()) {
@@ -72,17 +72,12 @@ export function criarMenus({ T, $, acoes }) {
   $('bContinuar').addEventListener('click', fechar);
   $('bRecomecar').addEventListener('click', () => { fechar(); acoes.recomecar(); });
   $('bSom').addEventListener('click', () => { acoes.som(); somIcone(); });
-  $('bAventura').addEventListener('click', () => { fechar(); acoes.modoAventura(); });
-  $('bClassico').addEventListener('click', () => { fechar(); acoes.modoClassico(); });
-  $('bDiario').addEventListener('click', () => { fechar(); acoes.modoDiario(); });
 
-  /** Tela de fim: { pontos, recorde, novo, gratis, video, derrotados? } */
+  /** Tela de fim (mesa cheia): { pontos, nivel, gratis, video } */
   function mostrarFim(info) {
     $('fimTitulo').textContent = info.titulo || T.semJogadas;
     $('fimPontos').textContent = String(info.pontos);
-    $('fimMonstros').hidden = info.derrotados === undefined;
-    if (info.derrotados !== undefined) $('fimMonstros').textContent = T.fimDerrotados.replace('{n}', String(info.derrotados));
-    $('fimRecorde').textContent = info.novo ? T.novoRecorde : (info.recorde ? `${T.recorde} ${info.recorde}` : '');
+    $('fimNivel').textContent = info.nivel || '';
     $('bFimContinuar').hidden = !info.gratis;
     $('bFimVideo').hidden = !info.video;
     fim.hidden = false;

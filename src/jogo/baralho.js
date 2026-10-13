@@ -9,6 +9,8 @@ import { maiorNaMesa } from './colunas.js';
 export const PESOS_PADRAO = Object.freeze({ 2: 6, 4: 5, 8: 3.5, 16: 2.2, 32: 1.4, 64: 0.9, 128: 0.5, 256: 0.3 });
 /** Cartas normais entre duas especiais, no minimo. */
 export const ESPACO_ESPECIAL = 6;
+/** Tipos de carta especial, na ordem do sorteio. */
+export const ESPECIAIS = ['coringa', 'bomba', 'dobro', 'quadruplo'];
 
 /** Um passo do mulberry32: devolve [u em [0,1), estado novo]. */
 export function rngPasso(a) {
@@ -35,7 +37,7 @@ export function valoresPermitidos(estado) {
 export function jogadasLegais(estado, carta) {
   const r = [];
   for (let c = 0; c < estado.colunas.length; c++) {
-    if (podeColocar(estado.regras, estado.colunas[c], carta, { trancada: !!estado.cadeados[c] }).ok) r.push(c);
+    if (podeColocar(estado.regras, estado.colunas[c], carta).ok) r.push(c);
   }
   return r;
 }
@@ -66,7 +68,7 @@ export function sortear(estado) {
   if (estado.desdeEspecial >= ESPACO_ESPECIAL) {
     [u, rng] = rngPasso(rng);
     let acum = 0;
-    for (const k of ['coringa', 'bomba', 'dobro']) {
+    for (const k of ESPECIAIS) {
       acum += esp[k] || 0;
       if (u < acum) { tipo = k; break; }
     }
@@ -74,7 +76,7 @@ export function sortear(estado) {
   const id = estado.proxId;
   let carta;
   if (tipo !== 'normal') {
-    carta = { id, tipo, v: 0, cor: 0 };
+    carta = { id, tipo, v: 0 };
   } else {
     let valores = valoresPermitidos(estado);
     const pesos = b.pesos || PESOS_PADRAO;
@@ -83,22 +85,14 @@ export function sortear(estado) {
     const frente = estado.fila[0];
     const semLegal = frente && jogadasLegais(estado, frente).length === 0;
     if (semLegal || estado.secas >= 2) {
-      const fundem = valores.filter((v) => estado.colunas.some((col, c) => !estado.cadeados[c] && fundeCom(regras, topo(col), { tipo: 'normal', v, cor: -1 })));
-      const cabem = valores.filter((v) => jogadasLegais(estado, { tipo: 'normal', v, cor: 0 }).length);
-      if (fundem.length && !regras.naipes) valores = fundem;
+      const fundem = valores.filter((v) => estado.colunas.some((col) => fundeCom(regras, topo(col), { tipo: 'normal', v })));
+      const cabem = valores.filter((v) => jogadasLegais(estado, { tipo: 'normal', v }).length);
+      if (fundem.length) valores = fundem;
       else if (cabem.length) valores = cabem;
     }
     [u, rng] = rngPasso(rng);
     const v = escolher(valores, pesos, u);
-    let cor = 0;
-    if (regras.naipes) {
-      [u, rng] = rngPasso(rng);
-      cor = Math.floor(u * 4);
-      // com naipes, a piedade tenta a cor do topo igual
-      const alvo = estado.colunas.find((col, c) => !estado.cadeados[c] && topo(col) && topo(col).tipo === 'normal' && topo(col).v === v && !topo(col).gelo);
-      if (alvo && (semLegal || estado.secas >= 2)) cor = topo(alvo).cor;
-    }
-    carta = { id, tipo: 'normal', v, cor };
+    carta = { id, tipo: 'normal', v };
   }
   return {
     estado: {

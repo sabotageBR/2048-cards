@@ -28,21 +28,17 @@ test('carta >= 44 px e tudo dentro da tela', () => {
   }
 });
 
-test('arena do duelo: o monstro cabe acima (retrato) ou ao lado (paisagem) da mesa', () => {
-  for (const [W, H] of TELAS) for (const [colunas, pilhaMax] of [[4, 6], [5, 6], [5, 7]]) {
+test('mesa e fila cabem na tela com 3, 4 e 5 colunas (o mundo 5 tem 3), com o descarte na mesa ou na fila', () => {
+  for (const [W, H] of TELAS) for (const [colunas, pilhaMax] of [[3, 6], [4, 6], [5, 6]]) for (const descarteFila of [false, true]) {
     const retrato = H >= W * 0.95;
-    const topo = retrato ? 112 : 92;
-    const L = calcularLayout({ W, H, topo, base: 0, colunas, pilhaMax, tamFila: 3, arena: true });
-    const m = L.monstro;
-    const nome = `${W}x${H} ${colunas}x${pilhaMax}`;
+    const topo = retrato ? 140 : 92;
+    const L = calcularLayout({ W, H, topo, base: 0, colunas, pilhaMax, tamFila: 3, descarteFila });
+    const nome = `${W}x${H} ${colunas}x${pilhaMax}${descarteFila ? ' descarte na fila' : ''}`;
     assert.ok(L.cw >= 44, `${nome}: cw ${L.cw}`);
-    assert.ok(m && m.R >= 28, `${nome}: monstro`);
-    // caixa do monstro: chifres a 2.1R acima dos pes, corpo +-1.15R
-    assert.ok(m.y - m.R * 2.1 >= topo - 2, `${nome}: monstro sob o HUD (${m.y - m.R * 2.1} < ${topo})`);
-    assert.ok(m.x - m.R * 1.15 >= -2 && m.x + m.R * 1.15 <= W + 2, `${nome}: monstro fora da tela`);
-    if (retrato) assert.ok(m.y <= L.mesa.y + 2, `${nome}: pes do monstro dentro da mesa`);
-    else assert.ok(m.x + m.R * 1.15 <= L.mesa.x + 2, `${nome}: monstro sobre a mesa`);
-    assert.ok(L.mesa.y + L.mesa.h <= H + 1 && L.mesa.x + L.mesa.w <= W + 1, `${nome}: mesa fora`);
+    assert.ok(L.mesa.y >= topo, `${nome}: mesa sob o HUD`);
+    assert.ok(L.descarte.x >= 0 && L.descarte.x + L.descarte.w <= W + 1, `${nome}: descarte fora`);
+    assert.ok(L.filaPos(0).x >= 0, `${nome}: fila fora (esquerda)`);
+    assert.ok(L.mesa.y + L.mesa.h <= H + 1 && L.mesa.x + L.mesa.w <= W + 1 && L.mesa.x >= 0, `${nome}: mesa fora`);
     const f = L.filaPos(L.tamFila - 1);
     assert.ok(f.x + f.w <= W + 1 && f.y + f.h <= H + 1, `${nome}: fila fora`);
   }

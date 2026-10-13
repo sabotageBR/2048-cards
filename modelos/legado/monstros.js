@@ -1,3 +1,5 @@
+// Legado do duelo contra monstros (fora do jogo desde 2026-10-13, branch so-cartas):
+// so os laboratorios de modelos/ e a thumb antiga (tools/thumb.html) usam.
 // Monstros do duelo, desenhados no canvas (sem imagens). Uma especie por
 // reino: Gosmo (lodo), Golem (pedra), Yeti (gelo), Espectro (corrente) e
 // Dragao (tudo). Cada especie e uma funcao (ctx, def, R, t, pose) com a
@@ -9,7 +11,7 @@
 // monstroDaFase escolhe a especie pelo mundo e a variante (cor, chifres,
 // acessorio, apelido) pela posicao no mundo; a posicao 8 e o chefao de coroa.
 // monstroDaCadeia faz o mesmo para o monstro n do Classico e do Diario.
-import { TINTA, OURO, TAU, circulo, elipse, misturar, escurecer, rgba, semente, clamp } from './desenho.js';
+import { TINTA, OURO, TAU, circulo, elipse, misturar, escurecer, rgba, semente, clamp } from '../../src/render/desenho.js';
 
 const lw0 = (R) => Math.max(2, R * 0.045);
 

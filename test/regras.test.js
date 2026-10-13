@@ -1,10 +1,10 @@
-// Regras de colocacao e cascata (estrita, permissiva, naipes, teto).
+// Regras de colocacao e cascata (estrita, permissiva, especiais, teto).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { REGRAS_PADRAO, normalizarRegras, podeColocar, fundeCom } from '../src/jogo/regras.js';
-import { colocar, cascata, completar, descongelar, danificarPedra } from '../src/jogo/colunas.js';
+import { colocar, cascata, completar, graduar } from '../src/jogo/colunas.js';
 
-const N = (v, id = v, extra = {}) => ({ id, tipo: 'normal', v, cor: 0, ...extra });
+const N = (v, id = v, extra = {}) => ({ id, tipo: 'normal', v, ...extra });
 const R = normalizarRegras();
 
 test('normalizarRegras limita os valores', () => {
@@ -24,7 +24,6 @@ test('estrita: igual funde, menor empilha, maior e recusada, cheia e recusada', 
   const cheia = [N(128), N(64), N(32), N(16), N(8), N(4)];
   assert.equal(podeColocar(R, cheia, N(2)).motivo, 'cheia');
   assert.equal(podeColocar(R, cheia, N(4)).modo, 'fusao', 'fusao nao ocupa espaco');
-  assert.equal(podeColocar(R, [N(8)], N(4), { trancada: true }).motivo, 'trancada');
 });
 
 test('permissiva aceita maior sobre menor', () => {
@@ -32,19 +31,12 @@ test('permissiva aceita maior sobre menor', () => {
   assert.equal(podeColocar(P, [N(8)], N(16)).modo, 'empilha');
 });
 
-test('naipes: so funde com a mesma cor', () => {
-  const Nn = normalizarRegras({ naipes: true });
-  assert.equal(fundeCom(Nn, N(8, 1, { cor: 1 }), N(8, 2, { cor: 1 })), true);
-  assert.equal(fundeCom(Nn, N(8, 1, { cor: 1 }), N(8, 2, { cor: 2 })), false);
-  assert.equal(podeColocar(Nn, [N(8, 1, { cor: 1 })], N(8, 2, { cor: 2 })).modo, 'empilha');
-});
-
 test('coringa funde com qualquer topo e vira 2 na coluna vazia', () => {
   const ev = [];
-  const r = colocar([N(32)], R, 0, { id: 9, tipo: 'coringa', v: 0, cor: 0 }, ev);
+  const r = colocar([N(32)], R, 0, { id: 9, tipo: 'coringa', v: 0 }, ev);
   assert.equal(r.col[0].v, 64);
   assert.equal(r.fusao, true);
-  const v = colocar([], R, 0, { id: 9, tipo: 'coringa', v: 0, cor: 0 }, []);
+  const v = colocar([], R, 0, { id: 9, tipo: 'coringa', v: 0 }, []);
   assert.equal(v.col[0].v, 2);
   assert.equal(v.col[0].tipo, 'normal');
 });
@@ -52,8 +44,36 @@ test('coringa funde com qualquer topo e vira 2 na coluna vazia', () => {
 test('bomba precisa de alvo; dobro precisa de carta normal no topo', () => {
   assert.equal(podeColocar(R, [], { tipo: 'bomba' }).motivo, 'vazia');
   assert.equal(podeColocar(R, [N(8)], { tipo: 'bomba' }).modo, 'bomba');
-  assert.equal(podeColocar(R, [{ id: 1, tipo: 'pedra', hp: 2 }], { tipo: 'dobro' }).motivo, 'semAlvo');
+  assert.equal(podeColocar(R, [], { tipo: 'dobro' }).motivo, 'semAlvo');
   assert.equal(podeColocar(R, [N(8)], { tipo: 'dobro' }).modo, 'dobro');
+});
+
+test('um especial por carta: coringa e dobro recusam o topo marcado; a bomba nao', () => {
+  const M = N(16, 1, { esp: true });
+  assert.equal(podeColocar(R, [M], { tipo: 'dobro' }).motivo, 'usada');
+  assert.equal(podeColocar(R, [M], { tipo: 'quadruplo' }).motivo, 'usada');
+  assert.equal(podeColocar(R, [N(16)], { tipo: 'quadruplo' }).modo, 'dobro');
+  assert.equal(podeColocar(R, [], { tipo: 'quadruplo' }).motivo, 'semAlvo');
+  assert.equal(podeColocar(R, [M], { tipo: 'coringa' }).motivo, 'usada');
+  assert.equal(fundeCom(R, M, { tipo: 'coringa' }), false);
+  const cheia = [N(512), N(256), N(128), N(64), N(32), N(16, 1, { esp: true })];
+  assert.equal(podeColocar(R, cheia, { tipo: 'coringa' }).motivo, 'usada', 'o motivo e a marca, nao a pilha');
+  assert.equal(podeColocar(R, [M], { tipo: 'bomba' }).modo, 'bomba');
+  assert.equal(podeColocar(R, [M], N(16, 2)).modo, 'fusao', 'carta normal funde com a marcada');
+  assert.equal(podeColocar(R, [], { tipo: 'coringa' }).modo, 'empilha');
+});
+
+test('a marca do especial: o coringa marca; a fusao normal e a cascata limpam', () => {
+  const c = colocar([N(32)], R, 0, { id: 9, tipo: 'coringa', v: 0 }, []);
+  assert.equal(c.col[0].esp, true);
+  const n = colocar([N(64, 1, { esp: true })], R, 0, N(64, 2), []);
+  assert.equal(n.col[0].v, 128);
+  assert.equal('esp' in n.col[0], false);
+  const k = colocar([N(64, 1, { esp: true }), N(32)], R, 0, { id: 9, tipo: 'coringa', v: 0 }, []);
+  assert.deepEqual(k.col.map((x) => x.v), [128]);
+  assert.equal('esp' in k.col[0], false, 'a cascata faz uma carta nova');
+  const v = colocar([], R, 0, { id: 9, tipo: 'coringa', v: 0 }, []);
+  assert.equal('esp' in v.col[0], false, 'o coringa na coluna vazia vira um 2 limpo');
 });
 
 test('cascata funde degrau a degrau e sobe o multiplicador', () => {
@@ -67,7 +87,7 @@ test('cascata funde degrau a degrau e sobe o multiplicador', () => {
   assert.ok(fus.every((e) => e.c === 2));
 });
 
-test('2048 sai da mesa e libera a coluna; no chefe fica ate 4096', () => {
+test('2048 sai da mesa e libera a coluna; com teto 4096 fica', () => {
   const ev = [];
   const r = colocar([N(1024)], R, 0, N(1024, 5), ev);
   const c = completar(r.col, R, 0, ev);
@@ -80,28 +100,11 @@ test('2048 sai da mesa e libera a coluna; no chefe fica ate 4096', () => {
   assert.equal(r2.col[0].v, 2048);
 });
 
-test('gelo nao funde ate uma fusao na coluna; depois cascateia', () => {
-  const gelo = N(8, 1, { gelo: true });
-  assert.equal(podeColocar(R, [N(16), gelo], N(8)).motivo, 'gelo', 'igual sobre gelo e recusada');
-  assert.equal(podeColocar(R, [N(16), gelo], N(4)).modo, 'empilha');
-  const ev = [];
-  // [16, 8(gelo), 4] + 4 -> 8 funde? nao: 4+4=8, descongela o 8, 8+8=16, 16+16=32
-  const r = colocar([N(16, 1), N(8, 2, { gelo: true }), N(4, 3)], R, 0, N(4, 4), ev);
-  assert.deepEqual(r.col.map((k) => k.v), [32]);
-  assert.ok(ev.some((e) => e.tipo === 'gelo' && e.id === 2));
-  assert.equal(r.degrau, 3);
-});
-
-test('pedra perde 1 por fusao e quebra', () => {
-  const pedra = { id: 1, tipo: 'pedra', v: 0, cor: 0, hp: 2 };
-  const ev = [];
-  const r = colocar([pedra, N(4, 2), N(2, 3)], R, 0, N(2, 4), ev);
-  // 2+2=4 (dano 1), 4+4=8 (dano 2: quebra)
-  assert.deepEqual(r.col.map((k) => k.v), [8]);
-  assert.equal(r.pedras, 1);
-  assert.ok(ev.some((e) => e.tipo === 'pedra' && e.quebrou));
-  const d = danificarPedra([{ ...pedra, hp: 3 }, N(4)], 0, []);
-  assert.equal(d.col[0].hp, 2);
-  assert.equal(descongelar([N(2)], 0, []).length, 1);
+test('graduar tira da mesa so as cartas abaixo do piso', () => {
+  const cols = [[N(64, 1), N(32, 2), N(4, 3), N(2, 4)], [N(8, 5)], [], [N(2, 6)]];
+  const g = graduar(cols, 4);
+  assert.deepEqual(g.colunas.map((c) => c.map((k) => k.v)), [[64, 32, 4], [8], [], []]);
+  assert.deepEqual(g.cartas.map((k) => [k.c, k.id, k.valor]), [[0, 4, 2], [3, 6, 2]]);
+  assert.equal(graduar(cols, 2).colunas, cols, 'sem carta abaixo do piso, a mesa e a mesma');
   assert.equal(cascata([N(4), N(4)], R, 0, [], 1, []).col[0].v, 8);
 });

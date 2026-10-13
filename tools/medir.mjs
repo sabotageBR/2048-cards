@@ -1,58 +1,76 @@
-// Mede as fases com os dois jogadores do bot.js: o guloso (prova que a fase
-// e vencivel: piso de 82%, 78% na ultima do mundo) e o casual (PERFIL_CASUAL,
-// a regua da curva de dificuldade: alvoCasual em fases.js). Usado por
-// simular.mjs, curadoria.mjs e curva.mjs.
-import { POR_MUNDO, posNoMundo, alvoCasual, FAIXA_CASUAL, QUEDA_MAX } from '../src/jogo/fases.js';
-import { jogarSozinho, PERFIL_CASUAL } from '../src/jogo/bot.js';
+// Mede os mundos com os dois jogadores do bot.js, cada um jogando o mundo
+// inteiro numa mesa so (jogarMundo): o guloso (prova que cada nivel e
+// passavel sem recomecar: piso de 82%, 78% no 2048) e o casual (PERFIL_CASUAL, a regua da
+// curva de dificuldade, alvoCasual em fases.js, e do ritmo: jogadas por
+// nivel). Usado por simular.mjs, curadoria.mjs e curva.mjs.
+import { MUNDOS, POR_MUNDO, faseGlobal, alvoDoNivel, alvoCasual, FAIXA_CASUAL, QUEDA_MAX, ritmoMax } from '../src/jogo/fases.js';
+import { jogarMundo, PERFIL_CASUAL } from '../src/jogo/bot.js';
 
 export const GULOSO = 25;
-/** Partidas do casual por serie de sementes (sao duas: 2 x CASUAL partidas por fase). */
+/** Partidas do casual por serie de sementes (sao duas: 2 x CASUAL partidas por mundo). */
 export const CASUAL = 80;
+/** Piso do guloso (% de partidas que passam o nivel sem recomecar): 78 no 2048, o ultimo do mundo. */
+export const pisoGuloso = (n) => (n === POR_MUNDO ? 78 : 82);
 
 /** Quantil p de uma lista de numeros. */
-export const q = (a, p) => { const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
+export const q = (a, p) => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p * s.length))] : 0; };
 
 /**
- * Joga a fase com os dois perfis. O guloso usa as tentativas 1..n
- * (`semente + s * 7919`). O casual joga as duas series: a dos testes
- * (`semente + s`) e a das tentativas a partir da 0, a primeira partida de quem
- * joga (main.js usa `semente + tentativas * 7919`). Uma serie so varia uns 10
- * pontos de uma fase para outra conforme o baralho; as duas juntas, bem menos.
+ * Joga o mundo m com os dois perfis. O guloso usa `semente + s * 7919`
+ * (s = 1..n); o casual joga duas series, `semente + s * 7919` e `semente + s + 1`.
+ * Por nivel: em quantas partidas que chegaram ao nivel o casual o passou sem
+ * recomecar (`casual`, %), jogadas (mediana, contando os recomecos), mesas
+ * cheias e recomecos por partida.
  */
-export function medirFase(f, nGuloso = GULOSO, nCasual = CASUAL) {
-  let v = 0, apos = 0, vc = 0;
-  const jog = [], pts = [], at = [], jogC = [], fins = {};
+export function medirMundo(m, nGuloso = GULOSO, nCasual = CASUAL) {
+  const def = MUNDOS[m - 1];
+  let limpo = 0;
+  const jogG = [], runsG = [];
   for (let s = 1; s <= nGuloso; s++) {
-    const r = jogarSozinho(f, {}, f.semente + s * 7919);
-    if (r.venceu) v++;
-    if (r.aposFeitico) apos++;
-    jog.push(r.jogadas); pts.push(r.pontos); at.push(r.ataques);
+    const r = jogarMundo(m, def.semente + s * 7919);
+    if (r.completou && r.niveis.every((nv) => nv.recomecos === 0)) limpo++;
+    jogG.push(r.jogadas);
+    runsG.push(r);
   }
+  /** Em quantas partidas (%) que chegaram ao nivel n ele foi passado sem recomecar. */
+  const semRecomeco = (rs, n) => {
+    const ch = rs.filter((r) => r.niveis[n - 1].chegou);
+    return ch.length ? Math.round((ch.filter((r) => r.niveis[n - 1].passou && r.niveis[n - 1].recomecos === 0).length / ch.length) * 100) : 0;
+  };
+  const runs = [];
   for (let s = 0; s < nCasual; s++) {
-    for (const semente of [f.semente + s * 7919, f.semente + s + 1]) {
-      const r = jogarSozinho(f, {}, semente, PERFIL_CASUAL);
-      if (r.venceu) vc++;
-      else fins[r.fim || 'parou'] = (fins[r.fim || 'parou'] || 0) + 1;
-      jogC.push(r.jogadas);
-    }
+    for (const semente of [def.semente + s * 7919, def.semente + s + 1]) runs.push(jogarMundo(m, semente, PERFIL_CASUAL));
+  }
+  const niveis = [];
+  for (let n = 1; n <= POR_MUNDO; n++) {
+    const chegaram = runs.filter((r) => r.niveis[n - 1].chegou);
+    const N = faseGlobal(m, n);
+    niveis.push({
+      N, n, alvoValor: alvoDoNivel(n),
+      guloso: semRecomeco(runsG, n), casual: semRecomeco(runs, n),
+      jogadas: q(chegaram.map((r) => r.niveis[n - 1].jogadas), 0.5),
+      descartes: chegaram.reduce((a, r) => a + r.niveis[n - 1].descartes, 0) / Math.max(1, chegaram.length),
+      cheias: chegaram.reduce((a, r) => a + r.niveis[n - 1].cheias, 0) / Math.max(1, chegaram.length),
+      recomecos: chegaram.reduce((a, r) => a + r.niveis[n - 1].recomecos, 0) / Math.max(1, chegaram.length),
+      alvo: alvoCasual(N), ritmo: ritmoMax(N), piso: pisoGuloso(n),
+    });
   }
   return {
-    id: f.id, mundo: f.mundo, vitorias: v / nGuloso, jogadas: q(jog, 0.5), pontos: [q(pts, 0.25), q(pts, 0.5), q(pts, 0.75)],
-    ataques: q(at, 0.5), apos, casual: Math.round((vc / (2 * nCasual)) * 100), jogadasCasual: q(jogC, 0.5), fins,
-    alvo: alvoCasual(f.id), piso: posNoMundo(f.id) === POR_MUNDO ? 0.78 : 0.82,
+    mundo: m, gulosoLimpo: limpo / nGuloso, jogadasGuloso: q(jogG, 0.5),
+    completou: runs.filter((r) => r.completou).length / runs.length, jogadasCasual: q(runs.map((r) => r.jogadas), 0.5), niveis,
   };
 }
 
 /**
- * Problemas da fase medida `m` (lista vazia = ok). `ant` e a fase anterior
- * medida (para a queda): sem ela, so a faixa vale.
+ * Problemas do nivel medido `nv` (lista vazia = ok). `ant` e o nivel anterior
+ * medido (para a queda): sem ele, so o piso, a faixa e o ritmo valem.
  */
-export function problemas(m, ant) {
+export function problemas(nv, ant) {
   const r = [];
-  if (m.vitorias < m.piso) r.push('ABAIXO DO PISO');
-  if (m.jogadas < 5) r.push('TRIVIAL');
-  if (m.casual < m.alvo - FAIXA_CASUAL) r.push('PAREDE');
-  else if (ant && ant.casual - m.casual > QUEDA_MAX) r.push('QUEDA');
-  if (m.casual > m.alvo + FAIXA_CASUAL) r.push('FACIL');
+  if (nv.guloso < nv.piso) r.push('ABAIXO DO PISO');
+  if (nv.casual < nv.alvo - FAIXA_CASUAL) r.push('PAREDE');
+  else if (ant && ant.casual - nv.casual > QUEDA_MAX) r.push('QUEDA');
+  if (nv.casual > nv.alvo + FAIXA_CASUAL) r.push('FACIL');
+  if (nv.jogadas > nv.ritmo) r.push('LENTO');
   return r;
 }

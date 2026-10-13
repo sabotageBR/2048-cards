@@ -1,175 +1,70 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><title>thumb</title>
-<style>html,body{margin:0;overflow:hidden;background:#000}canvas{display:block}</style></head>
+<style>
+@font-face { font-family: 'Fredoka'; src: url('../src/ui/fontes/fredoka-latin-700-normal.woff2') format('woff2'); font-weight: 700; }
+html,body{margin:0;overflow:hidden;background:#000}canvas{display:block}
+</style></head>
 <body><canvas id="c"></canvas><pre id="medidas"></pre>
 <script type="module">
-// Thumb da Poki desenhada com a arte do proprio jogo: a arena de um reino, o
-// monstro gigante levando o golpe especial (o raio da carta 2048 que nasce da
-// cascata) e o numero do dano. Regras (developers.poki.com/guide/game-thumbnail):
+// Thumb da Poki desenhada com a arte do proprio jogo: sem monstro (branch
+// so-cartas), as cartas sao o assunto e a carta 2048 e a protagonista, num
+// fundo limpo com raios de luz. Regras (developers.poki.com/guide/game-thumbnail):
 //   - quadrado 1:1 de no minimo 628 px, sangrado: sem borda, margem, tarja nem
 //     faixa lisa encostada na beirada; a Poki arredonda os cantos;
-//   - sem texto (os numeros das cartas e do dano sao o proprio jogo);
-//   - um assunto principal (o monstro levando o golpe), fundo limpo;
+//   - sem texto (os numeros das cartas sao o proprio jogo);
+//   - um assunto principal (a carta 2048), fundo limpo;
 //   - contraste alto e nenhuma cor perto do #83FFE7 do site;
 //   - legivel nos tiles pequenos (ver ?grade).
-//   ?opcao=a..h&s=1256      a thumb no tamanho s (a janela deve ter s x s)
-//   ?opcao=a&grade          folha de conferencia: tiles de 314 a 94 px sobre o #83FFE7
-//   ?opcao=a&medir          mede a thumb de 628 px e escreve o JSON em #medidas
-import { arenaDe } from '../src/render/arena.js';
+//   ?opcao=fusao&s=1256      a thumb no tamanho s (a janela deve ter s x s)
+//   ?opcao=fusao&grade       folha de conferencia: tiles de 314 a 94 px sobre o #83FFE7
+//   ?opcao=fusao&medir       mede a thumb de 628 px e escreve o JSON em #medidas
+//   ?opcao=fusao&perto       a thumb de 628 px com os pixels perto do #83FFE7 em magenta (para achar o que reprova)
+// (A thumb do duelo, opcao h com o Gosmo, esta na master.)
 import { desenharCarta } from '../src/render/cartas.js';
-import { corDuelo } from '../src/render/cartaDuelo.js';
-import { desenharMonstro, variante } from '../src/render/monstros.js';
-import { texto, estrela, rr, circulo, elipse, TINTA } from '../src/render/desenho.js';
+import { temaDe } from '../src/render/temas/index.js';
+import { estrela, rr, circulo, TINTA } from '../src/render/desenho.js';
 
 const q = new URLSearchParams(location.search);
-const opcao = q.get('opcao') || 'a';
 const S = Math.max(64, parseInt(q.get('s') || '1256', 10));
 const POKI = '#83FFE7';
 const TILES = [314, 204, 140, 94];
 
 /**
- * Opcoes: reino, monstro (especie e posicao; 8 = chefao), pose e cena.
- * a-d: cena 'raio' (coluna da cascata a esquerda, raio do 2048 ate o monstro, dano);
- * e-g: cena 'perto' (o monstro de perto levando a carta 2048 na cara; sem texto alem da carta).
+ * Opcoes (cenas num quadrado virtual de 600):
+ *   fusao   dois 1024 se chocam e o 2048 salta do estouro (a regra do jogo);
+ *   cascata o 2048 sai voando do topo da pilha (o golpe especial, sem monstro);
+ *   leque   uma mao de cartas, o 2048 na frente e mais alto (jogo de cartas);
+ *   escada  os valores subindo em degraus ate o 2048 (a fase sobe a cada valor novo).
+ * fundo: [centro, meio, borda] do degrade e o foco (x, y) dos raios.
  */
 const OPCOES = {
-  a: { cena: 'raio', reino: 1, especie: 'gosmo', pos: 1, furia: false },
-  b: { cena: 'raio', reino: 5, especie: 'dragao', pos: 8, furia: true },
-  c: { cena: 'raio', reino: 3, especie: 'yeti', pos: 8, furia: false },
-  d: { cena: 'raio', reino: 4, especie: 'espectro', pos: 4, furia: false },
-  e: { cena: 'perto', reino: 1, especie: 'gosmo', pos: 1, furia: false, perto: {
-    M: { x: 412, y: 598, R: 192 }, recua: 0.05, golpe: true, estouro: [228, 306, 72],
-    carta: { x: 16, y: 92, w: 184, rot: -0.3 },
-  } },
-  f: { cena: 'perto', reino: 5, especie: 'dragao', pos: 8, furia: true, perto: {
-    M: { x: 410, y: 600, R: 180 }, recua: 0.05, golpe: true, estouro: [246, 276, 72],
-    carta: { x: 16, y: 90, w: 184, rot: -0.3 },
-  } },
-  h: { cena: 'perto', reino: 1, especie: 'gosmo', pos: 1, furia: false, perto: {
-    M: { x: 424, y: 600, R: 188 }, recua: 0.04,
-    carta: { x: 16, y: 168, w: 184, rot: -0.2 }, voo: -0.3, linhas: [[-70, -50, 130, 11], [-10, -70, 190, 15], [50, -50, 120, 11]],
-  } },
+  fusao: { fundo: ['#a66bff', '#4b1c92', '#140527'], foco: [300, 205] },
+  cascata: { fundo: ['#5a8cff', '#1d338f', '#060b29'], foco: [390, 190] },
+  leque: { fundo: ['#c45cff', '#5c177c', '#170521'], foco: [300, 240] },
+  escada: { fundo: ['#9a7bff', '#33208c', '#0a0726'], foco: [390, 250] },
 };
-const O = OPCOES[opcao] || OPCOES.a;
-const arena = arenaDe(O.reino);
-const def = variante(O.especie, O.pos);
+const opcao = OPCOES[q.get('opcao')] ? q.get('opcao') : 'fusao';
+const O = OPCOES[opcao];
 
 let ctx = null;
 let k = 1; // tudo num quadrado virtual de 600
-/** Monstro grande a direita; os pes na arena (cena 'raio'). */
-const M = { x: 398, y: 372, R: 122 };
-/** Cena 'perto': a arena atras fica na escala normal (o monstro de perto vem de OPCOES). */
-const FUNDO = { x: 384, y: 470, R: 118 };
 
 function carta(v, x, y, w, rot, alpha = 1) {
   ctx.save();
   ctx.scale(k, k);
-  desenharCarta(ctx, { id: v, tipo: 'normal', v, cor: 0 }, { x, y, w, h: w / 0.72, alpha, rot, dpr: k, t: 0.4 });
+  desenharCarta(ctx, { id: v, tipo: 'normal', v }, { x, y, w, h: w / 0.72, alpha, rot, dpr: k, t: 0.4 });
   ctx.restore();
 }
 
-/** Raio do golpe especial: da carta 2048 ate o monstro. */
-function raio(x0, y0, x1, y1) {
-  let s = 11;
-  const r = () => { s = (s * 1103515245 + 12345) >>> 0; return s / 4294967296; };
-  const n = 8;
-  const pts = [[x0, y0]];
-  for (let i = 1; i < n; i++) {
-    const u = i / n, j = (r() - 0.5) * 60 * (1 - Math.abs(u - 0.5));
-    pts.push([x0 + (x1 - x0) * u + j * 0.4, y0 + (y1 - y0) * u + j]);
-  }
-  pts.push([x1, y1]);
+/** Carta com sombra macia (profundidade) desenhada por baixo. */
+function cartaSombra(v, x, y, w, rot) {
+  const h = w / 0.72;
   ctx.save(); ctx.scale(k, k);
-  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  ctx.shadowColor = '#fff3a0'; ctx.shadowBlur = 30;
-  for (const [larg, cor] of [[28, 'rgba(255,226,122,0.5)'], [14, '#ffe27a'], [5, '#ffffff']]) {
-    ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-    ctx.strokeStyle = cor; ctx.lineWidth = larg; ctx.stroke();
-  }
+  ctx.translate(x + w / 2, y + h / 2 + 10); ctx.rotate(rot);
+  ctx.shadowColor = 'rgba(8,2,20,0.55)'; ctx.shadowBlur = 26; ctx.shadowOffsetY = 10;
+  rr(ctx, -w / 2 + 6, -h / 2 + 6, w - 12, h - 12, 18); ctx.fillStyle = 'rgba(8,2,20,0.5)'; ctx.fill();
   ctx.restore();
-}
-
-function faiscas(cx, cy, raioMin, raioMax, n, semente) {
-  ctx.save(); ctx.scale(k, k);
-  let s = semente;
-  const r = () => { s = (s * 1103515245 + 12345) >>> 0; return s / 4294967296; };
-  for (let i = 0; i < n; i++) {
-    const a = r() * Math.PI * 2, d = raioMin + r() * (raioMax - raioMin), t = 6 + r() * 10;
-    estrela(ctx, cx + Math.cos(a) * d, cy + Math.sin(a) * d, t, t * 0.42, 4, a);
-    ctx.fillStyle = ['#ffe27a', '#ffffff', '#ff8a3d'][i % 3]; ctx.globalAlpha = 0.6 + r() * 0.4; ctx.fill();
-  }
-  ctx.restore();
-}
-
-function desenhar(s) {
-  k = s / 600;
-  if (O.cena === 'perto') { cenaPerto(); return; }
-  ctx.save(); ctx.scale(k, k);
-  arena.parado(ctx, 600, 600, { monstro: M, retrato: true });
-  arena.vivo(ctx, 600, 600, 2.2, { monstro: M, retrato: true });
-  // vinheta: o olho vai ao golpe, os cantos escurecem (contraste com a carta)
-  const v = ctx.createRadialGradient(330, 300, 170, 330, 300, 520);
-  v.addColorStop(0, 'rgba(10,4,20,0)'); v.addColorStop(0.7, 'rgba(10,4,20,0.35)'); v.addColorStop(1, 'rgba(10,4,20,0.8)');
-  ctx.fillStyle = v; ctx.fillRect(0, 0, 600, 600);
-  // o monstro levando o golpe: olhos apertados de dor (a furia na opcao do chefao)
-  desenharMonstro(ctx, def, M, 1.1, { golpe: 0.93, furia: O.furia });
-  ctx.restore();
-  // a coluna da cascata, como na mesa: a faixa de cada carta aparece, a menor embaixo
-  [[1024, 352], [512, 396], [256, 440], [128, 484]].forEach(([val, y]) => carta(val, 26, y, 132, 0));
-  // o 2048 salta da coluna, com brilho
-  ctx.save(); ctx.scale(k, k);
-  ctx.translate(108, 238); ctx.rotate(-0.1);
-  ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = 55;
-  rr(ctx, -82, -112, 164, 224, 20); ctx.fillStyle = 'rgba(255,216,74,0.35)'; ctx.fill();
-  ctx.restore();
-  carta(2048, 30, 128, 156, -0.1);
-  raio(188, 196, M.x - 30, M.y - M.R * 0.95);
-  faiscas(M.x - 20, M.y - M.R * 0.95, 30, 140, 24, 7);
-  faiscas(110, 240, 100, 150, 10, 3);
-  // o numero do dano saindo do monstro
-  ctx.save(); ctx.scale(k, k);
-  ctx.translate(M.x + 40, M.y - M.R * 2.22); ctx.rotate(0.06);
-  texto(ctx, '-2048', 0, 0, 72, '#ffffff', { contorno: '#a3122b', espessura: 16 });
-  ctx.restore();
-}
-
-/** Estouro do golpe (sem texto): estrela de quadrinho com miolo branco e brilho. */
-function estouro(x, y, r) {
-  ctx.save(); ctx.scale(k, k);
-  const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 1.7);
-  g.addColorStop(0, 'rgba(255,240,170,0.9)'); g.addColorStop(0.5, 'rgba(255,190,60,0.35)'); g.addColorStop(1, 'rgba(255,160,40,0)');
-  ctx.fillStyle = g; circulo(ctx, x, y, r * 1.7); ctx.fill();
-  estrela(ctx, x, y, r, r * 0.62, 11, 0.2); ctx.fillStyle = '#ff9a2e'; ctx.fill();
-  ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.strokeStyle = TINTA; ctx.stroke();
-  estrela(ctx, x, y, r * 0.78, r * 0.5, 11, 0.35); ctx.fillStyle = '#ffe27a'; ctx.fill();
-  estrela(ctx, x, y, r * 0.46, r * 0.3, 9, 0.1); ctx.fillStyle = '#ffffff'; ctx.fill();
-  ctx.restore();
-}
-
-/** Linhas de velocidade atras da carta (ang: direcao do voo). */
-function velocidade(x, y, ang, linhas) {
-  ctx.save(); ctx.scale(k, k);
-  ctx.translate(x, y); ctx.rotate(ang);
-  ctx.lineCap = 'round';
-  for (const [dy, x0, comp, larg] of linhas) {
-    const g = ctx.createLinearGradient(x0, 0, x0 - comp, 0);
-    g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.beginPath(); ctx.moveTo(x0, dy); ctx.lineTo(x0 - comp, dy);
-    ctx.strokeStyle = g; ctx.lineWidth = larg; ctx.stroke();
-  }
-  ctx.restore();
-}
-
-/** Lagrimas saltando dos olhos, no espaco do monstro (origem nos pes, raio R). */
-function lagrimas(R) {
-  for (const s of [-1, 1]) {
-    const r = R * 0.085;
-    ctx.save(); ctx.translate(s * R * 0.7, -R * 1.02); ctx.rotate(s * 1.0);
-    ctx.beginPath(); ctx.moveTo(0, -r * 1.7); ctx.quadraticCurveTo(r * 1.05, -r * 0.2, 0, r); ctx.quadraticCurveTo(-r * 1.05, -r * 0.2, 0, -r * 1.7); ctx.closePath();
-    ctx.fillStyle = '#7fd0ff'; ctx.fill(); ctx.lineWidth = R * 0.03; ctx.strokeStyle = TINTA; ctx.stroke();
-    elipse(ctx, -r * 0.3, -r * 0.2, r * 0.22, r * 0.34); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill();
-    ctx.restore();
-  }
+  carta(v, x, y, w, rot);
 }
 
 /** Carta 2048 com brilho dourado atras. */
@@ -177,44 +72,187 @@ function carta2048(x, y, w, rot) {
   const h = w / 0.72;
   ctx.save(); ctx.scale(k, k);
   ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot);
-  ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = 60;
-  rr(ctx, -w / 2 - 6, -h / 2 - 6, w + 12, h + 12, 26); ctx.fillStyle = 'rgba(255,216,74,0.45)'; ctx.fill();
+  ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = 70;
+  rr(ctx, -w / 2 - 8, -h / 2 - 8, w + 16, h + 16, 28); ctx.fillStyle = 'rgba(255,216,74,0.55)'; ctx.fill();
   ctx.restore();
   carta(2048, x, y, w, rot);
 }
 
-/**
- * Cena 'perto': a arena atras e o monstro gigante. Com golpe, a carta 2048
- * acerta a cabeca dele (careta de dor, lagrimas, estouro); sem golpe, ela
- * vem voando e ele arregala os olhos.
- */
-function cenaPerto() {
-  const P = O.perto, M = P.M;
+function faiscas(cx, cy, raioMin, raioMax, n, semente) {
   ctx.save(); ctx.scale(k, k);
-  arena.parado(ctx, 600, 600, { monstro: FUNDO, retrato: true });
-  arena.vivo(ctx, 600, 600, 2.2, { monstro: FUNDO, retrato: true });
-  const v = ctx.createRadialGradient(360, 330, 200, 360, 330, 560);
-  v.addColorStop(0, 'rgba(10,4,20,0)'); v.addColorStop(0.65, 'rgba(10,4,20,0.3)'); v.addColorStop(1, 'rgba(10,4,20,0.75)');
+  let s = semente;
+  const r = () => { s = (s * 1103515245 + 12345) >>> 0; return s / 4294967296; };
+  for (let i = 0; i < n; i++) {
+    const a = r() * Math.PI * 2, d = raioMin + r() * (raioMax - raioMin), t = 6 + r() * 11;
+    estrela(ctx, cx + Math.cos(a) * d, cy + Math.sin(a) * d, t, t * 0.42, 4, a);
+    ctx.fillStyle = ['#ffe27a', '#ffffff', '#ff8a3d'][i % 3]; ctx.globalAlpha = 0.6 + r() * 0.4; ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** Estouro (sem texto): estrela de quadrinho com miolo branco e brilho. */
+function estouro(x, y, r) {
+  ctx.save(); ctx.scale(k, k);
+  const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 1.8);
+  g.addColorStop(0, 'rgba(255,240,170,0.9)'); g.addColorStop(0.5, 'rgba(255,190,60,0.35)'); g.addColorStop(1, 'rgba(255,160,40,0)');
+  ctx.fillStyle = g; circulo(ctx, x, y, r * 1.8); ctx.fill();
+  estrela(ctx, x, y, r, r * 0.62, 11, 0.2); ctx.fillStyle = '#ff9a2e'; ctx.fill();
+  ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.strokeStyle = TINTA; ctx.stroke();
+  estrela(ctx, x, y, r * 0.78, r * 0.5, 11, 0.35); ctx.fillStyle = '#ffe27a'; ctx.fill();
+  estrela(ctx, x, y, r * 0.46, r * 0.3, 9, 0.1); ctx.fillStyle = '#ffffff'; ctx.fill();
+  ctx.restore();
+}
+
+/** Linhas de velocidade (ang: direcao do movimento; as linhas ficam atras). */
+function velocidade(x, y, ang, linhas) {
+  ctx.save(); ctx.scale(k, k);
+  ctx.translate(x, y); ctx.rotate(ang);
+  ctx.lineCap = 'round';
+  for (const [dy, x0, comp, larg] of linhas) {
+    const g = ctx.createLinearGradient(x0, 0, x0 - comp, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath(); ctx.moveTo(x0, dy); ctx.lineTo(x0 - comp, dy);
+    ctx.strokeStyle = g; ctx.lineWidth = larg; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Fundo limpo: degrade radial a partir do foco, raios de luz girando dele, brilhos e vinheta. */
+function fundo() {
+  const [a, b, c] = O.fundo, [fx, fy] = O.foco;
+  ctx.save(); ctx.scale(k, k);
+  const g = ctx.createRadialGradient(fx, fy, 10, fx, fy, 640);
+  g.addColorStop(0, a); g.addColorStop(0.42, b); g.addColorStop(1, c);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 600, 600);
+  // raios: fatias alternadas, mais fortes perto do foco
+  const n = 18;
+  for (let i = 0; i < n; i++) {
+    const ang = 0.13 + (i * Math.PI * 2) / n;
+    const r = ctx.createRadialGradient(fx, fy, 0, fx, fy, 700);
+    r.addColorStop(0, 'rgba(255,255,255,0.16)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath(); ctx.moveTo(fx, fy); ctx.arc(fx, fy, 900, ang, ang + (Math.PI / n) * 0.8); ctx.closePath();
+    ctx.fillStyle = r; ctx.fill();
+  }
+  // brilhos pequenos espalhados
+  let s = 41;
+  const rnd = () => { s = (s * 1103515245 + 12345) >>> 0; return s / 4294967296; };
+  for (let i = 0; i < 26; i++) {
+    const x = rnd() * 600, y = rnd() * 600, t = 2 + rnd() * 4;
+    estrela(ctx, x, y, t, t * 0.4, 4, 0); ctx.fillStyle = `rgba(255,255,255,${0.25 + rnd() * 0.45})`; ctx.fill();
+  }
+  // vinheta: o olho vai ao foco
+  const v = ctx.createRadialGradient(fx, fy, 230, fx, fy, 640);
+  v.addColorStop(0, 'rgba(6,2,16,0)'); v.addColorStop(1, 'rgba(6,2,16,0.55)');
   ctx.fillStyle = v; ctx.fillRect(0, 0, 600, 600);
-  // o monstro recua: inclina para longe da carta, apoiado na base
-  ctx.save();
-  ctx.translate(M.x, M.y); ctx.rotate(P.recua); ctx.translate(-M.x, -M.y);
-  desenharMonstro(ctx, def, M, 1.1, { golpe: P.golpe ? 0.93 : 1, furia: O.furia, espanto: 1 });
-  if (P.golpe) { ctx.translate(M.x, M.y); lagrimas(M.R * (def.escala || 1)); }
   ctx.restore();
+}
+
+/** fusao: dois 1024 se chocam embaixo; o 2048 salta do estouro, grande e no alto. */
+function cenaFusao() {
+  estouro(300, 418, 78);
+  velocidade(120, 440, 0.32, [[-40, -40, 120, 10], [0, -60, 150, 13], [40, -40, 110, 10]]);
+  velocidade(480, 440, Math.PI - 0.32, [[-40, -40, 120, 10], [0, -60, 150, 13], [40, -40, 110, 10]]);
+  cartaSombra(1024, 52, 330, 160, 0.34);
+  cartaSombra(1024, 388, 330, 160, -0.34);
+  faiscas(300, 418, 70, 150, 18, 5);
+  carta2048(186, 36, 228, -0.07);
+  faiscas(300, 190, 150, 200, 12, 9);
+}
+
+/** cascata: a pilha da mesa a esquerda; o 2048 sai voando do topo dela para a direita. */
+function cenaCascata() {
+  [[1024, 292], [512, 340], [256, 388], [128, 436]].forEach(([v, y]) => cartaSombra(v, 30, y, 150, 0));
+  // rastro de luz do topo da pilha ate a carta
+  ctx.save(); ctx.scale(k, k);
+  const g = ctx.createLinearGradient(110, 300, 360, 200);
+  g.addColorStop(0, 'rgba(255,226,122,0)'); g.addColorStop(1, 'rgba(255,226,122,0.75)');
+  ctx.beginPath(); ctx.moveTo(90, 300); ctx.quadraticCurveTo(170, 150, 330, 170); ctx.lineTo(340, 260); ctx.quadraticCurveTo(200, 250, 140, 320); ctx.closePath();
+  ctx.fillStyle = g; ctx.fill();
   ctx.restore();
-  if (P.estouro) { const [bx, by, br] = P.estouro; estouro(bx, by, br); }
-  const { x, y, w, rot } = P.carta;
-  if (P.linhas) velocidade(x + w / 2, y + w / 0.72 / 2, P.voo, P.linhas);
+  velocidade(330, 215, -0.32, [[-55, -40, 150, 11], [0, -70, 190, 15], [55, -40, 140, 11]]);
+  carta2048(300, 40, 236, 0.13);
+  faiscas(418, 205, 165, 225, 16, 3);
+  faiscas(105, 300, 30, 90, 8, 12);
+}
+
+/** leque: uma mao de cartas; o 2048 no meio, na frente e mais alto. */
+function cenaLeque() {
+  const px = 300, py = 780, R = 520;
+  const pos = (ang, w, sobe = 0) => {
+    const h = w / 0.72;
+    const cx = px + Math.sin(ang) * R, cy = py - Math.cos(ang) * R - sobe;
+    return [cx - w / 2, cy - h / 2, w, ang];
+  };
+  // tres cartas abertas o bastante para o numero de cada uma aparecer inteiro
+  for (const [v, ang] of [[512, -0.4], [1024, 0.4]]) {
+    const [x, y, w, rot] = pos(ang, 172);
+    cartaSombra(v, x, y, w, rot);
+  }
+  const [x, y, w, rot] = pos(0, 222, 70);
   carta2048(x, y, w, rot);
-  if (P.estouro) { const [bx, by, br] = P.estouro; faiscas(bx, by, br * 0.7, br * 1.9, 22, 7); }
-  else faiscas(x + w * 0.6, y + w * 0.7, w * 0.75, w * 1.1, 16, 3);
+  faiscas(300, 230, 150, 215, 18, 7);
+}
+
+/** escada: os valores subindo da esquerda para a direita ate o 2048, no alto. */
+function cenaEscada() {
+  // a trilha de luz da escada
+  ctx.save(); ctx.scale(k, k);
+  const g = ctx.createLinearGradient(40, 560, 500, 120);
+  g.addColorStop(0, 'rgba(255,226,122,0)'); g.addColorStop(1, 'rgba(255,226,122,0.6)');
+  ctx.beginPath(); ctx.moveTo(10, 600); ctx.quadraticCurveTo(250, 470, 470, 150); ctx.lineTo(540, 210); ctx.quadraticCurveTo(320, 540, 120, 640); ctx.closePath();
+  ctx.fillStyle = g; ctx.fill();
+  ctx.restore();
+  // degraus separados: o numero de cada carta aparece inteiro
+  [[256, 28, 398, 112, -0.05], [512, 152, 302, 122, -0.04], [1024, 284, 200, 132, -0.03]]
+    .forEach(([v, x, y, w, rot]) => cartaSombra(v, x, y, w, rot));
+  carta2048(410, 58, 158, 0.05);
+  faiscas(489, 168, 110, 160, 16, 3);
+}
+
+function desenhar(s) {
+  k = s / 600;
+  fundo();
+  ({ fusao: cenaFusao, cascata: cenaCascata, leque: cenaLeque, escada: cenaEscada })[opcao]();
 }
 
 function thumb(cv, s) {
   cv.width = s; cv.height = s;
   ctx = cv.getContext('2d');
   desenhar(s);
+  afastarPoki(cv);
+}
+
+/**
+ * Ultimo passo de cor: o trecho verde-agua da moldura holografica das cartas
+ * nobres (1024, 2048) e o brilho do diamante ficam perto do #83FFE7 do site.
+ * Esses pixels (Delta E < 28) vao para o azul vizinho do arco-iris e escurecem
+ * um pouco: a carta continua igual a olho nu e a thumb nao se mistura com o fundo da Poki.
+ */
+function afastarPoki(cv) {
+  const g = cv.getContext('2d'), s = cv.width;
+  const img = g.getImageData(0, 0, s, s), d = img.data;
+  const n = parseInt(POKI.slice(1), 16), P = lab((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  for (let i = 0; i < d.length; i += 4) {
+    const L = lab(d[i], d[i + 1], d[i + 2]);
+    if (Math.hypot(L[0] - P[0], L[1] - P[1], L[2] - P[2]) >= 28) continue;
+    const [, sat, lum] = hsl(d[i], d[i + 1], d[i + 2]);
+    const [r, gg, b] = rgb(205, Math.min(1, sat * 1.05), lum * 0.78);
+    d[i] = r; d[i + 1] = gg; d[i + 2] = b;
+  }
+  g.putImageData(img, 0, 0);
+}
+function hsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx - mn, sat = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, sat, l];
+}
+function rgb(h, sat, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * sat, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
 }
 
 // ------------------------------------------------------------ medidas
@@ -236,7 +274,7 @@ function contrasteCarta(d, s) {
   const amostra = (x0, y0) => { let r = 0, g = 0, b = 0, n = 0; for (let y = y0; y < y0 + 20; y++) for (let x = x0; x < x0 + 20; x++) { const i = (y * s + x) * 4; r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } return [r / n, g / n, b / n]; };
   const cantos = [amostra(10, 10), amostra(s - 30, 10), amostra(10, s - 30), amostra(s - 30, s - 30)];
   const fundo = cantos.reduce((a, c) => a + lum(...c), 0) / 4;
-  const n = parseInt(corDuelo(2048).slice(1), 16);
+  const n = parseInt(temaDe(1).cor(2048).slice(1), 16);
   const carta2048 = lum((n >> 16) & 255, (n >> 8) & 255, n & 255);
   return +((Math.max(fundo, carta2048) + 0.05) / (Math.min(fundo, carta2048) + 0.05)).toFixed(2);
 }
@@ -286,6 +324,15 @@ const pronto = () => {
       g.drawImage(big, x, y, t, t); g.restore();
       x += t + m;
     }
+  } else if (q.has('perto')) {
+    thumb(cv, 628);
+    const g = cv.getContext('2d'), img = g.getImageData(0, 0, 628, 628), d = img.data;
+    const n = parseInt(POKI.slice(1), 16), P = lab((n >> 16) & 255, (n >> 8) & 255, n & 255);
+    for (let i = 0; i < d.length; i += 4) {
+      const L = lab(d[i], d[i + 1], d[i + 2]);
+      if (Math.hypot(L[0] - P[0], L[1] - P[1], L[2] - P[2]) < 25) { d[i] = 255; d[i + 1] = 0; d[i + 2] = 255; }
+    }
+    g.putImageData(img, 0, 0);
   } else if (q.has('medir')) {
     thumb(cv, 628);
     document.getElementById('medidas').textContent = JSON.stringify(medir(cv));

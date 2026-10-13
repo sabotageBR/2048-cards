@@ -15,13 +15,12 @@
   <div id="painel" class="painel">
     <div class="linha1">
       <span id="rotulo"></span>
-      <span class="dano"><svg class="espada" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(45 12 12)"><path d="M12 1.5 14.2 4.5V15H9.8V4.5Z" fill="#e9eef6"/><rect x="6.5" y="15" width="11" height="2.6" rx="1" fill="#e8b84a"/><rect x="10.9" y="17.6" width="2.2" height="4.4" fill="#7a4b2a"/></g></svg><small id="danoTxt">DAMAGE</small><b id="pontos">0</b></span>
+      <span class="placar"><small id="pontosTxt">SCORE</small><b id="pontos">0</b></span>
     </div>
-    <div class="vida">
-      <svg class="coracao" viewBox="0 0 24 22" aria-hidden="true"><path d="M12 20.5C5 15.6 1.5 12 1.5 7.4 1.5 4.3 3.9 2 6.8 2c2.1 0 3.9 1.2 5.2 3 1.3-1.8 3.1-3 5.2-3 2.9 0 5.3 2.3 5.3 5.4 0 4.6-3.5 8.2-10.5 13.1z"/></svg>
-      <div class="barra"><i id="barraVis"></i><i id="barra"></i><span id="vidaTxt"></span></div>
+    <div class="escada" id="escada" hidden></div>
+    <div class="progresso">
+      <div class="barra"><i id="barra"></i><span id="metaTxt"></span></div>
     </div>
-    <div class="meta"><span id="metaTxt"></span><small id="recorde"></small></div>
   </div>
   <div class="botoes">
     <button id="bMenu" class="btn" aria-label="Menu">
@@ -41,6 +40,9 @@
   <button id="iCoringa" class="btn item" aria-label="Wild"><span>★</span><i class="conta" aria-hidden="true">0</i></button>
   <button id="iMartelo" class="btn item" aria-label="Hammer"><span>🔨</span><i class="conta" aria-hidden="true">0</i></button>
   <button id="iTroca" class="btn item" aria-label="Swap"><span>⇄</span><i class="conta" aria-hidden="true">0</i></button>
+  <!-- rewarded (so por escolha): esvaziar o descarte cheio e um coringa a mais, 1x por nivel cada -->
+  <button id="vDescarte" class="btn video anuncio" hidden aria-label="Empty the discard (video)"><i class="selo-video" aria-hidden="true">🎬</i><span id="vDescarteTxt">Empty</span></button>
+  <button id="vCoringa" class="btn video anuncio" hidden aria-label="Wild +1 (video)"><i class="selo-video" aria-hidden="true">🎬</i><span>★+1</span></button>
 </div>
 <div id="febre" hidden><span id="febreTxt">FURY ×2</span></div>
 <div id="aviso" hidden><b id="avisoTitulo"></b><span id="avisoTxt"></span></div>
@@ -55,11 +57,6 @@
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="ligado" d="M17 9a4 4 0 0 1 0 6M19.5 6.5a8 8 0 0 1 0 11"/><path class="desligado" d="m17 9 5 6M22 9l-5 6"/></svg>
         </button>
       </div>
-      <div class="linha modos">
-        <button class="acao clara" id="bAventura">Adventure</button>
-        <button class="acao clara" id="bClassico">Endless</button>
-        <button class="acao clara" id="bDiario">Daily</button>
-      </div>
       <h3 id="missoesTitulo">Missions</h3>
       <div class="missoes" id="listaMissoes"></div>
       <div class="grade" id="gradeFases"></div>
@@ -69,10 +66,10 @@
 <div id="fim" hidden>
   <div class="cartao">
     <h2 id="fimTitulo">No moves left</h2>
-    <div class="placarFim"><b id="fimPontos">0</b><small id="fimRecorde"></small><small id="fimMonstros" hidden></small></div>
+    <div class="placarFim"><b id="fimPontos">0</b><small id="fimNivel"></small></div>
     <button class="acao grande" id="bFimContinuar">Continue</button>
     <button class="acao anuncio" id="bFimVideo"><span id="txtFimVideo">Continue</span><i class="selo-inline" aria-hidden="true">🎬</i></button>
-    <button class="acao clara" id="bFimDeNovo">Play again</button>
+    <button class="acao clara" id="bFimDeNovo">Restart level</button>
   </div>
 </div>
 <div id="anuncio" hidden><div class="cartao"><span>Ad (local test)</span><b id="anNum">3</b><button class="acao clara" id="anFechar">✕</button></div></div>

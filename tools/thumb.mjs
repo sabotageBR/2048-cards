@@ -3,16 +3,25 @@
 //   node tools/thumb.mjs --final   mede a ESCOLHIDA contra a regra da Poki (falha alto se
 //                                  sair dela) e grava marketing/thumb/2048-cards-{1256,628}.{png,jpg}
 //                                  e a folha de conferencia marketing/thumb/conferir.png
-//   node tools/thumb.mjs [opcoes]  as opcoes (padrao: h e f b) em marketing/thumb/opcoes/<opcao>-<tamanho>.png,
-//                                  lado a lado em marketing/thumb/comparar.png, e as medidas de cada uma
+//   node tools/thumb.mjs [opcoes]  as opcoes (padrao: fusao cascata leque escada) em
+//                                  marketing/thumb/opcoes/<opcao>-<tamanho>.png, lado a lado em
+//                                  marketing/thumb/comparar.png, os tiles pequenos de cada uma em
+//                                  marketing/thumb/comparar-tiles.png, e as medidas de cada uma
+//   node tools/thumb.mjs --perto [opcoes]  marca de magenta os pixels perto do #83FFE7
+//                                  (marketing/thumb/opcoes/<opcao>-perto.png), para achar o que reprova
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { servir, RAIZ } from './servir.mjs';
 
-/** Opcao escolhida pelo usuario em 2026-10-12 (tools/thumb.html): o Gosmo assustado com o 2048 chegando. */
-const ESCOLHIDA = 'h';
+/**
+ * Opcao escolhida pelo usuario (tools/thumb.html). A do duelo (h, o Gosmo
+ * assustado, 2026-10-12) ficou na master; no branch so-cartas o usuario
+ * escolheu a cascata (2026-10-13, build 0.4.0), com as cartas da Floresta.
+ */
+const ESCOLHIDA = 'cascata';
+const OPCOES = ['fusao', 'cascata', 'leque', 'escada'];
 /** Tamanhos entregues: o minimo da Poki (628) e o dobro. */
 const TAMANHOS = [1256, 628];
 /**
@@ -66,7 +75,16 @@ async function conferir(o) {
   return { m, falhas, avisos };
 }
 
-if (process.argv.includes('--final')) {
+if (process.argv.includes('--perto')) {
+  const pedidas = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+  const dir = join(RAIZ, 'marketing/thumb/opcoes');
+  mkdirSync(dir, { recursive: true });
+  for (const o of pedidas.length ? pedidas : OPCOES) await print(`opcao=${o}&perto`, 628, 628, join(dir, `${o}-perto.png`));
+} else if (process.argv.includes('--final') && !ESCOLHIDA) {
+  process.stdout.write('sem thumb escolhida: rode sem --final, mostre as opcoes ao usuario e grave a escolha em ESCOLHIDA\n');
+  await fechar();
+  process.exit(1);
+} else if (process.argv.includes('--final')) {
   const { m, falhas, avisos } = await conferir(ESCOLHIDA);
   process.stdout.write(`medidas: ${JSON.stringify(m)}\n`);
   if (avisos.length) process.stdout.write('aviso: ' + avisos.join('; ') + '\n');
@@ -87,7 +105,7 @@ if (process.argv.includes('--final')) {
   // 28 + (314+28) + (204+28) + (140+28) + (94+28) = 892; 314 + 2*28 = 370
   await print(`opcao=${ESCOLHIDA}&grade`, 892, 370, join(dir, 'conferir.png'));
 } else {
-  const opcoes = process.argv.slice(2).length ? process.argv.slice(2) : ['h', 'e', 'f', 'b'];
+  const opcoes = process.argv.slice(2).length ? process.argv.slice(2) : OPCOES;
   const dir = join(RAIZ, 'marketing/thumb/opcoes');
   mkdirSync(dir, { recursive: true });
   for (const o of opcoes) for (const s of TAMANHOS) await print(`opcao=${o}&s=${s}`, s, s, join(dir, `${o}-${s}.png`));
@@ -96,6 +114,12 @@ if (process.argv.includes('--final')) {
   const ent = opcoes.flatMap((o) => ['-i', join(dir, `${o}-628.png`)]);
   execFileSync('ffmpeg', ['-v', 'error', '-y', ...ent, '-filter_complex', `hstack=inputs=${opcoes.length}`, lado]);
   process.stdout.write(`thumb -> ${relative(RAIZ, lado)}\n`);
+  // os tiles pequenos (314 a 94 px sobre o fundo da Poki), uma linha por opcao
+  for (const o of opcoes) await print(`opcao=${o}&grade`, 892, 370, join(dir, `${o}-tiles.png`));
+  const tiles = join(RAIZ, 'marketing/thumb/comparar-tiles.png');
+  const entT = opcoes.flatMap((o) => ['-i', join(dir, `${o}-tiles.png`)]);
+  execFileSync('ffmpeg', ['-v', 'error', '-y', ...entT, '-filter_complex', `vstack=inputs=${opcoes.length}`, tiles]);
+  process.stdout.write(`thumb -> ${relative(RAIZ, tiles)}\n`);
   for (const o of opcoes) {
     const { m, falhas, avisos } = await conferir(o);
     process.stdout.write(`${o}: ${JSON.stringify(m)}${falhas.length ? '\n   fora da regra: ' + falhas.join('; ') : ''}${avisos.length ? '\n   aviso: ' + avisos.join('; ') : ''}\n`);

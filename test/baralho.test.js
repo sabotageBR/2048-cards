@@ -20,7 +20,7 @@ test('mesma semente, mesma sequencia; sementes diferentes, sequencias diferentes
 test('faixa dinamica cresce com a mesa', () => {
   const e = criarPartida({}, fase(), 1);
   assert.deepEqual(valoresPermitidos(e), [2, 4, 8]);
-  const grande = { ...e, colunas: [[{ id: 1, tipo: 'normal', v: 512, cor: 0 }], [], [], []] };
+  const grande = { ...e, colunas: [[{ id: 1, tipo: 'normal', v: 512 }], [], [], []] };
   assert.deepEqual(valoresPermitidos(grande), [2, 4, 8, 16, 32, 64]);
   const fixo = { ...e, baralho: { ...e.baralho, dinamico: false, pesos: { 2: 1, 128: 1 } } };
   assert.deepEqual(valoresPermitidos(fixo), [2, 128]);
@@ -38,7 +38,7 @@ test('piedade: sem jogada legal, a proxima carta cabe', () => {
   // mesa cheia de 2 no topo e fila com 64: a proxima carta tem de ser 2
   const f = fase({ regras: { colunas: 3, pilhaMax: 2 }, inicio: [[4, 2], [4, 2], [4, 2]], baralho: { total: Infinity, dinamico: false, pesos: { 2: 1, 64: 5 } } });
   let e = criarPartida({}, f, 5);
-  e = { ...e, fila: [{ id: 900, tipo: 'normal', v: 64, cor: 0 }, ...e.fila.slice(1)] };
+  e = { ...e, fila: [{ id: 900, tipo: 'normal', v: 64 }, ...e.fila.slice(1)] };
   for (let i = 0; i < 20; i++) { const r = sortear(e); e = r.estado; assert.equal(r.carta.v, 2); }
 });
 
@@ -51,11 +51,3 @@ test('especiais respeitam o espacamento minimo', () => {
   assert.ok(tipos.includes('coringa'));
 });
 
-test('naipes: cartas com cor 0..3', () => {
-  let e = criarPartida({ naipes: true }, fase(), 5);
-  const cores = new Set();
-  for (let i = 0; i < 60; i++) { const r = sortear(e); e = r.estado; cores.add(r.carta.cor); }
-  assert.deepEqual([...cores].sort(), [0, 1, 2, 3]);
-  const r = jogar(e, { tipo: 'colocar', c: 0, t: 0 });
-  assert.equal(r.estado.colunas[0].length, 1);
-});

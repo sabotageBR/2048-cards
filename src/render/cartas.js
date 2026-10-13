@@ -1,16 +1,21 @@
-// Cartas na mesa: a parte parada de cada carta do duelo (cartaDuelo.js) vai
-// para uma cache offscreen por tipo, valor, gelo, lodo, hp e tamanho; por cima, a
-// cada quadro, a pose (escala, squash pela base, giro, alpha), o brilho que
-// anda, a sombra das cartas de tras da fila e o destaque da carta da vez.
-// As skins de antes do duelo estao em modelos/legado/cartas.js.
-import { pintarDuelo, temBrilho, brilhoDuelo, raioCarta } from './cartaDuelo.js';
+// Cartas na mesa: a parte parada de cada carta (pintada pelo tema do mundo,
+// temas/index.js) vai para uma cache offscreen por tema, tipo, valor e
+// tamanho; por cima, a cada quadro, a pose (escala, squash pela base, giro,
+// alpha), o brilho que anda, a sombra das cartas de tras da fila e o
+// destaque da carta da vez. As skins antigas estao em modelos/legado/.
+import { temaDe } from './temas/index.js';
 import { rr } from './desenho.js';
 
 const cache = new Map();
 let cacheDpr = 1;
 export function limparCache() { cache.clear(); }
 
-const chave = (carta, w, h) => `${carta.tipo}|${carta.v}|${carta.gelo ? 1 : 0}${carta.lodo ? 'l' : ''}|${carta.hp || 0}/${carta.hpMax || 0}|${w}x${h}`;
+/** Pintura das cartas do tema do mundo (padrao: o do mundo 1). */
+let tema = temaDe(1);
+/** @param {{ id: string, carta: Function, temBrilho: Function, brilho: Function, raio: Function }} t */
+export function definirTema(t) { if (t && t.carta) tema = t; }
+
+const chave = (carta, w, h) => `${tema.id}|${carta.tipo}|${carta.v}|${w}x${h}`;
 
 /** Imagem da carta (offscreen), com margem para a sombra e o brilho. */
 export function imagemCarta(carta, w, h, dpr = 1) {
@@ -26,7 +31,7 @@ export function imagemCarta(carta, w, h, dpr = 1) {
   const ctx = /** @type {CanvasRenderingContext2D} */ (c.getContext('2d'));
   ctx.scale(dpr, dpr);
   ctx.translate(folga + w / 2, folga + h / 2);
-  pintarDuelo(ctx, carta, { x: -w / 2, y: -h / 2, w, h });
+  tema.carta(ctx, carta, { x: -w / 2, y: -h / 2, w, h });
   img = { canvas: c, folga };
   cache.set(k, img);
   return img;
@@ -48,8 +53,8 @@ export function desenharCarta(ctx, carta, { x, y, w, h, esc = 1, alpha = 1, dpr 
   const fw = img.canvas.width / dpr, fh = img.canvas.height / dpr;
   ctx.drawImage(img.canvas, -fw / 2, -fh / 2, fw, fh);
   const r = { x: -w / 2, y: -h / 2, w, h };
-  if (temBrilho(carta)) brilhoDuelo(ctx, carta, r, t);
-  const raio = raioCarta(w);
+  if (tema.temBrilho(carta)) tema.brilho(ctx, carta, r, t);
+  const raio = tema.raio(w);
   if (sombra > 0) { rr(ctx, r.x, r.y, w, h, raio); ctx.fillStyle = `rgba(20,8,24,${sombra})`; ctx.fill(); }
   if (destaque > 0) {
     ctx.shadowColor = '#ffe27a'; ctx.shadowBlur = 14 * destaque;

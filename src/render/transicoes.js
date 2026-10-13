@@ -1,9 +1,12 @@
-// Fim de fase e fim de mundo no estilo do Blumgi Bounce (porte de stringcut/src/render/transicoes.js).
+// Subida de nivel, fim de fase e fim de mundo no estilo do Blumgi Bounce (porte de stringcut/src/render/transicoes.js).
 /*
- * Fim de fase e fim de mundo no estilo do Blumgi Bounce (medido quadro a
- * quadro na gravacao de referencia). Tudo e funcao pura do tempo t (s desde
- * a vitoria), para o modo &quadro=ms congelar qualquer instante.
+ * Subida de nivel, fim de fase e fim de mundo no estilo do Blumgi Bounce
+ * (medido quadro a quadro na gravacao de referencia). Tudo e funcao pura do
+ * tempo t (s desde a vitoria), para o modo &quadro=ms congelar qualquer instante.
  *
+ * Nivel (~1,7 s, a mesa nao troca): flash + soco de camera -> o valor feito
+ *        ("128!") -> confete -> a trilha dos 8 valores do mundo, o feito
+ *        acendendo e o proximo pulsando. O jogo segue na mesma mesa.
  * Fase  (~2,3 s ate trocar): flash branco + feixe + soco de camera -> "YES!"
  *        com extrusao colorida ciclando -> confete dos dois lados -> "YES!" sai
  *        por cima -> corte para o nivel novo, que nasce lavado de branco e com
@@ -16,8 +19,8 @@ export const Transicoes = (() => {
   const TAU = Math.PI * 2;
   const CORES = ['#ff4fa3', '#ff9a3d', '#ffd93b', '#43dd6e', '#2fd0ff', '#5b7cff', '#a55bff', '#ff5be0'];
   const CONFETE = ['#ff4fa3', '#ffd93b', '#7a5cff', '#3ee08f', '#38c8ff', '#ff8a3d', '#ffffff'];
-  const TROCA = { fase: 2.3, mundo: 3.3 };
-  const FIM = { fase: 2.3, mundo: 3.95 };
+  const TROCA = { nivel: 1.7, fase: 2.3, mundo: 3.3 };
+  const FIM = { nivel: 1.7, fase: 2.3, mundo: 3.95 };
 
   const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
   const easeOut = (u) => 1 - Math.pow(1 - clamp(u), 3);
@@ -242,12 +245,13 @@ export const Transicoes = (() => {
   }
 
   /**
-   * Trilha do mundo (so na passagem de fase, sem clique): as fases do mundo,
-   * a vencida acendendo, a proxima pulsando, a coroa no chefao e o nome do
-   * proximo monstro. trilha = { pos (1..total, a fase vencida), total, nome, rotulo }.
+   * Trilha do mundo (na subida de nivel e na passagem de fase, sem clique):
+   * os niveis do mundo, o vencido acendendo, o proximo pulsando, o valor de
+   * cada um embaixo (se vier) e o proximo alvo. trilha = { pos (1..total, o
+   * nivel vencido), total, nome, rotulo, valores? }.
    */
-  function desenharTrilha(ctx, t, W, H, trilha, cor) {
-    const ini = 0.45, fim = TROCA.fase;
+  function desenharTrilha(ctx, t, W, H, trilha, cor, fim = TROCA.fase) {
+    const ini = 0.4;
     if (!trilha || t < ini || t > fim) return;
     const u = easeOut((t - ini) / 0.35);
     const sai = t > fim - 0.2 ? (t - (fim - 0.2)) / 0.2 : 0;
@@ -257,12 +261,14 @@ export const Transicoes = (() => {
     const r = clamp(passo * 0.24, 8, 16);
     const tamTxt = Math.round(clamp(r * 1.3, 14, 22));
     const cy = H * 0.5 + (1 - u) * 24;
+    const comValores = !!trilha.valores;
+    const tamVal = Math.round(clamp(r * 0.95, 10, 15));
     const x0 = W / 2 - larg / 2;
     const xk = (k) => x0 + (k - 1) * passo;
     ctx.save();
     ctx.globalAlpha = clamp(u) * (1 - sai);
     // placa
-    const px = x0 - r * 2.2, pw = larg + r * 4.4, py = cy - r * 3.1, ph = r * 4.2 + tamTxt * 1.9;
+    const px = x0 - r * 2.2, pw = larg + r * 4.4, py = cy - r * 2.2, ph = r * 3.3 + tamTxt * 1.9 + (comValores ? tamVal * 1.4 : 0);
     ctx.beginPath(); ctx.roundRect(px, py, pw, ph, r * 1.4);
     ctx.fillStyle = 'rgba(28,14,38,0.82)'; ctx.fill();
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.stroke();
@@ -276,8 +282,7 @@ export const Transicoes = (() => {
       ctx.stroke();
     }
     for (let k = 1; k <= n; k++) {
-      const chefe = k === n;
-      let rk = r * (chefe ? 1.3 : 1);
+      let rk = r;
       const feita = k < trilha.pos || (k === trilha.pos && t > 0.7);
       if (k === trilha.pos) rk *= t > 0.7 ? clamp(acende, 0, 1.4) * 0.25 + 0.75 : 1;
       if (k === trilha.pos + 1 && t > 1) rk *= 1 + Math.sin((t - 1) * 9) * 0.1;
@@ -290,21 +295,18 @@ export const Transicoes = (() => {
         ctx.beginPath(); ctx.moveTo(xk(k) - rk * 0.42, cy + rk * 0.02); ctx.lineTo(xk(k) - rk * 0.1, cy + rk * 0.34); ctx.lineTo(xk(k) + rk * 0.45, cy - rk * 0.32);
         ctx.lineWidth = Math.max(2.5, rk * 0.26); ctx.strokeStyle = '#ffffff'; ctx.stroke();
       }
-      if (chefe) {
-        // coroa do chefao em cima da marca
-        const cx = xk(k), cyc = cy - rk - r * 0.95, cw = r * 1.5, ch = r * 0.95;
-        ctx.beginPath();
-        ctx.moveTo(cx - cw / 2, cyc + ch / 2); ctx.lineTo(cx - cw / 2, cyc - ch / 2); ctx.lineTo(cx - cw / 4, cyc);
-        ctx.lineTo(cx, cyc - ch / 2 - ch * 0.15); ctx.lineTo(cx + cw / 4, cyc); ctx.lineTo(cx + cw / 2, cyc - ch / 2); ctx.lineTo(cx + cw / 2, cyc + ch / 2);
-        ctx.closePath();
-        ctx.fillStyle = '#ffd84a'; ctx.fill(); ctx.lineJoin = 'round'; ctx.lineWidth = 2; ctx.strokeStyle = '#7a4a00'; ctx.stroke();
+      if (comValores) {
+        ctx.font = `700 ${tamVal}px Fredoka, "Arial Rounded MT Bold", system-ui, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = feita || k === trilha.pos + 1 ? '#ffffff' : 'rgba(255,255,255,0.55)';
+        ctx.fillText(String(trilha.valores[k - 1]), xk(k), cy + r + tamVal * 0.85);
       }
     }
-    // "Proximo: Gosmo Ranzinza"
+    // "Proximo: 256"
     ctx.font = `700 ${tamTxt}px Fredoka, "Arial Rounded MT Bold", system-ui, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
     const txt = `${trilha.rotulo} ${trilha.nome}`;
-    const ty = cy + r * 1.3 + tamTxt * 0.95;
+    const ty = cy + r * 1.3 + tamTxt * 0.95 + (comValores ? tamVal * 1.3 : 0);
     ctx.lineWidth = Math.max(3, tamTxt * 0.22); ctx.strokeStyle = '#1c0e26'; ctx.strokeText(txt, W / 2, ty, pw - r * 2);
     ctx.fillStyle = '#ffffff'; ctx.fillText(txt, W / 2, ty, pw - r * 2);
     ctx.restore();
@@ -319,8 +321,9 @@ export const Transicoes = (() => {
     desenharFlash(ctx, t, W, H, info.fx);
     const canhoes = tipo === 'mundo' ? [0.12, 0.62] : [0.12];
     desenharConfete(ctx, t, W, H, info.semente || 7, canhoes);
-    desenharGrito(ctx, t, W, H, info.texto || 'YES!');
-    if (tipo === 'fase') desenharTrilha(ctx, t, W, H, info.trilha, info.corMundo || '#43dd6e');
+    if (tipo === 'nivel') desenharGrito(ctx, t, W, H, info.texto || 'YES!', 0.08, 1.15, 0.9);
+    else desenharGrito(ctx, t, W, H, info.texto || 'YES!');
+    if (tipo === 'fase' || tipo === 'nivel') desenharTrilha(ctx, t, W, H, info.trilha, info.corMundo || '#43dd6e', TROCA[tipo]);
     if (tipo === 'mundo') {
       desenharBolinhas(ctx, t, W, H, info.pontos);
       desenharVarredura(ctx, t, W, H, info.corMundo || '#ffd84a');

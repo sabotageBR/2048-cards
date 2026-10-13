@@ -23,7 +23,7 @@ function regrasDoPainel() {
   const esp = $('especiais').checked;
   return {
     regras: {
-      colocacao: $('colocacao').value, filaLivre: $('filaLivre').value === '1', naipes: $('naipes').checked,
+      colocacao: $('colocacao').value, filaLivre: $('filaLivre').value === '1',
       colunas: Number($('colunas').value), pilhaMax: Number($('pilhaMax').value),
     },
     fase: esp ? FASE : { ...FASE, baralho: { ...FASE.baralho, especiais: {} } },
@@ -125,14 +125,14 @@ function quadro() {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.drawImage(c.fundo, 0, 0, W, H);
     c.cen.vivo(ctx, W, H, agora / 1000);
-    desenharMesa(ctx, c.estado, c.L, { skin: c.skin, pal: { ...c.cen.paleta, naipes: c.estado.regras.naipes }, agora, dpr: DPR, linha: c.linha });
+    desenharMesa(ctx, c.estado, c.L, { skin: c.skin, pal: c.cen.paleta, agora, dpr: DPR, linha: c.linha });
   }
   requestAnimationFrame(quadro);
 }
 
 montarGrade();
 reiniciar();
-for (const id of ['colocacao', 'filaLivre', 'naipes', 'colunas', 'pilhaMax', 'especiais']) $(id).addEventListener('change', reiniciar);
+for (const id of ['colocacao', 'filaLivre', 'colunas', 'pilhaMax', 'especiais']) $(id).addEventListener('change', reiniciar);
 $('reiniciar').addEventListener('click', reiniciar);
 if (document.fonts && document.fonts.load) document.fonts.load('700 40px Fredoka').then(() => { limparCache(); requestAnimationFrame(quadro); }, () => requestAnimationFrame(quadro));
 else requestAnimationFrame(quadro);

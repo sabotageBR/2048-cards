@@ -1,4 +1,6 @@
-// Linha do tempo: a carta que completa o monte sai da mesa com o valor do teto.
+// Linha do tempo: a carta que completa o monte sai da mesa com o valor do
+// teto; na subida de nivel as cartas pequenas sobem e somem depois da cascata
+// e a pilha do descarte sai; a jogada recusada mostra o proibido.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { criarLinha } from '../src/render/linha.js';
@@ -7,7 +9,7 @@ import { criarPartida, jogar } from '../src/jogo/partida.js';
 
 test('fantasma do monte completo mostra 2048 ao sair (nao o valor antigo)', () => {
   const fase = { id: 1, mundo: 1, semente: 1, baralho: { pesos: { 2: 1 }, total: 20, dinamico: false }, inicio: [[1024, 512, 256, 128], [], [], []], metas: [{ tipo: 'montes', n: 2 }] };
-  const antes = { ...criarPartida({}, fase, 1), fila: [{ id: 900, tipo: 'normal', v: 128, cor: 0 }] };
+  const antes = { ...criarPartida({}, fase, 1), fila: [{ id: 900, tipo: 'normal', v: 128 }] };
   const r = jogar(antes, { tipo: 'colocar', c: 0, t: 0 });
   const ev = r.eventos.find((e) => e.tipo === 'completar');
   assert.ok(ev, 'a jogada completa o monte');
@@ -26,66 +28,53 @@ test('fantasma do monte completo mostra 2048 ao sair (nao o valor antigo)', () =
   assert.equal(vistos[0], 1024);
 });
 
-test('feitico do monstro: a mesa mostrada e a de antes ate o impacto; acelerar aplica na hora', () => {
-  const fase = { id: 1, mundo: 1, semente: 1, baralho: { pesos: { 2: 1 }, total: 20, dinamico: false }, inicio: [[64], [], [], []], metas: [{ tipo: 'pontos', alvo: 9999 }], monstro: { cada: 1, feiticos: ['pedra'] } };
-  const antes = criarPartida({}, fase, 1);
-  const r = jogar(antes, { tipo: 'colocar', c: 1, t: 0 });
-  assert.ok(r.meio, 'houve feitico');
-  const L = calcularLayout({ W: 390, H: 844, topo: 112, colunas: 4, pilhaMax: 6, tamFila: 3, arena: true });
+test('subida de nivel: as cartas abaixo do piso saem depois da cascata, uma de cada vez', async () => {
+  const { faseDe, faseGlobal } = await import('../src/jogo/fases.js');
+  // nivel 5 (256) do mundo 1: o 8 jogado fecha o 256; o baralho do 512 comeca no 4 e os 2 saem
+  const f = { ...faseDe(faseGlobal(1, 5)), inicio: [[128, 64, 32, 16, 8], [2], [4, 2], []] };
+  const antes = { ...criarPartida({}, f, 1), fila: [{ id: 900, tipo: 'normal', v: 8 }] };
+  const r = jogar(antes, { tipo: 'colocar', c: 0, t: 0 });
+  const g = r.eventos.find((e) => e.tipo === 'graduar');
+  assert.ok(g && g.cartas.length === 2, 'duas cartas saem');
+  const L = calcularLayout({ W: 390, H: 844, topo: 72, colunas: 4, pilhaMax: 6, tamFila: 3 });
   const linha = criarLinha();
-  linha.montar(r.eventos, L, 0, { antes, depois: r.estado, meio: r.meio, origem: L.filaPos(0), carta: antes.fila[0] });
-  const efs = linha.drenarEfeitos(5000);
-  const imp = efs.find((e) => e.tipo === 'impacto');
-  assert.ok(imp && efs.some((e) => e.tipo === 'feitico') && efs.some((e) => e.tipo === 'projetil'));
-  assert.equal(linha.visivel(r.estado, 0), r.meio);
-  assert.equal(linha.visivel(r.estado, imp.t - 1), r.meio);
-  assert.equal(linha.visivel(r.estado, imp.t), r.estado);
-  assert.ok(linha.fim >= imp.t);
-  // a carta que subiu de altura desliza depois do impacto
-  const alvo = r.eventos.find((e) => e.tipo === 'monstro').alvos[0];
-  const subiu = r.estado.colunas[alvo.c][1];
-  if (subiu) {
-    const p = linha.pose(subiu.id, imp.t + 40);
-    assert.ok(p && p.x !== undefined, 'desliza');
+  linha.montar(r.eventos, L, 0, { antes, depois: r.estado, origem: L.filaPos(0), carta: antes.fila[0] });
+  const fimCascata = 180 + 5 * 140;
+  for (const k of g.cartas) {
+    // parada no lugar durante a cascata, depois sobe e some
+    const cedo = linha.fantasmas(fimCascata - 50).find((x) => x.carta.id === k.id);
+    assert.ok(cedo && cedo.alpha === 1, `a carta ${k.id} espera a cascata`);
+    assert.ok(!linha.fantasmas(4000).some((x) => x.carta.id === k.id), `a carta ${k.id} some`);
   }
-  // estado trocado (desfazer, jogada nova): nada de mesa antiga
-  assert.equal(linha.visivel({ ...r.estado, colunas: r.estado.colunas.slice() }, 0).colunas !== r.meio.colunas, true);
-  linha.acelerar(10);
-  assert.equal(linha.visivel(r.estado, 10), r.estado);
-  assert.equal(linha.feiticoPendente(10), false);
+  const efeitos = linha.drenarEfeitos(5000).filter((e) => e.tipo === 'graduar');
+  assert.equal(efeitos.length, 2);
+  assert.ok(efeitos[1].t > efeitos[0].t, 'uma de cada vez');
+  assert.ok(efeitos[0].t >= fimCascata, 'depois da cascata');
 });
 
-test('golpe final: a barra so desce quando o golpe chega e o monstro cai no ultimo da cascata', async () => {
-  const { criarDuelo } = await import('../src/render/duelo.js');
-  const { vidaDe } = await import('../src/jogo/metas.js');
-  const fase = { id: 1, mundo: 1, semente: 1, baralho: { pesos: { 2: 1 }, total: 20, dinamico: false }, inicio: [[32, 16, 8], [], [], []], metas: [{ tipo: 'cartas', v: 64, n: 1 }] };
-  const antes = { ...criarPartida({}, fase, 1), fila: [{ id: 900, tipo: 'normal', v: 8, cor: 0 }] };
-  const r = jogar(antes, { tipo: 'colocar', c: 0, t: 0 }); // 8+8, 16+16, 32+32: vence no 3o degrau
-  assert.equal(r.estado.fim, 'venceu');
-  const L = calcularLayout({ W: 390, H: 844, topo: 112, colunas: 4, pilhaMax: 6, tamFila: 3, arena: true });
+test('recusa mostra o proibido na coluna; a pilha do descarte sai na subida de nivel', async () => {
+  const { faseDe, faseGlobal } = await import('../src/jogo/fases.js');
+  const L = calcularLayout({ W: 390, H: 844, topo: 72, colunas: 4, pilhaMax: 6, tamFila: 3 });
+  // dobro sobre o topo que ja recebeu um especial: recusa (usada) e o proibido na coluna 0
+  const f = { ...faseDe(faseGlobal(3, 2)), inicio: [[16], [], [], []] };
+  const e0 = criarPartida({}, f, 1);
+  const antes = { ...e0, colunas: [[{ id: 1, tipo: 'normal', v: 16, esp: true }], [], [], []], fila: [{ id: 900, tipo: 'dobro', v: 0 }, ...e0.fila.slice(1)] };
+  const r = jogar(antes, { tipo: 'colocar', c: 0, t: 0 });
+  assert.equal(r.eventos[0].motivo, 'usada');
   const linha = criarLinha();
-  // o ultimo golpe saiu ha muito tempo: a salvaguarda (bomba, martelo) nao pode adiantar a queda
-  const t0 = 5000;
-  linha.montar(r.eventos, L, t0, { antes, depois: r.estado, origem: L.filaPos(0), carta: antes.fila[0] });
-  const duelo = criarDuelo();
-  const vida0 = vidaDe(antes);
-  duelo.novaBatalha(null, vida0);
-  const P = { add() {}, texto() {}, estourar() {}, anel() {}, subir() {} };
-  const golpes = [], hps = [];
-  let derrota = -1;
-  for (let t = t0; t <= t0 + 2500; t += 16) {
-    for (const fx of linha.drenarEfeitos(t)) if (fx.tipo === 'fusao' || fx.tipo === 'completar') duelo.golpear(fx, t, P, L.monstro);
-    for (const o of duelo.atualizar(0.016, t, vidaDe(r.estado), P, L.monstro, {}, linha.golpesPorVir())) {
-      if (o.tipo === 'golpe') golpes.push(t);
-      if (o.tipo === 'derrotado') derrota = t;
-    }
-    hps.push({ t, hp: duelo.hp });
-  }
-  assert.equal(golpes.length, 3);
-  assert.ok(hps.filter((h) => h.t < golpes[0]).every((h) => h.hp === vida0), 'nada desce antes do primeiro golpe');
-  for (let i = 0; i < 2; i++) {
-    const depois = hps.find((h) => h.t === golpes[i]).hp;
-    assert.ok(depois > 0.001, `o golpe ${i + 1} ainda deixa vida (${depois})`);
-  }
-  assert.equal(derrota, golpes[2], 'cai no ultimo golpe');
+  linha.montar(r.eventos, L, 1000, { antes, depois: r.estado });
+  assert.deepEqual(linha.proibidos(1100).map((p) => p.c), [0]);
+  assert.equal(linha.proibidos(1000 + 700).length, 0, 'o proibido some');
+  // descarte com uma carta e a subida de nivel: o fantasma da carta de cima sai
+  const g = { ...faseDe(faseGlobal(1, 1)), inicio: [[8], [], [4], []] };
+  let e = { ...criarPartida({}, g, 3), fila: [2, 8, 2].map((v, k) => ({ id: 950 + k, tipo: 'normal', v })) };
+  e = jogar(e, { tipo: 'descartar', t: 0 }).estado;
+  const s = jogar(e, { tipo: 'colocar', c: 0, t: 0 });
+  const vazio = s.eventos.find((ev) => ev.tipo === 'descarteVazio');
+  assert.ok(vazio && vazio.id === 950);
+  const l2 = criarLinha();
+  l2.montar(s.eventos, L, 0, { antes: e, depois: s.estado });
+  const visto = [];
+  for (let t = 0; t <= 1500; t += 20) if (l2.fantasmas(t).some((x) => x.carta.id === 950)) visto.push(t);
+  assert.ok(visto.length > 0, 'a carta do descarte aparece saindo');
 });

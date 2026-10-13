@@ -3,7 +3,7 @@ import { ATUAIS, CATALOGO, ESCOLHIDOS, REINOS } from './catalogo.js';
 import { NOTAS } from './notas.js';
 import { desenharAtaque } from './ataques.js';
 import { desenharLayout } from './silhuetas.js';
-import { desenharMonstro, variante } from '../../src/render/monstros.js';
+import { desenharMonstro, variante } from '../legado/monstros.js';
 
 const CHAVE = 'monstros-layout-escolha';
 const W = 360;

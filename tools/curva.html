@@ -12,9 +12,10 @@
 </head>
 <body>
 <!-- Grafico da curva de dificuldade (tools/curva.mjs mede e passa os dados):
-     vitorias do jogador casual por fase, antes e depois do ajuste, com a
-     faixa alvo (alvoCasual +- FAIXA_CASUAL) e os chefoes marcados.
-     ?d={"antes":[...],"depois":[...],"alvo":[...],"faixa":8,"chefes":[8,...],"jogadas":[...]} -->
+     em quantas partidas o jogador casual passa cada nivel da escada sem
+     recomecar, com a faixa alvo (alvoCasual +- FAIXA_CASUAL), os 2048 de
+     cada mundo marcados e, opcional, uma curva de comparacao (antes).
+     ?d={"antes":[...]?,"depois":[...],"alvo":[...],"faixa":8,"chefes":[8,...],"jogadas":[...],"mundos":[...]} -->
 <canvas id="c"></canvas>
 <script type="module">
 const d = JSON.parse(new URLSearchParams(location.search).get('d') || '{}');
@@ -23,7 +24,7 @@ const c = document.getElementById('c');
 c.width = W * dpr; c.height = H * dpr; c.style.width = W + 'px'; c.style.height = H + 'px';
 const ctx = c.getContext('2d');
 ctx.scale(dpr, dpr);
-const REINOS = ['Campos (Gosmo)', 'Pedreira (Golem)', 'Reino gelado (Yeti)', 'Masmorra (Espectro)', 'Vulcão (Dragão)'];
+const REINOS = d.mundos || ['Mundo 1', 'Mundo 2', 'Mundo 3', 'Mundo 4', 'Mundo 5'];
 const CORES = ['#e3f3d4', '#efe2cf', '#dcecf7', '#e6def0', '#f7dccf'];
 const n = d.depois.length;
 const esq = 70, dir = 30, topo = 96, base = 120;
@@ -35,9 +36,9 @@ const fonte = (px, peso = 600) => `${peso} ${px}px Fredoka, system-ui, sans-seri
 function desenhar() {
   ctx.fillStyle = '#fff8ee'; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = '#2a1630'; ctx.font = fonte(26, 700); ctx.textBaseline = 'alphabetic';
-  ctx.fillText('Vitórias do jogador casual por fase', esq, 40);
+  ctx.fillText('O jogador casual passa o nível sem recomeçar', esq, 40);
   ctx.font = fonte(15); ctx.fillStyle = '#6b5a72';
-  ctx.fillText('bot que erra 1 em 5 jogadas, não prevê o feitiço e usa o "Continuar" grátis; a faixa é o alvo ± ' + d.faixa + ' pontos', esq, 64);
+  ctx.fillText('bot que erra 1 em 5 jogadas e usa o "Continuar" grátis do nível; cada mundo numa mesa só; a faixa é o alvo ± ' + d.faixa + ' pontos', esq, 64);
 
   // mundos
   for (let m = 0; m < 5; m++) {
@@ -75,21 +76,20 @@ function desenhar() {
   ctx.textAlign = 'center';
   for (const ch of d.chefes) {
     const i = ch - 1;
-    ctx.fillStyle = '#c98a00'; ctx.font = fonte(18, 700);
-    ctx.fillText('♛', x(i), topo - 8);
+    ctx.fillStyle = '#c98a00'; ctx.font = fonte(13, 700);
+    ctx.fillText('2048', x(i), topo - 8);
   }
   // eixo x
   ctx.fillStyle = '#2a1630'; ctx.font = fonte(12);
-  for (let i = 0; i < n; i++) ctx.fillText(String(i + 1), x(i), H - base + 20);
-  ctx.font = fonte(14); ctx.fillText('fase', esq + gw / 2, H - base + 78);
-  // destaque da fase 7
-  if (d.antes) {
-    const i = 6;
-    ctx.textAlign = 'left'; ctx.font = fonte(14, 700); ctx.fillStyle = '#b03030';
-    ctx.fillText(`fase 7: ${d.antes[i]}% → ${d.depois[i]}%`, x(i) + 10, y(d.antes[i]) + 5);
+  // o valor de cada nivel (16..2048) e as jogadas do casual (mediana)
+  const VAL = [16, 32, 64, 128, 256, 512, 1024, 2048];
+  for (let i = 0; i < n; i++) {
+    ctx.fillText(String(VAL[i % 8]), x(i), H - base + 18);
+    if (d.jogadas) { ctx.fillStyle = '#9a8aa2'; ctx.font = fonte(10); ctx.fillText(String(d.jogadas[i]), x(i), H - base + 32); ctx.fillStyle = '#2a1630'; ctx.font = fonte(12); }
   }
+  ctx.font = fonte(14); ctx.fillText('nível (valor) e jogadas do casual', esq + gw / 2, H - base + 78);
   // legenda
-  const leg = [['#3b4fd8', 'depois (160 partidas por fase)'], ['rgba(214,72,72,0.75)', 'antes (40 partidas por fase)'], ['rgba(60,170,110,0.45)', 'faixa alvo'], ['#c98a00', '♛ chefão']];
+  const leg = [['#3b4fd8', 'casual (160 partidas por mundo)'], ...(d.antes ? [['rgba(214,72,72,0.75)', 'antes']] : []), ['rgba(60,170,110,0.45)', 'faixa alvo'], ['#c98a00', '2048: fim do mundo']];
   let lx = esq; ctx.textAlign = 'left'; ctx.font = fonte(14);
   for (const [cor, txt] of leg) {
     ctx.fillStyle = cor; ctx.fillRect(lx, H - 25, 16, 10);

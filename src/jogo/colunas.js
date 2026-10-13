@@ -1,82 +1,56 @@
-// Operacoes de coluna: colocar, fundir em cascata, descongelar, danificar a
-// pedra, completar o monte. Funcoes puras: devolvem colunas novas e empurram
-// eventos no vetor recebido.
-import { ehPedra, fundeCom, topo } from './regras.js';
+// Operacoes de coluna: colocar, fundir em cascata, completar o monte e
+// graduar (limpeza na subida de nivel). Funcoes puras: devolvem colunas novas
+// e empurram eventos no vetor recebido.
+import { fundeCom, topo } from './regras.js';
 
 /**
- * Descongela as cartas da coluna depois de uma fusao.
- * @returns {any[]} coluna nova
+ * A carta com o valor dobrado (ou vezes `fator`). `esp` marca que ela recebeu
+ * um especial (coringa, dobro, quadruplo): nao aceita outro ate fundir de
+ * novo, numa jogada normal ou na cascata, quando sai limpa (e uma carta nova).
  */
-export function descongelar(col, c, eventos) {
-  if (!col.some((k) => k.gelo)) return col;
-  return col.map((k) => {
-    if (!k.gelo) return k;
-    eventos.push({ tipo: 'gelo', c, id: k.id });
-    const { gelo: _g, ...resto } = k;
-    return resto;
-  });
-}
-
-/** Cada fusao na coluna tira 1 da pedra do fundo; com 0 ela quebra. lancada: pedra do monstro. */
-export function danificarPedra(col, c, eventos) {
-  if (!col.length || !ehPedra(col[0])) return { col, quebrou: false };
-  const p = { ...col[0], hp: col[0].hp - 1 };
-  if (p.hp <= 0) {
-    eventos.push({ tipo: 'pedra', c, id: p.id, hp: 0, quebrou: true });
-    return { col: col.slice(1), quebrou: true, lancada: !!p.lancada };
-  }
-  eventos.push({ tipo: 'pedra', c, id: p.id, hp: p.hp, quebrou: false });
-  return { col: [p, ...col.slice(1)], quebrou: false };
+export function dobrada(k, esp = false, fator = 2) {
+  const novo = { ...k, v: k.v * fator };
+  if (esp) novo.esp = true; else delete novo.esp;
+  return novo;
 }
 
 /**
  * Funde o topo com a carta de baixo enquanto forem iguais (cascata).
  * A primeira fusao (carta nova no topo) ja aconteceu quando isto e chamado,
- * com degrau 1; aqui vem o resto. Cada fusao descongela a coluna e danifica
- * a pedra.
- * @returns {{ col: any[], degrau: number, valores: number[], pedras: number }}
+ * com degrau 1; aqui vem o resto.
+ * @returns {{ col: any[], degrau: number, valores: number[] }}
  */
 export function cascata(col, regras, c, eventos, degrau = 1, valores = []) {
-  let pedras = 0;
-  for (;;) {
-    col = descongelar(col, c, eventos);
-    const d = danificarPedra(col, c, eventos);
-    col = d.col;
-    if (d.quebrou && !d.lancada) pedras++; // a pedra do monstro nao conta para a meta
-    if (col.length < 2) break;
+  while (col.length >= 2) {
     const t = col[col.length - 1];
     const b = col[col.length - 2];
-    if (ehPedra(b) || b.gelo || t.gelo || b.tipo !== 'normal' || t.tipo !== 'normal') break;
+    if (b.tipo !== 'normal' || t.tipo !== 'normal') break;
     if (b.v !== t.v) break;
-    if (regras.naipes && b.cor !== t.cor) break;
     degrau++;
-    const novo = { ...b, v: b.v * 2 };
-    delete novo.lodo;
+    const novo = dobrada(b);
     col = [...col.slice(0, -2), novo];
     valores.push(novo.v);
     eventos.push({ tipo: 'fundir', c, id: novo.id, idEntra: t.id, degrau, valor: novo.v });
   }
-  return { col, degrau, valores, pedras };
+  return { col, degrau, valores };
 }
 
 /**
  * Coloca a carta no topo: funde (e cascateia) ou empilha.
- * @returns {{ col: any[], fusao: boolean, degrau: number, valores: number[], pedras: number }}
+ * @returns {{ col: any[], fusao: boolean, degrau: number, valores: number[] }}
  */
 export function colocar(col, regras, c, carta, eventos) {
   const t = topo(col);
   if (fundeCom(regras, t, carta)) {
-    const novo = { ...t, v: t.v * 2 };
-    delete novo.gelo;
-    delete novo.lodo;
+    const novo = dobrada(t, carta.tipo === 'coringa');
     const base = [...col.slice(0, -1), novo];
     eventos.push({ tipo: 'fundir', c, id: novo.id, idEntra: carta.id, degrau: 1, valor: novo.v });
     const r = cascata(base, regras, c, eventos, 1, [novo.v]);
-    return { col: r.col, fusao: true, degrau: r.degrau, valores: r.valores, pedras: r.pedras };
+    return { col: r.col, fusao: true, degrau: r.degrau, valores: r.valores };
   }
-  const nova = carta.tipo === 'coringa' ? { id: carta.id, tipo: 'normal', v: 2, cor: carta.cor || 0 } : carta;
+  const nova = carta.tipo === 'coringa' ? { id: carta.id, tipo: 'normal', v: 2 } : carta;
   eventos.push({ tipo: 'colocar', c, id: nova.id, altura: col.length, valor: nova.v });
-  return { col: [...col, nova], fusao: false, degrau: 0, valores: [], pedras: 0 };
+  return { col: [...col, nova], fusao: false, degrau: 0, valores: [] };
 }
 
 /**
@@ -88,6 +62,25 @@ export function completar(col, regras, c, eventos) {
   if (!t || t.tipo !== 'normal' || t.v < regras.teto) return { col, completou: 0 };
   eventos.push({ tipo: 'completar', c, id: t.id, valor: t.v });
   return { col: col.slice(0, -1), completou: t.v };
+}
+
+/**
+ * Limpeza na subida de nivel: as cartas abaixo do piso do baralho novo saem
+ * da mesa (nenhuma carta nova as fundiria mais). Na colocacao estrita a
+ * coluna desce do fundo ao topo, entao sai sempre um pedaco do topo.
+ * @returns {{ colunas: any[][], cartas: { c: number, id: number, valor: number }[] }}
+ */
+export function graduar(colunas, piso) {
+  const cartas = [];
+  const novas = colunas.map((col, c) => {
+    if (!col.some((k) => k.tipo === 'normal' && k.v < piso)) return col;
+    return col.filter((k) => {
+      if (k.tipo !== 'normal' || k.v >= piso) return true;
+      cartas.push({ c, id: k.id, valor: k.v });
+      return false;
+    });
+  });
+  return { colunas: cartas.length ? novas : colunas, cartas };
 }
 
 /** Maior valor em jogo. */

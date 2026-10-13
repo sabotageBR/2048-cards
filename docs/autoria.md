@@ -155,3 +155,54 @@ Pedido do usuário: "o 2048 cards está em Player fit test e ainda não terminou
 - tempo médio e % com 3 min;
 - saída nas fases 3 a 5;
 - os eventos novos.
+
+## 2026-10-13 · branch `so-cartas`: sem monstros, a escada de valores
+
+Pedido do usuário: "Retire completamente a temática de monstros ou chefe de fases. Transforme o jogo somente em um jogo de cartas. [...] As cartas coringa, multiplicadores, carta bomba, continua valendo. [...] A evolução das fases inicial vai ser a medida q ele consegue chegar em um valor novo. Me de opções". Feito num branch (`so-cartas`); a 0.2.0 do duelo segue na `master` para o Player Fit Test.
+
+| Pergunta | Opções vistas | Escolha |
+|---|---|---|
+| Como a fase sobe | mesa contínua (o nível sobe na mesma mesa) · uma fase por valor (mesa nova a cada fase) · recorde de carta (cada partida do zero) | **Mesa contínua** |
+| Mundos depois do 2048 | a escada de novo com uma regra nova · teto que sobe (4096, 8192...) · fases numeradas sem fim · só visual | **A escada de novo, uma regra nova por mundo** |
+| Obstáculos (pedra, gelo, cadeado) | ficam só na mesa · entram pelo baralho · saem | **Saem** |
+| Clássico e Diário | escada sem fim · como antes do duelo · tirar por enquanto | **Tirar por enquanto** |
+| Sequência dos mundos | um especial por mundo · especiais no mundo 1 e a mesa muda depois · especiais novos (quádruplo ×4) | **Um especial por mundo**: 1 só cartas (coringa no nível 3) · 2 + bomba · 3 + dobro · 4 + naipes vermelho/preto · 5 tudo junto em 3 colunas |
+
+Medida que embasou as opções: numa mesa vazia, com o baralho do Clássico sem monstro, o casual faz o 16 na jogada 6, o 32 na 14, o 64 na 35, o 128 na 77, o 256 na 139, o 512 na 233, o 1024 na 348 e o 2048 na 558.
+
+**Ajustes que as medidas pediram** (no plano aprovado ou feitos na calibragem; detalhes e números em `docs/curadoria.md`), para o usuário conferir:
+- **Baralho por nível** (5 valores do alvo/8 para baixo) e **limpeza na subida** (as cartas abaixo do piso saem da mesa): estavam no plano aprovado.
+- **A curva virou uma rampa por mundo** (100 no 16 até 94, 92, 90, 70 e 60 no 2048). Bomba e dobro tornam os mundos 2 e 3 fáceis por natureza; o desafio fica nos naipes e nas 3 colunas.
+- **Mundo 4 com 5 colunas.** Os naipes em 4 colunas eram parede (o casual passava o 128 em diante em 13% a 31%). Ficou com 5 colunas, 2 descartes, baralho de 3 valores e mais coringas. A regra escolhida (só funde mesma cor; o coringa funde com tudo) não mudou.
+- **Mundo 5 sem naipes:** "tudo junto" foi lido como os três especiais juntos, em 3 colunas. Naipes em 3 colunas seriam bem mais duros.
+- **Saíram as estrelas** (o mapa mostra a escada de cada mundo) e a missão de montes ficou só em "Faça 1× 2048".
+- **Telemetria:** `level/N/complete` na subida; `level/N/start` do nível novo no fim da pausa, depois do anúncio (o banco do SDK pede o start depois do comercial).
+- **Progresso salvo da versão do duelo é descartado** (`VERSAO_SAVE` 2, `VERSAO_ESTADO` 6).
+- **Opções de visual para o usuário escolher** (`docs/escada/visual-retrato.png`, `visual-paisagem.png`, `visual-naipes.png`; mesma mesa em todas, pelo `?visual=`): A como está · B cartas maiores (descarte ao lado da fila: 62 → 73 px em 390×844) · C mesa quieta (sem cenário, a cor do mundo) · D escada no painel (os 8 valores, o alvo em destaque); e o naipe como ponto, símbolo de baralho ou borda da cor. **Escolha pendente.**
+- **Cartas só com números.** Ao ver a primeira rodada de thumbs, o usuário recusou o emblema do miolo ("parece uma cabeça de um cavalo cagalhão") e pediu "as cartas somente com números, sem desenho". O miolo da carta de valor passou a ser o número grande na cor dele (os emblemas por valor saíram), e o dobro virou um "×2" grande. O coringa (estrela) e a bomba mantêm o ícone, que diz o que a carta faz.
+- **Thumbs sem monstro** (pedido do usuário: "gere as novas thumbs desse jogo repaginado para a poki"): quatro cenas com a carta 2048 como assunto, num fundo limpo com raios de luz, já com as cartas só de números (`docs/escada/thumbs.png`, tiles em `marketing/thumb/comparar-tiles.png`): **fusao** (dois 1024 se chocam e o 2048 salta), **cascata** (o 2048 sai voando da pilha), **leque** (512, 2048 e 1024 em leque) e **escada** (256, 512, 1024 e 2048 em degraus). As quatro passam na régua; a moldura holográfica das cartas nobres tinha um trecho verde-água perto do #83FFE7, que um último passo de cor da thumb leva para o azul. **Escolha pendente.**
+- **Provisório até o usuário escolher o visual:** o cenário de cada mundo (o dos reinos, sem o palco do monstro), o painel (mundo e nível, pontos, barra com "Faça um 64"), a marca do naipe (ponto vermelho ou preto no canto) e a pausa de nível (o valor feito e a trilha dos 8 valores). A thumb do Gosmo não serve mais e saiu do `npm run poki`; o nome segue "2048 Cards". Versão 0.3.0.
+
+## 2026-10-13 · depois de jogar a 0.3.0: um especial por carta, descarte com limite, ×4 e vídeos
+
+Pedidos do usuário: "A carta especial só pode ser usado 1x por carta (tem q aparecer um proibido visivel ao usuario quando não pode). Por ex: eu deixei uma coluna somente com 1 carta e sempre que via a especial eu jogava nela, isso eu ia multiplicando e passando as fases"; "Quero 1 layout diferente por mundo. Layout de cenários e de cartas. Quero aprovar antes"; "Na coluna descartar, tem que ter um limite de cartas e tem que ter um contador pequeno". Durante o trabalho, sobre os naipes do mundo 4: "nao gostei dessa mecanica [...] retirar. dificil de entender, troque por outra"; e "Adicione tambem alguma coisa como recompensa no ads da poki".
+
+| Pergunta | Opções vistas | Escolha |
+|---|---|---|
+| Quando a carta volta a aceitar um especial | ao fundir de novo · nunca mais (até sair da mesa) | **Ao fundir de novo** (vale para coringa, dobro e ×4, da fila e do item; a bomba fica livre) |
+| Limite do descarte | por nível (a pilha esvazia na subida) · por mundo · recarga como hoje, à vista | **Por nível**, com o contador "n/N" |
+| Direção do visual por mundo | lugares refeitos · elementos · mesas de jogo | **Elementos**: Floresta, Oceano, Neve, Deserto, Cosmos (a aprovar mundo a mundo, por imagem) |
+| No lugar dos naipes (mundo 4) | carta ×4 · vassoura · mão livre · pilha curta | **Carta ×4** |
+
+**Decisões minhas, para o usuário conferir:**
+- **O sinal de proibido** aparece em três lugares: um selo pequeno no topo que já recebeu especial, enquanto coringa, dobro ou ×4 está na mão; um sinal grande na coluna ilegal sob o arrasto (qualquer motivo); e um salto rápido na jogada recusada (na coluna ou no descarte). Na primeira vez sai um aviso com a regra.
+- **Descarte:** 3 lugares por nível (2 no mundo 4), sem recarga; o "Continuar" libera 1 lugar; cheio, aparece "cheio" e o contador fica vermelho. Na primeira vez que enche, um aviso diz que ele esvazia na subida.
+- **×4:** não passa do 2048 (um 1024 vira 2048 e sai da mesa); o valor do meio conta como feito (×4 num 32 passa pelo 64 e sobe esse nível também). Entra também no mundo 5 ("tudo junto").
+- **Curva:** sem os naipes, o mundo 4 virou mundo de folga como o 2 e o 3 (piso de 70 para 80), e o mundo 5 foi de 60 para 70 (com 60 o bot guloso não passava o 2048 nas sementes do teste). Detalhes em `docs/curadoria.md`.
+- **Vídeos com prêmio** (só por escolha, 1x por nível cada, na barra de baixo): **"🎬 Esvaziar"** quando o descarte enche e **"🎬 ★+1"** (um coringa) quando não há coringa e a mesa aperta, a partir da fase 2. Telemetria `rewarded/descarte|coringa/visible|interact`.
+- `VERSAO_ESTADO` 7: a partida salva antes disso é descartada.
+
+**Aprovação dos mundos Elementos (mesmo dia).** Vistas as folhas de `docs/mundos/` (hoje × proposta em retrato, as cartas de cada mundo, a paisagem e as regras na tela), o usuário respondeu: "Ta aprovado, pode implementar". Os 5 temas viraram o padrão (`src/render/temas/`) e o que perdeu saiu do código: o cenário dos reinos (`arena.js`), a carta do duelo (`cartaDuelo.js`), a mesa de grimório com lápide, o `?tema=` e a opção de fundo quieto (`?visual=quieto`, que contrariava o pedido de um cenário por mundo). As 4 opções de thumb foram refeitas com as cartas da Floresta (a escolha segue pendente) e a página da thumb passou a carregar a Fredoka, que nunca tinha sido declarada nela.
+
+**Build 0.4.0 e a thumb (mesmo dia).** Pedido: "gera a nova build da poki". A versão subiu para 0.4.0 (regra do projeto: uma versão por envio, para comparar no filtro Version). A thumb que ia junto era ainda a do Gosmo (do duelo); entre as 4 opções sem monstro, refeitas com as cartas da Floresta, o usuário escolheu a **cascata** (o 2048 sai voando do topo da pilha). Pacote: `dist-poki/2048-cards-0.4.0.zip` e `2048-cards-0.4.0-thumb.png`.
+- **0.4.1:** no inspetor da Poki (desktop, cerca de 850×475) a tela de pausa abria quase toda abaixo da tela (print do usuário). Causa: o `#menu` era um grid com a linha `auto`; a linha crescia até o conteúdo inteiro (a grade das 40 fases) e o cartão, centrado nela, descia; no celular também abria do meio para baixo. Virou flex, e o cartão fica centrado e rola por dentro em qualquer tamanho.
