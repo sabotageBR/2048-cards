@@ -10,10 +10,13 @@
 //   ?vitrine         mesa de demonstracao (todos os valores e os especiais)
 //   ?semhud          esconde o HUD (thumb)
 //   ?menu            abre o menu ao carregar
-//   ?visual=descarte,escada   opcoes de visual em teste (prints para o usuario escolher);
-//                    no desktop: cursor (a seta do mouse no lugar da mao), teclas (1..N e o
-//                    espaco junto do gesto guiado) e teclasfixas (sempre na mesa)
+//   ?visual=descarte,escada,missao   opcoes de visual em teste (prints para o usuario escolher;
+//                    missao: a missao ativa no painel, ate a aprovacao da folha)
+//   ?variante=mesa-justa,desk-d   forca os braços do teste A/B (src/core/variante.js); nao vai
+//                    para o save. Sem ele, em localhost valem os controles (mesa-hoje, desk-a)
 //   ?guia=0.7        congela o gesto guiado nessa fase (0..1: clica, arrasta, solta), para os prints
+//   ?missao=cascata:3:1:coringa   fixa a missao do painel (tipo:alvo:atual:premio), para os prints
+//   ?voo=0.5         congela o voo do premio da missao nessa fase (0..1), para os prints
 //   ?semanim         sem animacao CSS (prints: no headless a animacao de entrada congela no comeco)
 //
 // Fora disso, so o banco de testes de tools/sdkcheck.html liga os ganchos
@@ -24,6 +27,7 @@ export function lerDepuracao() {
   const base = {
     local: false, ganchos: false, nivel: 0, auto: 0, fixo: false, semAnuncio: false, lang: '',
     regras: null, semHud: false, menu: false, gesto: '', vitrine: false, visual: '', semAnim: false, guia: -1,
+    variante: [], missao: '', voo: -1,
   };
   let local = false;
   try {
@@ -56,5 +60,8 @@ export function lerDepuracao() {
     visual: q.get('visual') || '',
     semAnim: q.has('semanim'),
     guia: q.has('guia') ? Math.max(0, Math.min(0.999, Number(q.get('guia')) || 0)) : -1,
+    variante: (q.get('variante') || '').split(',').filter(Boolean),
+    missao: q.get('missao') || '',
+    voo: q.has('voo') ? Math.max(0, Math.min(0.999, Number(q.get('voo')) || 0)) : -1,
   });
 }

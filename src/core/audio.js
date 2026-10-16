@@ -155,6 +155,8 @@ export function criarAudio() {
     /** carta pequena saindo da mesa na subida de nivel: brilho curto que sobe */
     graduar() { tom(1318, 0.12, 'sine', 0.05, 1760); },
     febre() { tom(300, 0.6, 'sawtooth', 0.04, 1200); ruido(0.6, 800, 0.5, 0.1, 0, 'bandpass', 4000); [784, 988, 1175, 1568].forEach((f, i) => tom(f, 0.2, 'triangle', 0.08, 0, 0.3 + i * 0.07)); },
+    /** perigo na mesa justa (coluna quase cheia, ou o fio): duas batidas graves, como um coracao */
+    alerta() { tom(75, 0.12, 'sine', 0.2, 55); tom(75, 0.12, 'sine', 0.16, 55, 0.2); },
     /** fim de partida (mesa cheia), curto e sem drama */
     fim() { [392, 330, 262].forEach((f, i) => tom(f, 0.22, 'triangle', 0.07, 0, i * 0.12)); },
     /** Fanfarra do "YES!" (mais longa no fim de mundo) com pipocos de confete. */

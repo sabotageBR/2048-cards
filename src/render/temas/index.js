@@ -23,7 +23,8 @@ import cosmos from './cosmos.js';
 
 export const TEMAS = { 1: floresta, 2: oceano, 3: neve, 4: deserto, 5: cosmos };
 
-/** Tema do mundo n (1..5); fora disso, o do mundo 1. */
+/** Tema do mundo n: 1..5 e, no mundo sem fim (6, 7, ...), os cinco de novo, na ordem. */
 export function temaDe(mundo) {
-  return TEMAS[mundo] || floresta;
+  const n = Math.max(1, mundo | 0);
+  return TEMAS[((n - 1) % 5) + 1] || floresta;
 }

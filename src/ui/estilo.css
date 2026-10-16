@@ -99,6 +99,46 @@ body.sem-animacao *, body.sem-animacao *::before, body.sem-animacao *::after { a
 .painel.comEscada .barra { height: 10px; border-width: 1.5px; }
 .painel.comEscada #metaTxt { display: none; }
 
+/* missao ativa na mesa: icone, contador e o selo do premio, sem frase. A (padrao): na linha do painel */
+.painel .missao-chip {
+  position: relative; flex: none; display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px 0 6px;
+  border-radius: 13px; background: rgba(0, 0, 0, 0.28); border: 2px solid rgba(232, 184, 74, 0.75); color: #fff3d6; font-size: 14px; line-height: 1;
+}
+.missao-chip .ic { display: grid; place-items: center; font-style: normal; }
+.missao-chip .ic svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.missao-chip .ic .mcarta {
+  display: block; min-width: 20px; padding: 2px 3px; border-radius: 4px; font-size: 10px; text-align: center; color: var(--tintaDuelo);
+  background: #fff8ec; box-shadow: 0 0 0 1.5px var(--tintaDuelo);
+}
+.missao-chip b { font-weight: 700; }
+.missao-chip .premio {
+  position: absolute; right: -8px; top: -9px; width: 18px; height: 18px; border-radius: 9px; background: var(--acento); color: #fff;
+  font-style: normal; font-size: 11px; line-height: 18px; text-align: center; box-shadow: 0 2px 0 var(--sombra);
+}
+.missao-chip.feita { background: linear-gradient(#ffe27a, #e0a100); color: var(--tintaDuelo); border-color: #fff; animation: pulsar 0.4s ease-in-out infinite; }
+.missao-chip.sobe { animation: chipSobe 0.35s ease-out; }
+@keyframes chipSobe { from { transform: translateY(8px) scale(0.8); opacity: 0; } }
+/* B: o chip no vao dos botoes (retrato), maior, entre o menu e o desfazer */
+@media (orientation: portrait) {
+  #painel.missaoB .missao-chip {
+    position: absolute; top: calc(100% + 16px); left: 50%; transform: translateX(-50%); height: 32px; gap: 6px; padding: 0 14px 0 9px;
+    border-radius: 16px; font-size: 17px; background: linear-gradient(var(--roxoA), var(--roxoB)); border-color: var(--ouro);
+    box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.3), 0 3px 8px rgba(20, 6, 24, 0.4);
+  }
+  #painel.missaoB .missao-chip .ic svg { width: 21px; height: 21px; }
+  #painel.missaoB .missao-chip.feita { background: linear-gradient(#ffe27a, #e0a100); }
+  #painel.missaoB .missao-chip.sobe { animation: chipSobeB 0.35s ease-out; }
+  @keyframes chipSobeB { from { transform: translate(-50%, 8px) scale(0.8); opacity: 0; } }
+}
+/* o premio da missao voando ate o botao do item (posicao pelo hud.js, no relogio do jogo) */
+#voo {
+  position: fixed; left: 0; top: 0; z-index: 5; width: 42px; height: 42px; margin: -21px 0 0 -21px; border-radius: 14px; pointer-events: none;
+  display: grid; place-items: center; font-size: 22px; color: #fff3d6; background: linear-gradient(var(--roxoA), var(--roxoB));
+  box-shadow: 0 0 0 2px var(--ouro), 0 0 18px rgba(255, 226, 122, 0.8), 0 6px 14px rgba(20, 6, 24, 0.5); will-change: transform;
+}
+.btn.item.chega { animation: chegar 0.45s ease-out; }
+@keyframes chegar { 40% { transform: scale(1.32); box-shadow: 0 0 0 3px #fff, 0 0 22px rgba(255, 226, 122, 0.9); } }
+
 /* aviso curto de premio (bau do mundo, missao feita): no meio da mesa, no estilo do painel */
 #aviso {
   position: fixed; left: 50%; top: var(--avisoY, 50%); transform: translate(-50%, -50%); z-index: 3; pointer-events: none;
@@ -183,14 +223,15 @@ body.sem-animacao *, body.sem-animacao *::before, body.sem-animacao *::after { a
   #topo .botoes { display: contents; }
   #topo .botoes .vao { display: none; }
   #bMenu { order: 0; }
-  #painel { order: 1; flex: 1; display: grid; grid-template-columns: minmax(90px, auto) 1fr auto; grid-template-areas: 'nome barra placar'; column-gap: 14px; align-items: center; }
+  #painel { order: 1; flex: 1; display: grid; grid-template-columns: minmax(90px, auto) 1fr auto auto; grid-template-areas: 'nome barra missao placar'; column-gap: 14px; align-items: center; }
+  .painel .missao-chip { grid-area: missao; height: 30px; font-size: 16px; }
   #bDesfazer, #bPausa { order: 2; }
   .painel .linha1 { display: contents; }
   .painel #rotulo { grid-area: nome; white-space: normal; font-size: 17px; line-height: 1.15; }
   .painel .placar { grid-area: placar; }
   .painel #pontos { font-size: 24px; }
   .painel .progresso { grid-area: barra; width: min(520px, 100%); justify-self: center; }
-  #painel.comEscada { grid-template-areas: 'nome escada placar' 'nome barra placar'; row-gap: 4px; }
+  #painel.comEscada { grid-template-areas: 'nome escada missao placar' 'nome barra missao placar'; row-gap: 4px; }
   .painel .escada { grid-area: escada; width: min(520px, 100%); justify-self: center; }
 }
 @media (orientation: landscape) and (max-height: 520px) {
@@ -202,4 +243,4 @@ body.sem-animacao *, body.sem-animacao *::before, body.sem-animacao *::after { a
   .painel #metaTxt { font-size: 12px; }
   .painel #pontos { font-size: 20px; }
 }
-@media (prefers-reduced-motion: reduce) { .btn.pulsar, #febre { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .btn.pulsar, #febre, .missao-chip.feita { animation: none; } }

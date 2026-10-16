@@ -266,3 +266,47 @@ O jogador passa mais níveis, mas não joga mais tempo, e a cauda (7 min ou mais
 **A 0.4.4 (sem mudança de visual nem de regra):** a página Errors da Poki mostrava erros que congelavam a tela. O `frame()` só agendava o próximo quadro no fim, e um erro no desenho parava o laço para sempre: o `drawImage` de um canvas 0×0 (`InvalidStateError`, 5 sessões em tablets com WebKit) e o `ctx.roundRect` do Safari antigo (na placa da trilha, que a 0.4.3 já tirou). Agora o próximo quadro é agendado antes de desenhar, um erro custa um quadro (e ainda vai para a Poki, uma vez por mensagem), a cena não desenha com o canvas 0×0 e, quando o Android devolve o contexto do canvas em branco (`canvas.contextlost`), o fundo e as cartas são refeitos. Conferido no Chrome headless com o jogo num iframe que começa 0×0: a 0.4.3 fica com a tela transparente para sempre; a 0.4.4 desenha a mesa quando o iframe ganha tamanho. `Failed to fetch` e `Object.hasOwn` vêm do SDK da Poki (`poki-sdk-hoist`), não do jogo.
 
 **Fica para o usuário escolher:** o desktop (79% tocam, 70% fazem o 16) com um cursor de mouse junto da mão guiada e as teclas 1 a 4 desenhadas sobre as colunas, que mudaria o visual.
+
+## 2026-10-16 · Player Fit Test da 0.4.4 e a 0.5.0 (rumo aos 7 minutos)
+
+O usuário pediu para analisar os testes no painel da Poki e ver "como vamos subir drasticamente a retenção para a casa dos 7 minutos". Análise e plano em `~/.claude/plans/analise-os-testes-do-toasty-oasis.md`.
+
+**O teste da 0.4.4 (13 Oct, 500 gameplays) passou de novo no mesmo lugar:** média 4m01s e 38% engajados (a 0.4.1 tinha 4m05s e 38%). Histograma: 0–1 min 27%, 1–2 min 24%, 2–3 min 11%, 3–4 min 10%, 4–5 min 4%, 5 min ou mais 23%.
+
+**Game Events da 0.4.4 (655 gameplays: 285 desktop, 310 celular):**
+
+| Métrica | Geral | Desktop | Celular | 0.4.1 |
+|---|---|---|---|---|
+| Toque no jogo | 79% | 69% | 88% | desktop 75% |
+| Nível 1 completo | 73% | 65% | 79% | 73% |
+| `tempo/N/min` 1 / 3 / 7 / 10 / 15 min | 55 / 31 / 15 / 10 / 6% | 49 / 26 / 14 / 11 / 7% | 60 / 34 / 15 / 9 / 5% | 54 / 32 / 18 / 12 / – |
+
+- **A saída é por minuto, não por nível:** cada nível do mundo 1 perde ~20% (3→4 78%, 4→5 76%, 5→6 80%, 6→7 82%, 7→8 79%), e os níveis pela metade da 0.4.2 não mudaram os minutos.
+- **A entrada de cada mundo é onde mais cai:** fase 9 78%, fase 17 69% (33% saem), fase 25 80%.
+- **1,2% zeram as 40 fases** (8 jogadores), e o jogo voltava calado ao mundo 1.
+- **Não há risco:** mesa cheia em ~7% das partidas, "Failed" ≈ 0%, o "Continuar" por vídeo aparece em 1,7%.
+- A mão de ócio (6 s parado) dispara para 31% de quem chega à fase 3 e para 50% de quem chega à 8 (a medida estava suja: contava o tempo de menu, vídeo e aba).
+- Rewarded: descarte 38% veem e 12% dos que veem clicam; coringa 30% e 3,6%.
+
+**O motor explicou:** o jogo se jogava sozinho. Jogando 100% ao acaso, 87% chegavam ao nível 4; o distraído (metade das jogadas ao acaso) fechava o mundo 1 sem recomeçar em 74% das partidas; o casual ocupava 8 das 24 vagas. Pelo vault, o Web Fit Test de puzzle pede ~8:30–9:40, e o fator Player Fit → Web Fit foi ×1,32 a ×1,74: **7 min no Player Fit Test é a meta certa**. No Hexa Drop, oito versões de recompensa renderam +16 s; a perda constante pede desafio novo.
+
+**Escolhas do usuário (todas as recomendadas):**
+1. **Núcleo: mesa justa, em A/B.** A partir do nível 4 a mesa enche de verdade; a coluna quase cheia treme e avermelha, sem texto; o "Continuar" vira o salvamento; jogar ao acaso deixa de passar. Sorteada por jogador contra a mesa de hoje no mesmo teste.
+2. **Ganchos:** a missão ativa na mesa (ícone e contador) e o mundo infinito depois da fase 40. Ficaram de fora: recorde por mundo e prévia do próximo mundo.
+3. **Mundo novo:** o anúncio do fim do mundo passa para a 2ª subida do mundo novo, e a carta nova chega já nas primeiras jogadas, com a mão guiada.
+4. **Desktop:** as opções C e D sorteadas contra a A. A B (só a seta) saiu: no Clock Tinker ela não mudou o toque.
+
+**O que entrou na 0.5.0:**
+- **Teste A/B** (`src/core/variante.js`, `save.variante`; etiqueta `variante/<braço>/start` antes do primeiro `level/N/start`; leitura por Funnels no painel). Medidas por braço: `<braço>/N/cheia`, `<braço>/N/salvo`, `<braço>/N/perigo`.
+- **Mesa justa** (`justa.niveis` em `fases.js`, do nível 4 em diante): descarte de 2 do nível 5 em diante nos mundos 1 a 3; a piedade das 2 secas desligada ou espaçada para 3; no mundo 1, baralho de 6 valores quase iguais do nível 5 em diante. No simulador, o casual do mundo 1 vê 1,56 mesa cheia (eram 0,23) com o mesmo ritmo (142 jogadas); o distraído fecha o mundo 1 em 10% (eram 74%). Tabelas em `docs/curadoria.md`.
+- **Entrada de mundo:** sem intervalo no fim do mundo; mundos 2 e 3 com abertura roteirizada (o dobro e o ×4 na segunda carta fazem o 16).
+- **Mundo sem fim** (6, 7, ...): todas as cartas, descarte de 2, mesa justa nos dois braços, os 5 cenários em ciclo, baú a cada mundo.
+- **Medidas:** o ócio zera ao fechar o menu, na volta do vídeo, ao escolher item, no arrasto solto e na volta da aba; marcos de tempo 1–8, 10, 12, 15, 20, 25, 30, 40, 50 e 60 min.
+
+**Decisões minhas, para o usuário conferir:**
+- A pilha continua com 6: no simulador, 5 ou 6 dão o mesmo resultado (a mesa trava pela regra estrita), e mudar a pilha mexeria no layout no meio do teste.
+- No braço justo, a mão de ócio (que mostra a jogada do guloso) fica só até a fase 3; a ajuda por recusas continua.
+- O braço é sorteado por jogador e guardado no save; os mundos 6+ usam a mesa justa nos dois braços.
+- Os mundos 4 e 5 abrem como antes: a novidade deles é uma regra, e a abertura nova deixava o 2048 do mundo 4 fácil demais na mesa de hoje.
+
+**Fica para o usuário:** aprovar a missão na mesa pela folha `docs/escada/missao-na-mesa.png` (A no painel ou B no vão dos botões). Até lá ela só liga com `?visual=missao|missaob`, e o jogo segue com o aviso "Mission done!". Depois, enviar a 0.5.0 e pedir dois Player Fit Tests. Metas: média ≥ 5:00; 3 min ≥ 40%, 7 min ≥ 22%, 10 min ≥ 15%; toque no desktop ≥ 80% no braço vencedor; perda nas fases 9 e 17 ≤ 12%; no braço justo, `tempo/3/min` não abaixo do de hoje.

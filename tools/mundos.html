@@ -28,7 +28,8 @@
 //   ?folha=regras    o proibido, o contador do descarte e o video de esvaziar
 //   ?folha=explosoes a explosao de cada mundo (fusao, 2048 e a festa da subida), quadros deterministicos
 //   ?folha=festa     a subida de nivel sem pausa: o "16!" piscando enquanto o jogador joga (prints do jogo)
-//   ?folha=desktop   opcoes de desktop em teste: a mao de hoje, a seta do mouse e as teclas (prints do jogo)
+//   ?folha=desktop   braços do desktop no teste A/B: a mao de hoje, a seta e as teclas no gesto, as teclas sempre (prints do jogo)
+//   ?folha=missao    a missao ativa na mesa (A no painel, B no vao dos botoes), o voo do premio e os 7 icones nos 5 mundos
 import { TEMAS } from '../src/render/temas/index.js';
 import { definirRotulos } from '../src/render/temas/kit.js';
 import { desenharCarta, definirTema, limparCache } from '../src/render/cartas.js';
@@ -36,6 +37,7 @@ import { proibido, rr } from '../src/render/desenho.js';
 import { criarParticulas } from '../src/render/particulas.js';
 import { tocarEfeito, registrarFormas } from '../src/render/efeitos.js';
 import { Transicoes as Tr } from '../src/render/transicoes.js';
+import { ICONES, ICONES_MISSAO, curto } from '../src/ui/icones.js';
 
 const q = new URLSearchParams(location.search);
 const folha = q.get('folha') || 'retrato';
@@ -121,8 +123,8 @@ if (folha === 'retrato') {
   g.appendChild(fig(`${P}festa-4.png`, '4. Jogando por baixo', 'O jogador já soltou a carta seguinte na coluna vazia enquanto o "16!" sobe e some.'));
   pronto();
 } else if (folha === 'desktop') {
-  $('titulo').textContent = 'Desktop: a seta do mouse e as teclas no lugar da mão';
-  $('sub').textContent = 'O gesto guiado da abertura do nível 1, congelado em três momentos (clica, arrasta, solta). Na 0.4.2, 21% de quem jogou no computador nunca clicou e 30% não fez o 16. Nenhum texto: só o desenho. As opções B a D aparecem só no computador; no celular fica a mão.';
+  $('titulo').textContent = 'Desktop: a mão, a seta com as teclas no gesto e as teclas sempre (teste A/B da 0.5.0)';
+  $('sub').textContent = 'O gesto guiado da abertura do nível 1, congelado em três momentos (clica, arrasta, solta). Na 0.4.4, 31% de quem jogou no computador nunca clicou. Nenhum texto: só o desenho. A, C e D são sorteadas entre os jogadores de computador; a que segurar mais gente fica. No celular fica a mão. (A seta sozinha, a antiga B, saiu: no Clock Tinker ela não mudou o toque.)';
   $('sub').style.maxWidth = '1880px';
   const g = $('grade'); g.style.gridTemplateColumns = 'repeat(3, 620px)';
   const linha = (titulo, texto) => {
@@ -134,7 +136,6 @@ if (folha === 'retrato') {
   const fases = ['Clica', 'Arrasta', 'Solta'];
   const OPCOES = [
     ['a', 'A · Hoje: a mão', 'O dedo aperta a carta da fila e a leva até a coluna. No computador ela lembra toque, não mouse.', ['O dedo aperta a carta da frente.', 'A carta vai junto, meio transparente.', 'Solta na coluna e some.']],
-    ['b', 'B · A seta do mouse', 'O mesmo gesto com a seta: um anel no clique, a seta arrasta a carta e outro anel ao soltar.', ['O anel do clique sai da ponta da seta.', 'A seta leva a carta.', 'O anel de novo, na coluna.']],
     ['c', 'C · A seta e as teclas no gesto', 'Junto com o gesto, as teclas 1 a 4 aparecem no pé das colunas e o espaço sob o descarte; a da coluna certa fica dourada e afunda quando a carta cai.', ['As teclas entram com o gesto; a 3 já está acesa.', 'A seta leva a carta.', 'A tecla 3 afunda quando a carta cai.']],
   ];
   for (const [id, titulo, texto, legendas] of OPCOES) {
@@ -145,6 +146,47 @@ if (folha === 'retrato') {
   g.appendChild(fig(`${P}desktop-d-mesa1.png`, 'Jogando, Floresta', 'Sem gesto: as teclas ficam meio apagadas; a pilha cheia cobre a sua tecla.', 620));
   g.appendChild(fig(`${P}desktop-d-mesa2.png`, 'Jogando, Cosmos (3 colunas)', 'As teclas acompanham o número de colunas e a mesa do mundo.', 620));
   g.appendChild(fig(`${P}desktop-d-3.png`, 'No gesto', 'A tecla 3 acende e afunda quando a carta cai.', 620));
+  pronto();
+} else if (folha === 'missao') {
+  await document.fonts.load('700 20px Fredoka');
+  $('titulo').textContent = 'Missão na mesa: a missão ativa no painel e o prêmio voando até o botão';
+  $('sub').textContent = 'Hoje as 3 missões ficam escondidas no menu de pausa (mesmo assim 38% cumprem a de cascata sem saber). Na mesa aparece a mais perto de cumprir, com o desenho do tipo e o contador, sem frase; o selo no canto é o prêmio. Cumprida, o chip fica dourado, o prêmio voa até o botão do item e o botão pulsa (no lugar do aviso "Mission done!"). No guia da fase 1 o chip não aparece. Duas posições para escolher: A, na linha do painel; B, maior, no vão entre o menu e o desfazer (em paisagem, as duas ficam no painel).';
+  $('sub').style.maxWidth = '2050px';
+  const g = $('grade'); g.style.gridTemplateColumns = 'repeat(5, 390px)';
+  g.appendChild(fig(`${P}missao-a.png`, 'A · No painel', 'Entre o mundo e os pontos: cascata de 3 degraus, 1 de 3 feito, prêmio coringa.', 390));
+  g.appendChild(fig(`${P}missao-b.png`, 'B · No vão dos botões', 'O mesmo chip, maior, entre o menu e o desfazer.', 390));
+  g.appendChild(fig(`${P}missao-voo-1.png`, 'Cumpriu: o chip fica dourado', 'Combo de 5 (5/5); o martelo sai do chip.', 390));
+  g.appendChild(fig(`${P}missao-voo-2.png`, 'O prêmio voa', 'Em arco, até o botão do item (0,65 s).', 390));
+  g.appendChild(fig(`${P}missao-voo-3.png`, 'Chega ao botão', 'No pouso o botão pulsa com o som do prêmio, a conta sobe e a missão seguinte entra no chip.', 390));
+  const pais = document.createElement('div');
+  pais.style.gridColumn = '1 / span 3';
+  pais.appendChild(fig(`${P}missao-paisagem.png`, 'Paisagem (computador)', 'O chip entra no painel, entre a barra e os pontos.', 1190));
+  g.appendChild(pais);
+  // os 7 chips sobre o painel de cada mundo
+  const chips = document.createElement('div');
+  chips.style.gridColumn = '4 / span 2';
+  chips.innerHTML = '<b style="display:block;font-size:20px;margin-bottom:10px">Os 7 tipos, no painel de cada mundo</b>';
+  const css = document.createElement('style');
+  css.textContent = `.faixaM{display:flex;flex-wrap:wrap;gap:12px 16px;padding:14px 16px;border-radius:14px;margin-bottom:10px;border:2.5px solid #e8b84a}
+    .chipM{position:relative;display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 10px 0 6px;border-radius:14px;background:rgba(0,0,0,.28);border:2px solid rgba(232,184,74,.75);color:#fff3d6;font-size:15px}
+    .chipM svg{width:19px;height:19px;stroke:currentColor;stroke-width:2.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .chipM .mc{min-width:20px;padding:2px 3px;border-radius:4px;font-size:10px;text-align:center;color:#2a1630;background:#fff8ec;box-shadow:0 0 0 1.5px #2a1630}
+    .chipM i{position:absolute;right:-8px;top:-9px;width:18px;height:18px;border-radius:9px;background:#ff4fd8;color:#fff;font-style:normal;font-size:11px;line-height:18px;text-align:center}`;
+  document.head.appendChild(css);
+  const EX = [['fusoes', 12, 30, 'coringa'], ['cascata', 1, 3, 'martelo'], ['cartas', 1, 2, 'troca'], ['montes', 0, 1, 'coringa'], ['combo', 2, 5, 'martelo'], ['descartes', 1, 4, 'troca'], ['pontos', 800, 1500, 'coringa']];
+  for (const m of MUNDOS) {
+    const pal = TEMAS[m.n].paleta;
+    const f = document.createElement('div');
+    f.className = 'faixaM';
+    f.style.background = `linear-gradient(${pal.painelA}, ${pal.painelB})`;
+    f.innerHTML = EX.map(([tipo, at, al, pr]) => `<span class="chipM">${tipo === 'cartas' ? '<span class="mc">128</span>' : ICONES_MISSAO[tipo]}<b>${curto(at)}/${curto(al)}</b><i>${ICONES[pr]}</i></span>`).join('');
+    chips.appendChild(f);
+  }
+  const leg = document.createElement('span');
+  leg.style.cssText = 'display:block;color:#cfc6da;font-size:14.5px;line-height:1.4';
+  leg.textContent = 'Fusões, cascata (degraus), fazer cartas de um valor, levar um 2048 para fora da mesa, combo, descartes e pontos no mundo.';
+  chips.appendChild(leg);
+  g.appendChild(chips);
   pronto();
 } else if (folha === 'explosoes') {
   await document.fonts.load('700 20px Fredoka');

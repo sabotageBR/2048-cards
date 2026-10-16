@@ -10,6 +10,9 @@ import { faseDe, faseGlobal, POR_MUNDO } from './fases.js';
 
 /** Jogador casual: 1 em 5 jogadas vai para uma coluna qualquer. */
 export const PERFIL_CASUAL = { erro: 0.2 };
+/** Reguas da mesa justa: o distraido joga metade das jogadas ao acaso; o acaso, todas. */
+export const PERFIL_DISTRAIDO = { erro: 0.5 };
+export const PERFIL_ACASO = { erro: 1 };
 
 /** Quanto a mesa esta "boa" (maior e melhor). */
 export function avaliarMesa(e) {
@@ -112,9 +115,9 @@ export function jogarSozinho(fase, regras, semente, op = {}) {
  * recomeca pelo kit (semente nova). Devolve
  * { completou, jogadas, niveis: [{ jogadas, cheias, recomecos, chegou, passou }] }
  * (`chegou`: comecou o nivel; `passou`: fechou o nivel).
- * @param {number} mundo 1..5
+ * @param {number} mundo 1..5 (ou o mundo sem fim, 6+)
  * @param {number} semente
- * @param {{ erro?: number, maxJogadas?: number, maxRecomecos?: number, nivel?: number, regras?: object }} [op]
+ * @param {{ erro?: number, maxJogadas?: number, maxRecomecos?: number, nivel?: number, regras?: object, perfil?: string }} [op]
  */
 export function jogarMundo(mundo, semente, op = {}) {
   const erro = op.erro || 0;
@@ -122,7 +125,7 @@ export function jogarMundo(mundo, semente, op = {}) {
   const maxRec = op.maxRecomecos === undefined ? 8 : op.maxRecomecos;
   const sortear = sorteador(semente);
   const niveis = Array.from({ length: POR_MUNDO }, () => ({ jogadas: 0, descartes: 0, cheias: 0, recomecos: 0, chegou: false, passou: false }));
-  const nova = (nivel, tentativa) => criarPartida(op.regras || {}, faseDe(faseGlobal(mundo, nivel), tentativa), (semente + tentativa * 7919) >>> 0);
+  const nova = (nivel, tentativa) => criarPartida(op.regras || {}, faseDe(faseGlobal(mundo, nivel), tentativa, op.perfil), (semente + tentativa * 7919) >>> 0);
   let tentativa = 0;
   let e = nova(op.nivel || 1, 0);
   niveis[e.nivel - 1].chegou = true;

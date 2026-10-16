@@ -4,9 +4,12 @@
 // do nivel com o contador "n/N", a fila e o sinal de proibido (no topo que ja
 // recebeu um especial, com coringa, dobro ou x4 na mao; na coluna ilegal sob
 // o arrasto; na jogada recusada). Nao tem estado proprio.
-// Opcoes de desktop em teste (?visual=cursor,teclas,teclasfixas): a seta do
-// mouse no lugar da mao e as teclas 1..N sob as colunas, com o espaco sob o
-// descarte.
+// Perigo (mesa justa, sem texto): a coluna a 1 carta do limite treme em
+// rajadas e ganha um contorno vermelho pulsando; no "fio" (a carta da frente
+// nao cabe e o descarte tem 1 lugar), o lugar do descarte tambem. O tremor e
+// funcao pura do tempo (o ?quadro= dos prints continua valendo).
+// Desktop (teste A/B da 0.5.0, braços C e D): a seta do mouse no lugar da mao
+// e as teclas 1..N sob as colunas, com o espaco sob o descarte.
 import { desenharCarta } from './cartas.js';
 import { TINTA, FONTE, rr, texto, proibido } from './desenho.js';
 import { respeitaMarca } from '../jogo/regras.js';
@@ -30,6 +33,26 @@ function tapete(ctx, L, rotulo, m) {
   else texto(ctx, rotulo, L.filaPos(0).x + L.filaPos(0).w / 2, y - tam * 0.75, tam, m.rotulo, op);
 }
 
+/** Vermelho do perigo (o mesmo do contador cheio), igual em todos os mundos, como o proibido. */
+const PERIGO = '#e5243b';
+/** Rajada de tremor do perigo: 260 ms a cada 1,4 s (forte: a coluna que a segunda chance vai limpar). */
+function rajada(agora, forte) {
+  const ciclo = forte ? 420 : 1400, dur = forte ? 420 : 260, amp = forte ? 4 : 2.5;
+  const u = (agora % ciclo) / dur;
+  return u >= 1 ? 0 : Math.sin(u * Math.PI * 6) * amp * (forte ? 1 : 1 - u);
+}
+
+/** Contorno vermelho pulsando em volta da area r (coluna ou descarte). */
+function contornoPerigo(ctx, r, gap, agora) {
+  const k = 0.5 + 0.5 * Math.abs(Math.sin(agora / 260));
+  ctx.save();
+  rr(ctx, r.x - gap * 0.4, r.y - gap * 0.4, r.w + gap * 0.8, r.h + gap * 0.8, gap);
+  ctx.fillStyle = `rgba(229,36,59,${0.08 + 0.1 * k})`; ctx.fill();
+  ctx.shadowColor = PERIGO; ctx.shadowBlur = 10 + 8 * k;
+  ctx.strokeStyle = `rgba(229,36,59,${0.55 + 0.4 * k})`; ctx.lineWidth = 3; ctx.stroke();
+  ctx.restore();
+}
+
 /** Contador pequeno do descarte ("n/N") no canto de cima do lugar; vermelho com a pilha cheia. */
 function contador(ctx, d, rotulo, cheio) {
   const tam = Math.max(10, Math.round(d.w * 0.2));
@@ -49,7 +72,7 @@ function contador(ctx, d, rotulo, cheio) {
  * @param {CanvasRenderingContext2D} ctx
  * @param {any} estado
  * @param {any} L layout
- * @param {{ pal: any, mesa: any, agora: number, t?: number, dpr?: number, linha?: any, arrasto?: any, destaque?: number, legal?: boolean, semFila?: boolean, febre?: number, alvo?: string, textos?: any, teclas?: any }} op
+ * @param {{ pal: any, mesa: any, agora: number, t?: number, dpr?: number, linha?: any, arrasto?: any, destaque?: number, legal?: boolean, semFila?: boolean, febre?: number, alvo?: string, textos?: any, teclas?: any, perigo?: { colunas: number[], fio: boolean, forte?: number } | null }} op
  */
 export function desenharMesa(ctx, estado, L, op) {
   const { pal, agora } = op;
@@ -59,7 +82,10 @@ export function desenharMesa(ctx, estado, L, op) {
   const linha = op.linha;
   const pose = (id) => (linha ? linha.pose(id, agora) : null);
   const valorDe = (k) => (linha ? linha.valor(k.id, agora, k.v) : k.v);
-  const tremor = (c) => (linha ? linha.tremor(c, agora) : 0);
+  const pg = op.perigo || null;
+  /** A coluna c (-1: o descarte) esta em perigo? */
+  const emPerigo = (c) => !!pg && (c < 0 ? pg.fio : !!pg.colunas[c] || pg.forte === c);
+  const tremor = (c) => (linha ? linha.tremor(c, agora) : 0) + (emPerigo(c) ? rajada(agora, !!pg && pg.forte === c) : 0);
   const febre = op.febre || 0;
 
   // mesa do tema do mundo (temas/kit.js)
@@ -81,6 +107,7 @@ export function desenharMesa(ctx, estado, L, op) {
       ctx.strokeStyle = `rgba(255,226,122,${0.5 + 0.4 * Math.abs(Math.sin(agora / 200))})`; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.stroke();
       ctx.restore();
     }
+    if (emPerigo(c)) contornoPerigo(ctx, { ...L.coluna(c), x: L.coluna(c).x + dx }, L.gap, agora);
     if (op.destaque === c) {
       const area = L.coluna(c);
       ctx.save();
@@ -151,6 +178,7 @@ export function desenharMesa(ctx, estado, L, op) {
   const max = estado.regras.descarteMax;
   const n = Math.max(0, max - estado.descarteCarga);
   const cheio = estado.descarteCarga <= 0;
+  if (emPerigo(-1)) contornoPerigo(ctx, { ...d, x: d.x + dxD }, L.gap, agora);
   m.descarte(ctx, { ...d, x: d.x + dxD }, !cheio, t, estado.descarte ? '' : (cheio ? txt.semCarga : txt.descartar));
   if (estado.descarte) {
     const p = pose(estado.descarte.id);

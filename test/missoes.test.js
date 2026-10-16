@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { criarMissoes, progredir, renovar } from '../src/jogo/missoes.js';
+import { criarMissoes, progredir, renovar, missaoDaVez } from '../src/jogo/missoes.js';
 
 test('tres missoes de tipos diferentes, deterministicas pela semente', () => {
   const a = criarMissoes(5), b = criarMissoes(5);
@@ -20,4 +20,15 @@ test('progredir conta eventos e renovar troca as feitas', () => {
   assert.equal(n.missoes[0].feita, false);
   assert.equal(n.missoes[0].id, 3);
   assert.equal(n.missoes[1].id, 2);
+});
+
+test('missaoDaVez: a mostrada fica ate ser feita; depois, a mais perto de cumprir', () => {
+  const m = (id, atual, alvo, feita = false) => ({ id, tipo: 'fusoes', v: 0, alvo, atual, feita, premio: 'coringa' });
+  const e = { missoes: [m(1, 1, 10), m(2, 3, 4), m(3, 2, 4)], rng: 1, prox: 4 };
+  assert.equal(missaoDaVez(e).id, 2);
+  assert.equal(missaoDaVez(e, 1).id, 1, 'a mostrada nao troca no meio');
+  assert.equal(missaoDaVez({ ...e, missoes: [m(1, 1, 10), m(2, 4, 4, true), m(3, 2, 4)] }, 2).id, 3);
+  // empate: a de menor id
+  assert.equal(missaoDaVez({ ...e, missoes: [m(5, 1, 2), m(4, 2, 4)] }).id, 4);
+  assert.equal(missaoDaVez({ ...e, missoes: [m(1, 2, 2, true)] }), null);
 });

@@ -1,7 +1,7 @@
 // Reducer da partida: imutabilidade, eventos, descarte, itens, febre, fim.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { criarPartida, jogar, acoesLegais, temJogada, desfazerPara } from '../src/jogo/partida.js';
+import { criarPartida, jogar, acoesLegais, temJogada, desfazerPara, perigo } from '../src/jogo/partida.js';
 import { progresso, progressoDoNivel } from '../src/jogo/metas.js';
 import { faseDe, faseGlobal, alvoDoNivel, MUNDOS, kitDoNivel } from '../src/jogo/fases.js';
 
@@ -354,4 +354,57 @@ test('progresso do nivel: trabalho alem da conta nao enche a barra antes da meta
     antes = p;
   }
   assert.ok(Math.abs(progressoDoNivel({ ...e0, cartasFeitas: { 64: Math.round((0.25 * e0.metas[0].trabalho) / 64) } }) - 0.5) < 0.03);
+});
+
+test('fila roteirizada: as primeiras cartas vem da fase, o especial zera o espacamento', () => {
+  const e = criarPartida({}, fase({ fila: [2, 'dobro', 4], baralho: { pesos: { 2: 1 }, total: 50, dinamico: false, especiais: { dobro: 1 } } }), 7);
+  assert.deepEqual(e.fila.map((k) => k.tipo === 'normal' ? k.v : k.tipo), [2, 'dobro', 4]);
+  assert.equal(new Set(e.fila.map((k) => k.id)).size, 3);
+  assert.equal(e.desdeEspecial, 1);
+  // a entrada do mundo 2 (fase 9) e do 3 (fase 17) trazem a carta nova; o recomeco nao
+  const f9 = faseDe(9);
+  assert.deepEqual(criarPartida({}, f9, f9.semente).fila.map((k) => k.tipo), ['normal', 'dobro', 'normal']);
+  const f17 = faseDe(17);
+  assert.equal(criarPartida({}, f17, f17.semente).fila[1].tipo, 'quadruplo');
+  const r9 = faseDe(9, 1);
+  assert.equal(r9.fila, undefined);
+});
+
+test('mesa justa: o descarte e a piedade trocam na subida de nivel', () => {
+  // mundo 1, nivel 4 da mesa justa: descarte de 3 e piedade desligada; no 5, descarte de 2 e piedade em 3 secas
+  const f = faseDe(faseGlobal(1, 4), 0, 'mesa-justa');
+  let e = criarPartida({}, f, f.semente);
+  assert.equal(e.perfil, 'mesa-justa');
+  assert.equal(e.regras.descarteMax, 3);
+  assert.equal(e.baralho.secas, 0);
+  // forca a subida: um 64 sobre o 64 faz o 128
+  e = { ...e, colunas: [[{ id: 800, tipo: 'normal', v: 64 }], [], [], []], fila: [{ id: 801, tipo: 'normal', v: 64 }, ...e.fila.slice(1)] };
+  e = jogar(e, { tipo: 'descartar', t: 0 }).estado; // a 64 vai para o descarte: 2 lugares livres
+  e = { ...e, fila: [{ id: 802, tipo: 'normal', v: 64 }, ...e.fila.slice(1)] };
+  const r = jogar(e, { tipo: 'colocar', c: 0, t: 1 });
+  const vazio = r.eventos.find((ev) => ev.tipo === 'descarteVazio');
+  assert.equal(r.estado.nivel, 5);
+  assert.equal(vazio.n, 1, 'o descarte vazio conta os lugares do nivel de antes');
+  assert.equal(r.estado.regras.descarteMax, 2);
+  assert.equal(r.estado.descarteCarga, 2);
+  assert.equal(r.estado.baralho.secas, 3);
+  // na mesa de hoje nada muda
+  const h = faseDe(faseGlobal(1, 5), 0, 'mesa-hoje');
+  const eh = criarPartida({}, h, h.semente);
+  assert.equal(eh.regras.descarteMax, 3);
+  assert.equal(eh.baralho.secas, undefined);
+});
+
+test('perigo: coluna a 1 carta do limite e o fio (a frente nao cabe e o descarte tem 1 lugar)', () => {
+  const k = (v, id) => ({ id, tipo: 'normal', v });
+  const e = criarPartida({}, fase(), 7);
+  const cheia = [k(64, 1), k(32, 2), k(16, 3), k(8, 4), k(4, 5)];
+  const p1 = perigo({ ...e, colunas: [cheia, [], [], []] });
+  assert.deepEqual(p1.colunas, [1, 0, 0, 0]);
+  assert.equal(p1.fio, false);
+  const topos = [[k(2, 11)], [k(2, 12)], [k(2, 13)], [k(2, 14)]];
+  const fio = { ...e, colunas: topos, fila: [k(64, 20)], descarteCarga: 1 };
+  assert.equal(perigo(fio).fio, true);
+  assert.equal(perigo({ ...fio, descarteCarga: 2 }).fio, false);
+  assert.equal(perigo({ ...fio, fila: [k(2, 21)] }).fio, false);
 });

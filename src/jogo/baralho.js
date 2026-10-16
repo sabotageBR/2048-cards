@@ -9,6 +9,8 @@ import { maiorNaMesa } from './colunas.js';
 export const PESOS_PADRAO = Object.freeze({ 2: 6, 4: 5, 8: 3.5, 16: 2.2, 32: 1.4, 64: 0.9, 128: 0.5, 256: 0.3 });
 /** Cartas normais entre duas especiais, no minimo. */
 export const ESPACO_ESPECIAL = 6;
+/** Jogadas secas seguidas que ligam a piedade (o baralho do nivel pode trocar; 0 desliga o gatilho). */
+export const SECAS_PADRAO = 2;
 /** Tipos de carta especial, na ordem do sorteio. */
 export const ESPECIAIS = ['coringa', 'bomba', 'dobro', 'quadruplo'];
 
@@ -80,11 +82,13 @@ export function sortear(estado) {
   } else {
     let valores = valoresPermitidos(estado);
     const pesos = b.pesos || PESOS_PADRAO;
-    // piedade: sem jogada legal para a frente da fila, ou 2 jogadas secas
-    // seguidas, a proxima carta vem das que fundem (ou das que cabem)
+    // piedade: sem jogada legal para a frente da fila, ou `secas` jogadas secas
+    // seguidas (2; a mesa justa desliga ou espaca o gatilho), a proxima carta
+    // vem das que fundem (ou das que cabem)
     const frente = estado.fila[0];
     const semLegal = frente && jogadasLegais(estado, frente).length === 0;
-    if (semLegal || estado.secas >= 2) {
+    const lim = b.secas ?? SECAS_PADRAO;
+    if (semLegal || (lim > 0 && estado.secas >= lim)) {
       const fundem = valores.filter((v) => estado.colunas.some((col) => fundeCom(regras, topo(col), { tipo: 'normal', v })));
       const cabem = valores.filter((v) => jogadasLegais(estado, { tipo: 'normal', v }).length);
       if (fundem.length) valores = fundem;

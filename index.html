@@ -15,6 +15,8 @@
   <div id="painel" class="painel">
     <div class="linha1">
       <span id="rotulo"></span>
+      <!-- missao ativa (icone e contador, sem frase); ate a aprovacao da folha, so com ?visual=missao -->
+      <span id="missao" class="missao-chip" role="img" hidden><i class="ic" id="missaoIc"></i><b id="missaoConta"></b><i class="premio" id="missaoPremio"></i></span>
       <span class="placar"><small id="pontosTxt">SCORE</small><b id="pontos">0</b></span>
     </div>
     <div class="escada" id="escada" hidden></div>
@@ -45,6 +47,7 @@
   <button id="vCoringa" class="btn video anuncio" hidden aria-label="Wild +1 (video)"><i class="selo-video" aria-hidden="true">🎬</i><span>★+1</span></button>
 </div>
 <div id="febre" hidden><span id="febreTxt">FURY ×2</span></div>
+<div id="voo" hidden aria-hidden="true"><span id="vooIc"></span></div>
 <div id="aviso" hidden><b id="avisoTitulo"></b><span id="avisoTxt"></span></div>
 <div id="menu" hidden>
   <div class="cartao" role="dialog" aria-modal="true" aria-labelledby="menuTitulo">

@@ -87,3 +87,21 @@ export function renovar(estadoM) {
   });
   return { missoes, rng, prox };
 }
+
+/**
+ * A missao que a mesa mostra (missao ativa no painel): a mostrada fica ate ser
+ * cumprida (nao troca no meio); depois, a mais perto de cumprir (maior
+ * atual/alvo; no empate, a de menor id).
+ * @param {{ missoes: any[] }} estadoM
+ * @param {number} [idAtual] id da missao mostrada agora
+ */
+export function missaoDaVez(estadoM, idAtual = -1) {
+  const ativas = estadoM.missoes.filter((m) => !m.feita);
+  const atual = ativas.find((m) => m.id === idAtual);
+  if (atual) return atual;
+  let melhor = null;
+  for (const m of ativas) {
+    if (!melhor || m.atual / m.alvo > melhor.atual / melhor.alvo || (m.atual / m.alvo === melhor.atual / melhor.alvo && m.id < melhor.id)) melhor = m;
+  }
+  return melhor;
+}

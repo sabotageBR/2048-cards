@@ -32,11 +32,12 @@ export function criarCena(canvas) {
   /** @type {HTMLCanvasElement|null} */ let fundo = null;
   let tVis = 0, clarao = -1e9;
   /**
-   * Opcoes de visual em teste: ?visual=descarte (o descarte junto da fila),
-   * cursor (a seta do mouse no lugar da mao), teclas (1..N e o espaco com o
-   * gesto guiado) ou teclasfixas (sempre); ?guia=0..1 congela a fase do gesto.
+   * Opcoes de visual: ?visual=descarte (o descarte junto da fila, em teste);
+   * no desktop, o braço do teste A/B: teclas 'guia' (C: a seta do mouse e as
+   * teclas 1..N e o espaco com o gesto guiado) ou 'fixas' (D: sempre na
+   * mesa); ?guia=0..1 congela a fase do gesto (prints).
    */
-  let vis = { descarteFila: false, cursor: false, teclas: '', guiaU: -1 };
+  let vis = { descarteFila: false, teclas: '', guiaU: -1 };
   let txt = { naMao: 'in hand', descartar: 'discard', semCarga: 'empty', livre: 'Free!', combo: 'COMBO ×{n}' };
 
   const layout = () => calcularLayout({ W, H, topo, base, colunas: regras.colunas, pilhaMax: regras.pilhaMax, tamFila: regras.tamFila, descarteFila: vis.descarteFila });
@@ -167,7 +168,7 @@ export function criarCena(canvas) {
   }
 
   /**
-   * @param {{ estado: any, agora: number, trans?: any, festa?: any, tEntrada?: number, arrasto?: any, destaque?: number, legal?: boolean, mao?: any, febre?: number, info?: any, semFila?: boolean, alvo?: string }} q
+   * @param {{ estado: any, agora: number, trans?: any, festa?: any, tEntrada?: number, arrasto?: any, destaque?: number, legal?: boolean, mao?: any, febre?: number, info?: any, semFila?: boolean, alvo?: string, perigo?: any }} q
    */
   function desenhar(q) {
     // janela sem largura ou altura (o iPad passa por 0x0): drawImage de um canvas 0x0 lanca InvalidStateError
@@ -191,10 +192,10 @@ export function criarCena(canvas) {
     if (zoom !== 1) { ctx.translate(W / 2, H / 2); ctx.scale(zoom, zoom); ctx.translate(-W / 2, -H / 2); }
     const tGuia = vis.guiaU >= 0 ? vis.guiaU * CICLO_GUIA : tVis;
     if (q.estado) {
-      desenharMesa(ctx, q.estado, L, { pal, mesa: tema.mesa, agora: q.agora, t, dpr, linha, arrasto: q.arrasto, destaque: q.destaque, legal: q.legal, febre: q.febre || 0, semFila: q.semFila, alvo: q.alvo || '', textos: txt, teclas: teclasDe(q.mao, tGuia) });
+      desenharMesa(ctx, q.estado, L, { pal, mesa: tema.mesa, agora: q.agora, t, dpr, linha, arrasto: q.arrasto, destaque: q.destaque, legal: q.legal, febre: q.febre || 0, semFila: q.semFila, alvo: q.alvo || '', textos: txt, teclas: teclasDe(q.mao, tGuia), perigo: q.perigo || null });
     }
     part.desenhar(ctx);
-    const comCursor = { cursor: vis.cursor, esc: Math.max(1, Math.min(1.7, L.cw / 70)) };
+    const comCursor = { cursor: !!vis.teclas, esc: Math.max(1, Math.min(1.7, L.cw / 70)) };
     if (q.mao && q.mao.de) desenharGuia(ctx, q.mao, tGuia, dpr, comCursor);
     else if (q.mao) desenharMao(ctx, q.mao.x, q.mao.y, tGuia, '#fff', comCursor);
     ctx.restore();

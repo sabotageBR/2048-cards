@@ -24,6 +24,11 @@
 // a ser o do nivel novo e as cartas abaixo do piso dele saem da mesa
 // (`graduar`). O desfazer, o "Continuar" gratis e o descarte renovam. No ultimo nivel a
 // partida e vencida. Sem escada, a fase tem as metas dela e termina nelas.
+// Um degrau pode trocar os lugares do descarte (`descarte`) e o gatilho da
+// piedade (`secas`, ver baralho.js): a mesa justa (fases.js) faz isso.
+//
+// `fase.fila`: as primeiras cartas da fila (numero = carta normal, texto =
+// especial), a abertura roteirizada do mundo; o resto vem do sorteio.
 import { normalizarRegras, podeColocar, topo } from './regras.js';
 import { colocar, cascata, completar, graduar, dobrada } from './colunas.js';
 import { encherFila, jogadasLegais, PESOS_PADRAO } from './baralho.js';
@@ -34,8 +39,10 @@ import { criarMetas, avaliar, todasFeitas } from './metas.js';
 // partida salva de outra versao. 6: a escada de valores, sem monstro; 7: um
 // especial por carta (`esp`) e o descarte com lugares por nivel (2026-10-13);
 // 8: a escada nova da 0.4.2 (coringa e bomba no mundo 1, baralho curto, os
-// mundos 2 a 4 deslocados).
-export const VERSAO_ESTADO = 8;
+// mundos 2 a 4 deslocados); 9: o perfil de mesa (teste A/B da 0.5.0), o
+// descarte e a piedade por nivel, a abertura roteirizada de cada mundo e o
+// mundo sem fim (2026-10-16).
+export const VERSAO_ESTADO = 9;
 
 /** Mesa inicial: as cartas de `inicio` (fundo -> topo) em cada coluna. */
 function montarMesa(fase, regras, proxId) {
@@ -57,29 +64,43 @@ const metaDoDegrau = (d) => [{ tipo: 'cartas', v: d.alvo, n: 1 }];
  * @param {number} semente
  */
 export function criarPartida(regrasBase, fase, semente) {
-  const regras = normalizarRegras({ ...(regrasBase || {}), ...(fase.regras || {}) });
+  let regras = normalizarRegras({ ...(regrasBase || {}), ...(fase.regras || {}) });
+  const descarteBase = regras.descarteMax;
   const mesa = montarMesa(fase, regras, 1);
   const escada = fase.escada || null;
   const nivel = escada ? Math.min(escada.length, Math.max(1, fase.nivel | 0)) : 0;
   const degrau = escada ? escada[nivel - 1] : null;
+  if (degrau && degrau.descarte !== undefined) regras = { ...regras, descarteMax: degrau.descarte };
   const b = fase.baralho || {};
+  const ab = filaRoteirizada(fase.fila, regras, mesa.proxId);
   let e = {
     v: VERSAO_ESTADO, regras, faseId: fase.id, mundo: fase.mundo || 0, modo: fase.modo || 'aventura',
-    rng: (semente >>> 0) || 1, proxId: mesa.proxId, n: 0,
+    perfil: fase.perfil || 'mesa-hoje', descarteBase,
+    rng: (semente >>> 0) || 1, proxId: ab.proxId, n: 0,
     colunas: mesa.colunas, escada, nivel,
     baralho: degrau
-      ? { pesos: degrau.pesos, especiais: degrau.especiais || {}, dinamico: false, minimo: 8 }
+      ? { pesos: degrau.pesos, especiais: degrau.especiais || {}, dinamico: false, minimo: 8, secas: degrau.secas }
       : { pesos: b.pesos || PESOS_PADRAO, especiais: b.especiais || {}, dinamico: b.dinamico !== false, minimo: b.minimo || 8 },
-    fila: [], descarte: null, descarteCarga: regras.descarteMax,
+    fila: ab.fila, descarte: null, descarteCarga: regras.descarteMax,
     restantes: escada || b.total === undefined || b.total === null || b.total === Infinity ? Infinity : Math.max(1, b.total | 0),
     pontos: 0, combo: 0, fusoesSeguidas: 0, secas: 0, febreAte: 0, febre: false,
     maiorCascata: 0, montes: 0, cartasFeitas: {}, fusoes: 0,
     itens: { coringa: 0, martelo: 0, troca: 0, desfazer: 1, ...(fase.itens || {}) },
     metas: criarMetas(degrau ? { metas: metaDoDegrau(degrau) } : fase, mesa.colunas, regras),
-    fim: null, recusas: 0, desdeEspecial: 2, continuacoes: 0,
+    fim: null, recusas: 0, desdeEspecial: ab.desdeEspecial, continuacoes: 0,
   };
   e = encherFila(e);
   return e;
+}
+
+/** As cartas da abertura roteirizada (fase.fila), com ids a partir de proxId; o especial zera o espacamento. */
+function filaRoteirizada(lista, regras, proxId) {
+  const fila = [];
+  let desdeEspecial = 2;
+  for (const x of (lista || []).slice(0, regras.tamFila)) {
+    if (typeof x === 'number') { fila.push({ id: proxId++, tipo: 'normal', v: x }); desdeEspecial++; } else { fila.push({ id: proxId++, tipo: x, v: 0 }); desdeEspecial = 0; }
+  }
+  return { fila, proxId, desdeEspecial };
 }
 
 /** Colunas legais para a carta (indices). */
@@ -288,6 +309,19 @@ function acRetomar(e, acao, eventos) {
   };
 }
 
+/**
+ * Perigo que a mesa justa mostra (sem texto: a coluna treme e avermelha):
+ * colunas a 1 carta do limite e o "fio" (a carta da frente nao cabe em coluna
+ * nenhuma e o descarte tem no maximo 1 lugar).
+ * @returns {{ colunas: number[], fio: boolean }}
+ */
+export function perigo(e) {
+  const colunas = e.colunas.map((col) => (col.length >= e.regras.pilhaMax - 1 ? 1 : 0));
+  const frente = e.fila[0];
+  const fio = !e.fim && !!frente && e.descarteCarga <= 1 && jogadasLegais(e, frente).length === 0;
+  return { colunas, fio };
+}
+
 /** Sem jogada, sem descarte e sem item que salve: a mesa esta cheia. */
 export function presa(e) {
   const martela = e.itens.martelo > 0 && e.colunas.some((col) => col.length);
@@ -312,9 +346,12 @@ function subirNivel(e, eventos) {
     eventos.push({ tipo: 'graduar', piso, cartas: g.cartas, pontos: pontos - e.pontos });
   }
   if (e.descarte) eventos.push({ tipo: 'descarteVazio', id: e.descarte.id, carta: e.descarte, n: e.regras.descarteMax - e.descarteCarga });
+  // o degrau novo pode trocar os lugares do descarte e o gatilho da piedade (mesa justa)
+  const descarteMax = d.descarte !== undefined ? d.descarte : (e.descarteBase ?? e.regras.descarteMax);
+  const regras = descarteMax === e.regras.descarteMax ? e.regras : { ...e.regras, descarteMax };
   return {
-    ...e, nivel, colunas: g.colunas, pontos, descarte: null, descarteCarga: e.regras.descarteMax,
-    baralho: { ...e.baralho, pesos: d.pesos, especiais: d.especiais || {} },
+    ...e, nivel, regras, colunas: g.colunas, pontos, descarte: null, descarteCarga: descarteMax,
+    baralho: { ...e.baralho, pesos: d.pesos, especiais: d.especiais || {}, secas: d.secas },
     metas: criarMetas({ metas: metaDoDegrau(d) }, g.colunas, e.regras, e.cartasFeitas),
     itens: { ...e.itens, desfazer: Math.max(1, e.itens.desfazer) },
     continuacoes: 0,

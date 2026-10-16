@@ -7,19 +7,30 @@
 // descarteMax do mundo por nivel), mesas cheias e recomecos por partida. Falha se algum nivel
 // ficar abaixo do piso do guloso (82%; 78% no 2048), sair da faixa do casual (PAREDE ou
 // FACIL), cair mais que QUEDA_MAX em relacao ao anterior (QUEDA) ou passar do
-// ritmo (LENTO).
-// Uso: node tools/simular.mjs [mundo...]
-import { MUNDOS, POR_MUNDO } from '../src/jogo/fases.js';
+// ritmo (LENTO). Na mesa justa, falha tambem se o acaso passar o nivel 5 (ACASO)
+// ou o distraido fechar o mundo (DISTRAIDO) em partidas demais.
+// Uso: node tools/simular.mjs [mundo...] [--mesa=hoje|justa]  (sem --mesa, as duas;
+// o mundo 6 e o primeiro do mundo sem fim, so com a mesa justa de fabrica)
+import { MUNDOS, POR_MUNDO, mundoDef } from '../src/jogo/fases.js';
 import { normalizarRegras } from '../src/jogo/regras.js';
-import { medirMundo, problemas } from './medir.mjs';
+import { medirMundo, problemas, problemasMundo } from './medir.mjs';
 
-const so = process.argv.slice(2).map(Number).filter(Boolean);
+const args = process.argv.slice(2);
+const so = args.map(Number).filter(Boolean);
+const mesa = (args.find((a) => a.startsWith('--mesa=')) || '').slice(7);
+const perfis = mesa ? ['mesa-' + mesa] : ['mesa-hoje', 'mesa-justa'];
+const mundos = so.length ? so : MUNDOS.map((d) => d.id);
 const p = (x, n) => String(x).padStart(n);
 let ok = true;
-for (const def of MUNDOS) {
-  if (so.length && !so.includes(def.id)) continue;
-  const mm = medirMundo(def.id);
-  process.stdout.write(`\nmundo ${def.id} (${def.novidades.map((x) => x.tipo).join(', ')}): o casual completa ${Math.round(mm.completou * 100)}% em ${mm.jogadasCasual} jogadas (mediana); o guloso, sem recomecar, ${Math.round(mm.gulosoLimpo * 100)}% em ${mm.jogadasGuloso}\n`);
+for (const perfil of perfis) for (const m of mundos) {
+  if (m > MUNDOS.length && perfil !== perfis[0]) continue; // o mundo sem fim e igual nos dois perfis
+  const def = mundoDef(m);
+  const mm = medirMundo(m, undefined, undefined, perfil);
+  const notaM = problemasMundo(mm);
+  if (notaM.length) ok = false;
+  const novas = def.novidades.map((x) => x.tipo).join(', ') || 'sem fim';
+  process.stdout.write(`\n${perfil} · mundo ${m} (${novas}): o casual completa ${Math.round(mm.completou * 100)}% em ${mm.jogadasCasual} jogadas (mediana), com ${mm.cheias.toFixed(2)} mesas cheias; o guloso, sem recomecar, ${Math.round(mm.gulosoLimpo * 100)}% em ${mm.jogadasGuloso}\n`);
+  process.stdout.write(`sem recomecar: o acaso passa o nivel 5 em ${mm.acaso}%, o distraido fecha o mundo em ${mm.distraido}%   ${notaM.join(' ')}\n`);
   process.stdout.write(`fase nivel valor  guloso  casual alvo  jogadas  desc/${String(normalizarRegras(def.regras).descarteMax).padEnd(2)} cheias recomecos   nota\n`);
   let ant = null;
   for (const nv of mm.niveis) {

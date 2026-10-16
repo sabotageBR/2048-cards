@@ -51,3 +51,19 @@ test('especiais respeitam o espacamento minimo', () => {
   assert.ok(tipos.includes('coringa'));
 });
 
+
+test('piedade das jogadas secas: o nivel troca o gatilho (secas 0 desliga; sem jogada legal continua)', () => {
+  // topos 8 e uma carta 2 na frente (cabe, mas nao funde): com 2 secas a piedade so da 8
+  const f = fase({ regras: { colunas: 3 }, inicio: [[8], [8], [8]], baralho: { total: Infinity, dinamico: false, pesos: { 2: 5, 8: 1 } } });
+  const base = criarPartida({}, f, 3);
+  const secas = { ...base, secas: 2, fila: [{ id: 900, tipo: 'normal', v: 2 }] };
+  const cartas = (e, n = 30) => { const r = []; for (let i = 0; i < n; i++) { const x = sortear(e); e = x.estado; r.push(x.carta.v); } return r; };
+  assert.ok(cartas(secas).every((v) => v === 8), 'com 2 secas, so cartas que fundem');
+  const desligada = { ...secas, baralho: { ...secas.baralho, secas: 0 } };
+  assert.ok(cartas(desligada).some((v) => v === 2), 'secas 0: o gatilho das secas nao liga');
+  const tres = { ...secas, baralho: { ...secas.baralho, secas: 3 } };
+  assert.ok(cartas(tres).some((v) => v === 2), 'secas 3: duas secas ainda nao ligam');
+  // sem jogada legal a piedade continua, mesmo com o gatilho desligado
+  const presa = { ...desligada, fila: [{ id: 901, tipo: 'normal', v: 64 }] };
+  assert.ok(cartas(presa).every((v) => v === 8));
+});
