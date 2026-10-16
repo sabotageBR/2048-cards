@@ -310,3 +310,13 @@ O usuário pediu para analisar os testes no painel da Poki e ver "como vamos sub
 - Os mundos 4 e 5 abrem como antes: a novidade deles é uma regra, e a abertura nova deixava o 2048 do mundo 4 fácil demais na mesa de hoje.
 
 **Fica para o usuário:** aprovar a missão na mesa pela folha `docs/escada/missao-na-mesa.png` (A no painel ou B no vão dos botões). Até lá ela só liga com `?visual=missao|missaob`, e o jogo segue com o aviso "Mission done!". Depois, enviar a 0.5.0 e pedir dois Player Fit Tests. Metas: média ≥ 5:00; 3 min ≥ 40%, 7 min ≥ 22%, 10 min ≥ 15%; toque no desktop ≥ 80% no braço vencedor; perda nas fases 9 e 17 ≤ 12%; no braço justo, `tempo/3/min` não abaixo do de hoje.
+
+## 2026-10-16 · sons que irritavam (ainda na 0.5.0)
+
+Pedidos do usuário, jogando a 0.5.0: "a musiquinha quando conquista um número acima... e um barulho de esvaziamento dos pontos estão muito irritantes"; "o barulho do aterrissar da carta também me incomoda".
+
+**O que mudou (`src/core/audio.js`):**
+- **Subida de nível:** a fanfarra de 4 notas (triângulo com quadrada embaixo, 6 pipocos de confete e um sopro 1,3 s depois) virou `subida(nivel)`, um sino curto e baixo de uma nota só, sem melodia, que sobe um grau da escala a cada nível do mundo (8 dB mais baixo no pico).
+- **Limpeza da subida:** as cartas pequenas que saem da mesa não tocam mais o trilo de bipes agudos (um por carta, 70 ms um do outro); fica só o brilho visual.
+- **Pouso da carta:** o chiado de ruído virou um toque grave e abafado, 8 dB mais baixo no pico.
+- O fim do mundo (o 2048) mantém a fanfarra de 5 notas, sem o sopro do fim.

@@ -587,7 +587,6 @@ function atualizar(dt) {
       case 'pouso': audio.pouso(); break;
       case 'fusao': audio.fusao(Math.max(1, (J.e ? J.e.combo : 1) - 1) + e.degrau); if (e.degrau === 1) vibrar(12); break;
       case 'completar': audio.completar(); audio.critico(); vibrar([20, 40, 30]); break;
-      case 'graduar': audio.graduar(); break;
       case 'explodir': audio.explodir(); break;
       default: break;
     }
@@ -598,7 +597,7 @@ function atualizar(dt) {
     if (t >= 0 && !J.festa.disparada) {
       J.festa.disparada = true;
       cena.festejar(J.festa.fx, J.festa.fy, J.festa.valor);
-      if (J.estado === 'jogando') { audio.yes(false); vibrar([18, 50, 24]); }
+      if (J.estado === 'jogando') { audio.subida(Math.log2(J.festa.valor) - 3); vibrar([18, 50, 24]); }
     }
     if (t >= Tr.FESTA_FIM) J.festa = null;
   }
@@ -634,7 +633,7 @@ function atualizar(dt) {
     if (t >= 0 && !J.trans.festa) {
       J.trans.festa = true;
       cena.festejar(J.trans.fx, J.trans.fy, 2048);
-      audio.yes(true);
+      audio.yes();
     }
     if (!J.trans.trocou && t >= Tr.TROCA[J.trans.tipo]) trocar();
     if (J.trans && t >= Tr.FIM[J.trans.tipo] + 0.4) J.trans = null;

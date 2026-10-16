@@ -134,8 +134,8 @@ export function criarAudio() {
       if (ctx && ctx.state === 'suspended' && !abaOculta) ctx.resume().catch(() => {});
       aplicarGanho();
     },
-    /** carta pousa na coluna */
-    pouso() { ruido(0.07, 900, 1, 0.3); tom(220, 0.08, 'sine', 0.12, 120); },
+    /** carta pousa na coluna: um toque grave e abafado (toca a cada jogada, entao fica baixo) */
+    pouso() { ruido(0.035, 1200, 0.7, 0.05, 0, 'lowpass', 300); tom(170, 0.07, 'sine', 0.06, 110); },
     /** fusao: a nota sobe sem fim com o combo (k) e um brilho a partir do 3o */
     fusao(k = 1) {
       ruido(0.03, 3200, 4, 0.2);
@@ -152,19 +152,25 @@ export function criarAudio() {
     recusa() { tom(140, 0.14, 'square', 0.05, 90); ruido(0.08, 300, 1, 0.2); },
     descartar() { ruido(0.22, 1400, 0.8, 0.25, 0, 'bandpass', 300); },
     explodir() { ruido(0.3, 500, 0.5, 0.6, 0, 'lowpass', 80); tom(90, 0.25, 'sine', 0.25, 40); },
-    /** carta pequena saindo da mesa na subida de nivel: brilho curto que sobe */
-    graduar() { tom(1318, 0.12, 'sine', 0.05, 1760); },
     febre() { tom(300, 0.6, 'sawtooth', 0.04, 1200); ruido(0.6, 800, 0.5, 0.1, 0, 'bandpass', 4000); [784, 988, 1175, 1568].forEach((f, i) => tom(f, 0.2, 'triangle', 0.08, 0, 0.3 + i * 0.07)); },
     /** perigo na mesa justa (coluna quase cheia, ou o fio): duas batidas graves, como um coracao */
     alerta() { tom(75, 0.12, 'sine', 0.2, 55); tom(75, 0.12, 'sine', 0.16, 55, 0.2); },
     /** fim de partida (mesa cheia), curto e sem drama */
     fim() { [392, 330, 262].forEach((f, i) => tom(f, 0.22, 'triangle', 0.07, 0, i * 0.12)); },
-    /** Fanfarra do "YES!" (mais longa no fim de mundo) com pipocos de confete. */
-    yes(mundo = false) {
-      const notas = mundo ? [523, 659, 784, 1046, 1318] : [523, 659, 784, 1046];
-      notas.forEach((f, i) => { tom(f, 0.26, 'triangle', 0.13, 0, i * 0.075); tom(f / 2, 0.2, 'square', 0.03, 0, i * 0.075); });
+    /**
+     * Subida de nivel (1..8 no mundo): um sino curto e baixo, sem melodia, que
+     * sobe um grau da escala a cada nivel. Toca a cada minuto: nada de fanfarra.
+     */
+    subida(nivel = 1) {
+      const g = Math.max(0, Math.floor(nivel) - 1);
+      const f = 523.25 * Math.pow(2, ESCALA_MAIOR[g % 7] / 12 + Math.floor(g / 7));
+      tom(f, 0.55, 'sine', 0.06);
+      tom(f * 2, 0.3, 'sine', 0.015);
+    },
+    /** Fanfarra do fim de mundo (o 2048) com pipocos de confete. */
+    yes() {
+      [523, 659, 784, 1046, 1318].forEach((f, i) => { tom(f, 0.26, 'triangle', 0.13, 0, i * 0.075); tom(f / 2, 0.2, 'square', 0.03, 0, i * 0.075); });
       for (let k = 0; k < 6; k++) ruido(0.05, 2500 + k * 300, 1.2, 0.25, 0.12 + k * 0.05);
-      ruido(0.3, 600, 0.6, 0.15, 1.3, 'bandpass', 3000);
     },
     tique() { tom(900, 0.05, 'triangle', 0.08, 1200); },
     /** o 2048 saindo da mesa: baque grave e brilho */
