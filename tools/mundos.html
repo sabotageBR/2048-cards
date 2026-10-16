@@ -28,6 +28,7 @@
 //   ?folha=regras    o proibido, o contador do descarte e o video de esvaziar
 //   ?folha=explosoes a explosao de cada mundo (fusao, 2048 e a festa da subida), quadros deterministicos
 //   ?folha=festa     a subida de nivel sem pausa: o "16!" piscando enquanto o jogador joga (prints do jogo)
+//   ?folha=desktop   opcoes de desktop em teste: a mao de hoje, a seta do mouse e as teclas (prints do jogo)
 import { TEMAS } from '../src/render/temas/index.js';
 import { definirRotulos } from '../src/render/temas/kit.js';
 import { desenharCarta, definirTema, limparCache } from '../src/render/cartas.js';
@@ -118,6 +119,32 @@ if (folha === 'retrato') {
   g.appendChild(fig(`${P}festa-2.png`, '2. "16!" entra', 'Clarão suave, o valor feito entra piscando e a explosão da Floresta (folhas, pétalas e pólen) sai do meio da mesa.'));
   g.appendChild(fig(`${P}festa-3.png`, '3. Festa cheia', 'Confete nas cores do mundo. O painel já diz "Faça um 32"; a fila continua livre.'));
   g.appendChild(fig(`${P}festa-4.png`, '4. Jogando por baixo', 'O jogador já soltou a carta seguinte na coluna vazia enquanto o "16!" sobe e some.'));
+  pronto();
+} else if (folha === 'desktop') {
+  $('titulo').textContent = 'Desktop: a seta do mouse e as teclas no lugar da mão';
+  $('sub').textContent = 'O gesto guiado da abertura do nível 1, congelado em três momentos (clica, arrasta, solta). Na 0.4.2, 21% de quem jogou no computador nunca clicou e 30% não fez o 16. Nenhum texto: só o desenho. As opções B a D aparecem só no computador; no celular fica a mão.';
+  $('sub').style.maxWidth = '1880px';
+  const g = $('grade'); g.style.gridTemplateColumns = 'repeat(3, 620px)';
+  const linha = (titulo, texto) => {
+    const h = document.createElement('div');
+    h.style.gridColumn = '1 / -1'; h.style.marginTop = '8px';
+    h.innerHTML = `<b style="font-size:24px">${titulo}</b><span style="color:#cfc6da;font-size:15.5px;margin-left:12px">${texto}</span>`;
+    g.appendChild(h);
+  };
+  const fases = ['Clica', 'Arrasta', 'Solta'];
+  const OPCOES = [
+    ['a', 'A · Hoje: a mão', 'O dedo aperta a carta da fila e a leva até a coluna. No computador ela lembra toque, não mouse.', ['O dedo aperta a carta da frente.', 'A carta vai junto, meio transparente.', 'Solta na coluna e some.']],
+    ['b', 'B · A seta do mouse', 'O mesmo gesto com a seta: um anel no clique, a seta arrasta a carta e outro anel ao soltar.', ['O anel do clique sai da ponta da seta.', 'A seta leva a carta.', 'O anel de novo, na coluna.']],
+    ['c', 'C · A seta e as teclas no gesto', 'Junto com o gesto, as teclas 1 a 4 aparecem no pé das colunas e o espaço sob o descarte; a da coluna certa fica dourada e afunda quando a carta cai.', ['As teclas entram com o gesto; a 3 já está acesa.', 'A seta leva a carta.', 'A tecla 3 afunda quando a carta cai.']],
+  ];
+  for (const [id, titulo, texto, legendas] of OPCOES) {
+    linha(titulo, texto);
+    fases.forEach((f, i) => g.appendChild(fig(`${P}desktop-${id}-${i + 1}.png`, `${i + 1}. ${f}`, legendas[i], 620)));
+  }
+  linha('D · A seta e as teclas sempre na mesa', 'As teclas ficam no pé das colunas o tempo todo, discretas; no gesto, a da coluna certa acende como na C.');
+  g.appendChild(fig(`${P}desktop-d-mesa1.png`, 'Jogando, Floresta', 'Sem gesto: as teclas ficam meio apagadas; a pilha cheia cobre a sua tecla.', 620));
+  g.appendChild(fig(`${P}desktop-d-mesa2.png`, 'Jogando, Cosmos (3 colunas)', 'As teclas acompanham o número de colunas e a mesa do mundo.', 620));
+  g.appendChild(fig(`${P}desktop-d-3.png`, 'No gesto', 'A tecla 3 acende e afunda quando a carta cai.', 620));
   pronto();
 } else if (folha === 'explosoes') {
   await document.fonts.load('700 20px Fredoka');

@@ -4,6 +4,9 @@
 // do nivel com o contador "n/N", a fila e o sinal de proibido (no topo que ja
 // recebeu um especial, com coringa, dobro ou x4 na mao; na coluna ilegal sob
 // o arrasto; na jogada recusada). Nao tem estado proprio.
+// Opcoes de desktop em teste (?visual=cursor,teclas,teclasfixas): a seta do
+// mouse no lugar da mao e as teclas 1..N sob as colunas, com o espaco sob o
+// descarte.
 import { desenharCarta } from './cartas.js';
 import { TINTA, FONTE, rr, texto, proibido } from './desenho.js';
 import { respeitaMarca } from '../jogo/regras.js';
@@ -46,7 +49,7 @@ function contador(ctx, d, rotulo, cheio) {
  * @param {CanvasRenderingContext2D} ctx
  * @param {any} estado
  * @param {any} L layout
- * @param {{ pal: any, mesa: any, agora: number, t?: number, dpr?: number, linha?: any, arrasto?: any, destaque?: number, legal?: boolean, semFila?: boolean, febre?: number, alvo?: string, textos?: any }} op
+ * @param {{ pal: any, mesa: any, agora: number, t?: number, dpr?: number, linha?: any, arrasto?: any, destaque?: number, legal?: boolean, semFila?: boolean, febre?: number, alvo?: string, textos?: any, teclas?: any }} op
  */
 export function desenharMesa(ctx, estado, L, op) {
   const { pal, agora } = op;
@@ -87,6 +90,9 @@ export function desenharMesa(ctx, estado, L, op) {
       ctx.restore();
     }
   }
+
+  // teclas do desktop (opcao em teste): sob as cartas, para a pilha cheia cobrir a tecla
+  if (op.teclas) desenharTeclas(ctx, L, op.teclas);
 
   const fantasmas = linha ? linha.fantasmas(agora) : [];
   const fantasma = (g) => desenharCarta(ctx, g.carta, { x: g.x, y: g.y, w: g.w, h: g.h, dpr, t, esc: g.esc, alpha: g.alpha, rot: g.rot });
@@ -217,23 +223,65 @@ function mao(ctx, x, y, esc, cor, alpha = 1) {
   ctx.restore();
 }
 
-/** Mao animada apontando para uma coluna (ou para a fila). */
-export function desenharMao(ctx, x, y, t, cor = '#ffffff') {
+/** Seta do mouse com a ponta em (x, y). */
+function cursor(ctx, x, y, esc, alpha = 1) {
+  ctx.save();
+  if (alpha < 1) ctx.globalAlpha = Math.max(0, alpha);
+  ctx.translate(x, y);
+  ctx.scale(esc, esc);
+  ctx.lineWidth = 2.5; ctx.strokeStyle = '#1f1a2e'; ctx.fillStyle = '#ffffff'; ctx.lineJoin = 'round';
+  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0); ctx.lineTo(0, 28); ctx.lineTo(7, 21.5); ctx.lineTo(11.5, 32); ctx.lineTo(16.5, 29.8); ctx.lineTo(12, 19.5); ctx.lineTo(21, 19.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Clique do mouse: um anel que abre a partir da ponta (k de 0 a 1). */
+function clique(ctx, x, y, k, esc, alpha = 1) {
+  if (k <= 0 || k >= 1) return;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, alpha * (1 - k));
+  // contorno escuro sob o anel branco: aparece na carta clara e na mesa escura
+  ctx.beginPath(); ctx.arc(x, y, (5 + 20 * k) * esc, 0, Math.PI * 2);
+  ctx.lineWidth = 5.5 * esc; ctx.strokeStyle = 'rgba(31,26,46,0.7)'; ctx.stroke();
+  ctx.lineWidth = 2.5 * esc; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+  ctx.restore();
+}
+
+/** Mao animada apontando para uma coluna (ou para a fila); com `cursor`, a seta chega e clica. */
+export function desenharMao(ctx, x, y, t, cor = '#ffffff', op = {}) {
+  if (op.cursor) {
+    const esc = op.esc || 1;
+    const u = (t % CICLO_GUIA) / CICLO_GUIA;
+    const vem = Math.min(1, u / 0.35), e = 1 - (1 - vem) * (1 - vem);
+    const k = (u - 0.4) / 0.4;
+    clique(ctx, x, y, k, esc);
+    cursor(ctx, x + 34 * esc * (1 - e), y + 26 * esc * (1 - e), esc * (k > 0 && k < 0.3 ? 0.9 : 1));
+    return;
+  }
   const bate = Math.abs(Math.sin(t * 4));
   mao(ctx, x, y + 10 - bate * 14, 1 - bate * 0.12, cor);
 }
 
 /** Duracao (s) de uma volta do gesto guiado. */
-const CICLO_GUIA = 1.8;
+export const CICLO_GUIA = 1.8;
+
+/** Fase u (0..1) do gesto guiado no instante t (s). */
+export const faseGuia = (t) => (((t % CICLO_GUIA) + CICLO_GUIA) % CICLO_GUIA) / CICLO_GUIA;
 
 /**
  * Gesto guiado: a mao aperta a carta da frente da fila e a arrasta ate a
- * coluna certa, em loop (ensina o arrasto, nao so o destino).
+ * coluna certa, em loop (ensina o arrasto, nao so o destino). Com `cursor`,
+ * a seta do mouse clica (anel), arrasta e solta (anel na coluna).
  * g = { x, y, de: { x, y }, carta, w, h }: centro do destino, centro da
  * carta na fila, a carta e o tamanho dela.
  */
-export function desenharGuia(ctx, g, t, dpr) {
-  const u = (t % CICLO_GUIA) / CICLO_GUIA;
+export function desenharGuia(ctx, g, t, dpr, op = {}) {
+  const u = faseGuia(t);
   const aperta = Math.min(1, u / 0.12);
   const anda = Math.max(0, Math.min(1, (u - 0.15) / 0.5));
   const e = anda < 0.5 ? 2 * anda * anda : 1 - Math.pow(2 - 2 * anda, 2) / 2;
@@ -246,7 +294,63 @@ export function desenharGuia(ctx, g, t, dpr) {
     desenharCarta(ctx, g.carta, { x: x - w / 2, y: y - h / 2, w, h, dpr, t, alpha: 0.75 * (1 - some) });
     ctx.restore();
   }
+  if (op.cursor) {
+    // a ponta da seta um pouco abaixo do meio da carta; o botao fica apertado do clique ate soltar
+    const esc = op.esc || 1;
+    const solto = Math.max(0, Math.min(1, (u - 0.68) / 0.12));
+    const dy = g.h * 0.1;
+    clique(ctx, g.de.x, g.de.y + dy, u / 0.22, esc);
+    clique(ctx, g.x, g.y + dy, (u - 0.66) / 0.24, esc, 1 - some);
+    cursor(ctx, x, y + dy, esc * (1 - 0.1 * aperta * (1 - solto)), 1 - some);
+    return;
+  }
   // a ponta do dedo um pouco abaixo do meio da carta; aperta no comeco e solta no fim
   const esc = 1 - 0.12 * aperta * (1 - Math.max(0, (u - 0.68) / 0.12));
   mao(ctx, x - 2 * esc, y + g.h * 0.12 + 32 * esc, esc, '#ffffff', 1 - some);
+}
+
+/**
+ * Tecla desenhada com o centro da tampa em (x, y): a lateral escura embaixo e
+ * a tampa clara por cima; `aperta` (0..1) afunda a tampa, `acesa` a pinta de
+ * dourado. Sem rotulo e com `espaco`, o sinal da barra de espaco.
+ */
+function tecla(ctx, x, y, w, h, rotulo, op) {
+  const fundo = Math.round(h * 0.16);
+  const desce = fundo * (op.aperta || 0);
+  const r = h * 0.24;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, op.alpha ?? 1));
+  ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+  rr(ctx, x - w / 2, y - h / 2 + fundo, w, h, r); ctx.fillStyle = '#1f1a2e'; ctx.fill();
+  ctx.shadowColor = 'transparent';
+  rr(ctx, x - w / 2, y - h / 2 + desce, w, h, r); ctx.fillStyle = op.acesa ? '#ffe27a' : '#f4efe6'; ctx.fill();
+  ctx.lineWidth = 2; ctx.strokeStyle = '#1f1a2e'; ctx.stroke();
+  if (rotulo) texto(ctx, rotulo, x, y + desce + 1, h * 0.58, TINTA);
+  else {
+    // o sinal da barra de espaco: um colchete deitado
+    const a = Math.min(w * 0.3, h * 0.7), b = h * 0.16, yy = y + desce + h * 0.08;
+    ctx.beginPath(); ctx.moveTo(x - a, yy - b); ctx.lineTo(x - a, yy + b); ctx.lineTo(x + a, yy + b); ctx.lineTo(x + a, yy - b);
+    ctx.lineWidth = Math.max(2, h * 0.09); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = TINTA; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Teclas do desktop (opcao em teste): 1..N no pe de cada coluna e o espaco
+ * sob o descarte. op = { alpha, alvo: coluna | 'desc' | -1, aperta: 0..1 }:
+ * a tecla do alvo acende e afunda junto com o gesto guiado.
+ */
+export function desenharTeclas(ctx, L, op) {
+  const h = Math.round(Math.max(24, Math.min(42, L.cw * 0.36)));
+  for (let c = 0; c < L.colunas; c++) {
+    const a = L.coluna(c);
+    const alvo = op.alvo === c;
+    tecla(ctx, a.x + a.w / 2, a.y + a.h - h * 0.75, h, h, String(c + 1), { alpha: alvo ? 1 : op.alpha, aperta: alvo ? op.aperta : 0, acesa: alvo });
+  }
+  const d = L.descarte;
+  const alvo = op.alvo === 'desc';
+  const w = Math.min(d.w * 0.9, h * 3.2);
+  let y = d.y + d.h + L.gap * 0.9 + h * 0.5;
+  if (y + h > L.mesa.y + L.mesa.h) y = d.y - L.gap * 0.9 - h * 0.6;
+  tecla(ctx, d.x + d.w / 2, y, w, h, '', { alpha: alvo ? 1 : op.alpha, aperta: alvo ? op.aperta : 0, acesa: alvo });
 }

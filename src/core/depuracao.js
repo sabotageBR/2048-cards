@@ -10,7 +10,10 @@
 //   ?vitrine         mesa de demonstracao (todos os valores e os especiais)
 //   ?semhud          esconde o HUD (thumb)
 //   ?menu            abre o menu ao carregar
-//   ?visual=descarte,escada   opcoes de visual em teste (prints para o usuario escolher)
+//   ?visual=descarte,escada   opcoes de visual em teste (prints para o usuario escolher);
+//                    no desktop: cursor (a seta do mouse no lugar da mao), teclas (1..N e o
+//                    espaco junto do gesto guiado) e teclasfixas (sempre na mesa)
+//   ?guia=0.7        congela o gesto guiado nessa fase (0..1: clica, arrasta, solta), para os prints
 //   ?semanim         sem animacao CSS (prints: no headless a animacao de entrada congela no comeco)
 //
 // Fora disso, so o banco de testes de tools/sdkcheck.html liga os ganchos
@@ -20,7 +23,7 @@
 export function lerDepuracao() {
   const base = {
     local: false, ganchos: false, nivel: 0, auto: 0, fixo: false, semAnuncio: false, lang: '',
-    regras: null, semHud: false, menu: false, gesto: '', vitrine: false, visual: '', semAnim: false,
+    regras: null, semHud: false, menu: false, gesto: '', vitrine: false, visual: '', semAnim: false, guia: -1,
   };
   let local = false;
   try {
@@ -52,5 +55,6 @@ export function lerDepuracao() {
     vitrine: q.has('vitrine'),
     visual: q.get('visual') || '',
     semAnim: q.has('semanim'),
+    guia: q.has('guia') ? Math.max(0, Math.min(0.999, Number(q.get('guia')) || 0)) : -1,
   });
 }

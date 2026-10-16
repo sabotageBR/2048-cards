@@ -599,7 +599,7 @@ function maoNaTela() {
   const col = J.e.colunas[a.c], k = a.k || 0;
   if (!col || !J.e.fila[k]) return null;
   const p = L.carta(a.c, Math.min(col.length, L.pilhaMax - 1)), f = L.filaPos(k);
-  return { x: p.x + p.w / 2, y: p.y + p.h / 2, de: { x: f.x + f.w / 2, y: f.y + f.h / 2 }, carta: J.e.fila[k], w: f.w, h: f.h };
+  return { x: p.x + p.w / 2, y: p.y + p.h / 2, de: { x: f.x + f.w / 2, y: f.y + f.h / 2 }, carta: J.e.fila[k], w: f.w, h: f.h, c: a.c };
 }
 
 function quadro() {
@@ -877,10 +877,15 @@ poki.init().then(() => {
 audio.definirMudo(!!save.mudo);
 cena.definirTextos(T);
 if (dep.semAnim) document.body.classList.add('sem-animacao');
-// opcoes de visual em teste (so local): ?visual=descarte,escada
-if (dep.visual) {
+// opcoes de visual em teste (so local): ?visual=descarte,escada,cursor,teclas,teclasfixas; ?guia=0..1
+if (dep.visual || dep.guia >= 0) {
   const v = dep.visual.split(',');
-  cena.definirVisual({ descarteFila: v.includes('descarte') });
+  cena.definirVisual({
+    descarteFila: v.includes('descarte'),
+    cursor: v.includes('cursor'),
+    teclas: v.includes('teclasfixas') ? 'fixas' : v.includes('teclas') ? 'guia' : '',
+    guiaU: dep.guia,
+  });
   hud.mostrarEscada(v.includes('escada'));
 }
 aplicarVisual();
