@@ -143,11 +143,8 @@ export function criarAudio() {
       for (const [f, p] of nota) if (p > 0.02) tom(f, 0.28, 'sine', 0.085 * p, 0, 0.005);
       if (k >= 3) tom(nota[4][0], 0.14, 'triangle', 0.035 * Math.min(1, (k - 2) / 6), 0, 0.03);
     },
-    /** monte completo (2048) */
-    completar() {
-      [523, 659, 784, 1046, 1318].forEach((f, i) => { tom(f, 0.3, 'triangle', 0.11, 0, i * 0.06); tom(f / 2, 0.22, 'square', 0.025, 0, i * 0.06); });
-      ruido(0.4, 5000, 0.8, 0.12, 0.2, 'highpass');
-    },
+    /** premio (video, missao, bau): um "ding" de uma nota, com a quinta baixinha por cima */
+    completar() { tom(1046.5, 0.45, 'sine', 0.06); tom(1568, 0.3, 'sine', 0.015, 0, 0.01); },
     /** jogada recusada */
     recusa() { tom(140, 0.14, 'square', 0.05, 90); ruido(0.08, 300, 1, 0.2); },
     descartar() { ruido(0.22, 1400, 0.8, 0.25, 0, 'bandpass', 300); },
@@ -167,13 +164,13 @@ export function criarAudio() {
       tom(f, 0.55, 'sine', 0.06);
       tom(f * 2, 0.3, 'sine', 0.015);
     },
-    /** Fanfarra do fim de mundo (o 2048) com pipocos de confete. */
-    yes() {
-      [523, 659, 784, 1046, 1318].forEach((f, i) => { tom(f, 0.26, 'triangle', 0.13, 0, i * 0.075); tom(f / 2, 0.2, 'square', 0.03, 0, i * 0.075); });
-      for (let k = 0; k < 6; k++) ruido(0.05, 2500 + k * 300, 1.2, 0.25, 0.12 + k * 0.05);
+    /** Fim do mundo (o "2048!"): um acorde de sino, as notas juntas e sem melodia, que se apaga devagar. */
+    mundo() {
+      [[523.25, 0.04], [659.25, 0.03], [784, 0.03], [1046.5, 0.025]].forEach(([f, v]) => tom(f, 1.3, 'sine', v));
+      tom(2093, 0.5, 'sine', 0.008);
     },
     tique() { tom(900, 0.05, 'triangle', 0.08, 1200); },
-    /** o 2048 saindo da mesa: baque grave e brilho */
-    critico() { ruido(0.35, 600, 0.6, 0.55, 0, 'lowpass', 90); tom(110, 0.3, 'sawtooth', 0.08, 45); [1046, 1318, 1568].forEach((f, i) => tom(f, 0.18, 'triangle', 0.06, 0, 0.05 + i * 0.05)); },
+    /** o 2048 saindo da mesa: um baque grave e macio (o acorde do mundo vem logo depois) */
+    critico() { tom(120, 0.35, 'sine', 0.14, 50); ruido(0.12, 400, 0.6, 0.06, 0, 'lowpass', 120); },
   };
 }

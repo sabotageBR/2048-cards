@@ -319,4 +319,5 @@ Pedidos do usuário, jogando a 0.5.0: "a musiquinha quando conquista um número 
 - **Subida de nível:** a fanfarra de 4 notas (triângulo com quadrada embaixo, 6 pipocos de confete e um sopro 1,3 s depois) virou `subida(nivel)`, um sino curto e baixo de uma nota só, sem melodia, que sobe um grau da escala a cada nível do mundo (8 dB mais baixo no pico).
 - **Limpeza da subida:** as cartas pequenas que saem da mesa não tocam mais o trilo de bipes agudos (um por carta, 70 ms um do outro); fica só o brilho visual.
 - **Pouso da carta:** o chiado de ruído virou um toque grave e abafado, 8 dB mais baixo no pico.
-- O fim do mundo (o 2048) mantém a fanfarra de 5 notas, sem o sopro do fim.
+- **Fim do mundo** (depois de ouvir os WAVs: "esse barulho do mundo depois me incomoda, mude"): tocavam três sons empilhados, o `completar()` e o `critico()` quando o 2048 sai da mesa (arpejo com zumbido, chiado, estrondo e serrote) e a fanfarra meio segundo depois. Agora é um baque grave e macio quando o 2048 sai e, meio segundo depois, `audio.mundo()`: um acorde de sino com as notas juntas, sem melodia, que se apaga em ~1,3 s (7 dB mais baixo na média).
+- **Prêmio** (vídeo, missão cumprida, baú): o `completar()` virou um "ding" de uma nota, 12 dB mais baixo.

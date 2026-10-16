@@ -586,7 +586,7 @@ function atualizar(dt) {
     switch (e.tipo) {
       case 'pouso': audio.pouso(); break;
       case 'fusao': audio.fusao(Math.max(1, (J.e ? J.e.combo : 1) - 1) + e.degrau); if (e.degrau === 1) vibrar(12); break;
-      case 'completar': audio.completar(); audio.critico(); vibrar([20, 40, 30]); break;
+      case 'completar': audio.critico(); vibrar([20, 40, 30]); break;
       case 'explodir': audio.explodir(); break;
       default: break;
     }
@@ -633,7 +633,7 @@ function atualizar(dt) {
     if (t >= 0 && !J.trans.festa) {
       J.trans.festa = true;
       cena.festejar(J.trans.fx, J.trans.fy, 2048);
-      audio.yes();
+      audio.mundo();
     }
     if (!J.trans.trocou && t >= Tr.TROCA[J.trans.tipo]) trocar();
     if (J.trans && t >= Tr.FIM[J.trans.tipo] + 0.4) J.trans = null;
