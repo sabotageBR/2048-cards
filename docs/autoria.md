@@ -311,7 +311,7 @@ O usuário pediu para analisar os testes no painel da Poki e ver "como vamos sub
 
 **Fica para o usuário:** aprovar a missão na mesa pela folha `docs/escada/missao-na-mesa.png` (A no painel ou B no vão dos botões). Até lá ela só liga com `?visual=missao|missaob`, e o jogo segue com o aviso "Mission done!". Depois, enviar a 0.5.0 e pedir dois Player Fit Tests. Metas: média ≥ 5:00; 3 min ≥ 40%, 7 min ≥ 22%, 10 min ≥ 15%; toque no desktop ≥ 80% no braço vencedor; perda nas fases 9 e 17 ≤ 12%; no braço justo, `tempo/3/min` não abaixo do de hoje.
 
-## 2026-10-16 · sons que irritavam (ainda na 0.5.0)
+## 2026-10-16 · sons que irritavam (0.5.1)
 
 Pedidos do usuário, jogando a 0.5.0: "a musiquinha quando conquista um número acima... e um barulho de esvaziamento dos pontos estão muito irritantes"; "o barulho do aterrissar da carta também me incomoda".
 
