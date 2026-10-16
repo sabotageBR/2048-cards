@@ -2,26 +2,21 @@
 // O contexto so nasce no primeiro toque (politica de autoplay). O mudo do
 // anuncio zera o ganho mestre ANTES de pedir o anuncio e suspende o contexto
 // 80 ms depois (padrao do hexadrop: o onStart do SDK pode nao chegar).
-// Infra copiada do stringcut; a nota sem fim (tom de Shepard) vem do memecats.
+// Infra copiada do stringcut. Sons que se repetem ficam baixos, curtos e sem
+// melodia (pedido do usuario, 2026-10-16).
 
 const ESCALA_MAIOR = [0, 2, 4, 5, 7, 9, 11];
-/** Oitava mais grave da nota sem fim: 660 / 8, entao a nota 1 tem o centro em 660 Hz. */
-const BASE_SEM_FIM = 82.5;
+const PENTATONICA = [0, 2, 4, 7, 9];
+const DO5 = 523.25;
 
 /**
- * Nota k (1, 2, 3...) da escala sem fim: sete senos em oitavas com volume em
- * sino em torno de 660 Hz. Cada passo sobe um grau; k e k + 7 soam iguais.
- * @returns {[number, number][]} [hz, peso]
+ * Nota da fusao k (1, 2, 3...): sobe um grau da pentatonica de do a cada
+ * degrau da cascata, por duas oitavas, e volta ao comeco (qualquer sequencia
+ * soa afinada com o sino da subida, que e da escala maior de do).
  */
-export function notaSemFim(k) {
-  const g = Math.max(0, Math.floor(k) - 1);
-  const pos = ESCALA_MAIOR[g % 7] / 12;
-  const out = [];
-  for (let i = 0; i < 7; i++) {
-    const oit = i + pos;
-    out.push([BASE_SEM_FIM * Math.pow(2, oit), Math.exp(-((oit - 3) ** 2) / 2)]);
-  }
-  return out;
+export function notaFusao(k) {
+  const g = Math.max(0, Math.floor(k) - 1) % 10;
+  return DO5 * Math.pow(2, (PENTATONICA[g % 5] + 12 * Math.floor(g / 5)) / 12);
 }
 
 export function criarAudio() {
@@ -136,12 +131,16 @@ export function criarAudio() {
     },
     /** carta pousa na coluna: um toque grave e abafado (toca a cada jogada, entao fica baixo) */
     pouso() { ruido(0.035, 1200, 0.7, 0.05, 0, 'lowpass', 300); tom(170, 0.07, 'sine', 0.06, 110); },
-    /** fusao: a nota sobe sem fim com o combo (k) e um brilho a partir do 3o */
+    /**
+     * fusao: uma batida de marimba (a nota redonda e o toque curto da baqueta,
+     * 4 vezes acima), que sobe com o combo (k); a partir do 3o, um eco baixinho
+     * uma oitava acima.
+     */
     fusao(k = 1) {
-      ruido(0.03, 3200, 4, 0.2);
-      const nota = notaSemFim(k);
-      for (const [f, p] of nota) if (p > 0.02) tom(f, 0.28, 'sine', 0.085 * p, 0, 0.005);
-      if (k >= 3) tom(nota[4][0], 0.14, 'triangle', 0.035 * Math.min(1, (k - 2) / 6), 0, 0.03);
+      const f = notaFusao(k);
+      tom(f, 0.34, 'sine', 0.1);
+      tom(f * 4, 0.07, 'sine', 0.014);
+      if (k >= 3) tom(f * 2, 0.22, 'sine', 0.025 * Math.min(1, (k - 2) / 6), 0, 0.05);
     },
     /** premio (video, missao, bau): um "ding" de uma nota, com a quinta baixinha por cima */
     completar() { tom(1046.5, 0.45, 'sine', 0.06); tom(1568, 0.3, 'sine', 0.015, 0, 0.01); },
@@ -160,7 +159,7 @@ export function criarAudio() {
      */
     subida(nivel = 1) {
       const g = Math.max(0, Math.floor(nivel) - 1);
-      const f = 523.25 * Math.pow(2, ESCALA_MAIOR[g % 7] / 12 + Math.floor(g / 7));
+      const f = DO5 * Math.pow(2, ESCALA_MAIOR[g % 7] / 12 + Math.floor(g / 7));
       tom(f, 0.55, 'sine', 0.06);
       tom(f * 2, 0.3, 'sine', 0.015);
     },
