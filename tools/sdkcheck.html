@@ -97,8 +97,8 @@ if (cenario === 'bloqueado' || cenario === 'pendente') {
   conferir(ct().J.estado === 'jogando', 'a segunda chance nao voltou ao jogo');
   conferir(!nomes().includes('rewardedBreak'), 'a segunda chance chamou rewardedBreak');
   const medidas0 = log.filter((l) => l[1] === 'measure').map((l) => l[2]);
-  // teste A/B (0.5.0): a etiqueta do braco vem antes do primeiro level/N/start, e as medidas da mesa cheia levam o braco
-  const braco = (medidas0.find((m) => /^variante\/mesa-/.test(m)) || '').split('/')[1];
+  // teste A/B (0.6.0): a etiqueta do braco vem antes do primeiro level/N/start, e as medidas da mesa cheia levam o braco
+  const braco = (medidas0.find((m) => /^variante\/(hoje|juntar)\//.test(m)) || '').split('/')[1];
   conferir(!!braco, 'measure do braco do teste A/B faltando');
   conferir(medidas0.indexOf('variante/' + braco + '/start') < medidas0.indexOf('level/' + nivel + '/start'), 'a etiqueta do braco veio depois do level/N/start');
   conferir(medidas0.includes(braco + '/' + nivel + '/cheia'), 'measure da mesa cheia faltando');

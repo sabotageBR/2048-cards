@@ -10,9 +10,6 @@ import { faseDe, faseGlobal, POR_MUNDO } from './fases.js';
 
 /** Jogador casual: 1 em 5 jogadas vai para uma coluna qualquer. */
 export const PERFIL_CASUAL = { erro: 0.2 };
-/** Reguas da mesa justa: o distraido joga metade das jogadas ao acaso; o acaso, todas. */
-export const PERFIL_DISTRAIDO = { erro: 0.5 };
-export const PERFIL_ACASO = { erro: 1 };
 
 /** Quanto a mesa esta "boa" (maior e melhor). */
 export function avaliarMesa(e) {
@@ -113,8 +110,9 @@ export function jogarSozinho(fase, regras, semente, op = {}) {
  * Joga um mundo inteiro numa mesa so, como o jogador: o nivel sobe na mesma
  * mesa; na mesa cheia vem o "Continuar" gratis do nivel e, sem ele, o nivel
  * recomeca pelo kit (semente nova). Devolve
- * { completou, jogadas, niveis: [{ jogadas, cheias, recomecos, chegou, passou }] }
- * (`chegou`: comecou o nivel; `passou`: fechou o nivel).
+ * { completou, jogadas, niveis: [{ jogadas, descartes, juntou, cheias, recomecos, chegou, passou }] }
+ * (`chegou`: comecou o nivel; `passou`: fechou o nivel; `juntou`: jogadas de
+ * juntar, no perfil 'juntar').
  * @param {number} mundo 1..5 (ou o mundo sem fim, 6+)
  * @param {number} semente
  * @param {{ erro?: number, maxJogadas?: number, maxRecomecos?: number, nivel?: number, regras?: object, perfil?: string }} [op]
@@ -124,7 +122,7 @@ export function jogarMundo(mundo, semente, op = {}) {
   const max = op.maxJogadas || 3000;
   const maxRec = op.maxRecomecos === undefined ? 8 : op.maxRecomecos;
   const sortear = sorteador(semente);
-  const niveis = Array.from({ length: POR_MUNDO }, () => ({ jogadas: 0, descartes: 0, cheias: 0, recomecos: 0, chegou: false, passou: false }));
+  const niveis = Array.from({ length: POR_MUNDO }, () => ({ jogadas: 0, descartes: 0, juntou: 0, cheias: 0, recomecos: 0, chegou: false, passou: false }));
   const nova = (nivel, tentativa) => criarPartida(op.regras || {}, faseDe(faseGlobal(mundo, nivel), tentativa, op.perfil), (semente + tentativa * 7919) >>> 0);
   let tentativa = 0;
   let e = nova(op.nivel || 1, 0);
@@ -151,6 +149,7 @@ export function jogarMundo(mundo, semente, op = {}) {
     jogadas++;
     nv.jogadas++;
     if (a.tipo === 'descartar') nv.descartes++;
+    if (a.tipo === 'juntar') nv.juntou++;
     if (e.nivel > antes || e.fim === 'venceu') {
       for (let n = antes; n < e.nivel; n++) { niveis[n - 1].passou = true; niveis[n].chegou = true; }
       if (e.fim === 'venceu') niveis[e.nivel - 1].passou = true;

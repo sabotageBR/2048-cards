@@ -6,19 +6,19 @@
 // test/fases.test.js (ver docs/curadoria.md).
 //
 //   { id, regras?, inicio: [[fundo..topo], ...], fila?: [valor | especial, ...], especiais: { tipo: { de, p } },
-//     novidades: [{ tipo, nivel }], faixa?: { div, larg, forma? }, niveis?: { n: { div?, larg?, forma? } },
-//     justa?: { niveis: { n: { div?, larg?, forma?, descarte?, secas? } } }, semente }
+//     novidades: [{ tipo, nivel }], faixa?: { div, larg, forma? }, niveis?: { n: { div?, larg?, forma?, descarte?, secas? } },
+//     porPerfil?: { <perfil>: { niveis: { n: {...} } } }, semente }
 //
 // Fase global N = (mundo - 1) * 8 + nivel: o numero da telemetria e do mapa.
 // Os 5 mundos curados sao as fases 1..40; depois deles vem o mundo sem fim
 // (mundoDef: 6, 7, ...), que recicla os cenarios com todas as regras.
 //
-// Dois perfis de mesa, sorteados no main.js (teste A/B da 0.5.0, depois do
-// Player Fit Test da 0.4.4: jogando ao acaso, 87% chegavam ao nivel 4):
-// 'mesa-hoje' e a mesa da 0.4.4; 'mesa-justa' troca, a partir do nivel 4, os
-// lugares do descarte (`descarte`), o gatilho da piedade (`secas`: jogadas
-// secas seguidas; 0 desliga) e, no mundo 1, o baralho (6 valores). Os niveis
-// 1 a 3 sao iguais nos dois (nenhuma derrota nos primeiros minutos).
+// Dois perfis de regra, sorteados no main.js (teste A/B da 0.6.0, depois do
+// Player Fit Test da 0.5.2: a mesa justa da 0.5.0 empatou com a de hoje):
+// 'hoje' e a regra da 0.5.2; 'juntar' deixa arrastar a carta do topo de uma
+// coluna ate um topo igual em outra (regras.juntar). Os baralhos sao os
+// mesmos: a unica diferenca e o verbo. `porPerfil` guarda um ajuste de
+// niveis por perfil, se a curadoria pedir.
 //
 // `fila`: a abertura roteirizada do mundo (as primeiras cartas da fila, so no
 // nivel 1 e na primeira tentativa). Nos mundos 2 e 3 ela traz a carta nova
@@ -48,10 +48,8 @@ const FORMA = [6, 5, 3.5, 2.2, 1.4, 0.9, 0.5, 0.3];
 
 const sem = (id) => 2048 * 31 + id * 9973;
 
-/** Perfis de mesa do teste A/B (o main.js sorteia um por jogador). */
-export const PERFIS = ['mesa-hoje', 'mesa-justa'];
-/** Baralho do mundo 1 na mesa justa, a partir do nivel 5: 6 valores, quase iguais (um valor pequeno a mais atravanca a mesa). */
-const FORMA_JUSTA_1 = [3, 3, 3, 3, 2.5, 2];
+/** Perfis de regra do teste A/B (o main.js sorteia um por jogador; o controle primeiro). */
+export const PERFIS = ['hoje', 'juntar'];
 
 /** Os 5 mundos, na ordem em que as novidades complicam. */
 export const MUNDOS = [
@@ -62,15 +60,6 @@ export const MUNDOS = [
     id: 1, inicio: [[8, 4], [], [2], []],
     especiais: { coringa: { de: 2, p: 0.05 }, bomba: { de: 4, p: 0.06 } },
     faixa: { div: 4, larg: 5, forma: [4, 4, 3, 2, 1.2] },
-    justa: {
-      niveis: {
-        4: { secas: 0 },
-        5: { larg: 6, forma: FORMA_JUSTA_1, descarte: 2, secas: 3 },
-        6: { larg: 6, forma: FORMA_JUSTA_1, descarte: 2, secas: 3 },
-        7: { larg: 6, forma: FORMA_JUSTA_1, descarte: 2, secas: 0 },
-        8: { larg: 6, forma: FORMA_JUSTA_1, descarte: 2, secas: 0 },
-      },
-    },
     novidades: [{ tipo: 'coringa', nivel: 2 }, { tipo: 'bomba', nivel: 4 }], semente: sem(1),
   },
   // 2: o dobro (dobra o topo e cascateia). O 2048 tem o baralho largo (6 valores).
@@ -79,7 +68,6 @@ export const MUNDOS = [
     id: 2, inicio: [[8, 4], [], [2], []], fila: [2, 'dobro', 4],
     especiais: { coringa: { de: 1, p: 0.04 }, bomba: { de: 1, p: 0.04 }, dobro: { de: 1, p: 0.06 } },
     niveis: { 8: { larg: 6 } },
-    justa: { niveis: { 4: { secas: 0 }, 5: { descarte: 2, secas: 3 }, 6: { descarte: 2, secas: 0 }, 7: { descarte: 2, secas: 0 }, 8: { descarte: 2, secas: 0 } } },
     novidades: [{ tipo: 'dobro', nivel: 1 }], semente: sem(2),
   },
   // 3: a carta x4 (o topo vezes 4, sem passar do 2048, e cascateia). Ela
@@ -90,7 +78,6 @@ export const MUNDOS = [
     id: 3, inicio: [[8, 2], [], [4], []], fila: [4, 'quadruplo', 2],
     especiais: { coringa: { de: 1, p: 0.04 }, bomba: { de: 1, p: 0.04 }, dobro: { de: 1, p: 0.03 }, quadruplo: { de: 1, p: 0.05 } },
     faixa: { div: 8, larg: 6 }, niveis: { 7: { div: 4, larg: 6 }, 8: { div: 4, larg: 7 } },
-    justa: { niveis: { 4: { secas: 0 }, 5: { descarte: 2, secas: 3 }, 6: { descarte: 2, secas: 0 }, 7: { descarte: 2, secas: 3 }, 8: { descarte: 2, secas: 0 } } },
     novidades: [{ tipo: 'quadruplo', nivel: 1 }], semente: sem(3),
   },
   // 4: o descarte aperta (2 lugares por nivel), com todos os especiais. O
@@ -99,7 +86,6 @@ export const MUNDOS = [
     id: 4, regras: { descarteMax: 2 }, inicio: [[8], [], [4], []],
     especiais: { coringa: { de: 1, p: 0.04 }, bomba: { de: 1, p: 0.04 }, dobro: { de: 1, p: 0.04 }, quadruplo: { de: 1, p: 0.04 } },
     faixa: { div: 8, larg: 6 }, niveis: { 7: { div: 4, larg: 6 }, 8: { div: 4, larg: 7 } },
-    justa: { niveis: { 4: { secas: 0 }, 5: { secas: 3 }, 6: { secas: 0 }, 7: { secas: 3 }, 8: { secas: 0 } } },
     novidades: [{ tipo: 'descarte', nivel: 1 }], semente: sem(4),
   },
   // 5: tudo junto em 3 colunas. O 1024 e o 2048 tem baralho largo de cartas
@@ -119,8 +105,9 @@ export const TOTAL_FASES = MUNDOS.length * POR_MUNDO;
 
 /**
  * O mundo sem fim (6, 7, ...), depois do mundo 5: todas as cartas especiais
- * em 4 colunas, o descarte de 2 lugares e a mesa justa de fabrica (igual nos
- * dois perfis). Recicla os cenarios (temaDe em render/temas/index.js).
+ * em 4 colunas, o descarte de 2 lugares e a piedade espacada ou desligada do
+ * nivel 4 em diante (a mesa enche de verdade e o perigo aparece, ver main.js).
+ * Recicla os cenarios (temaDe em render/temas/index.js).
  */
 const SEM_FIM = {
   regras: { descarteMax: 2 }, inicio: [[8, 4], [], [2], []], fila: [2, 2, 4],
@@ -136,11 +123,12 @@ export function mundoDef(m) {
   return k <= MUNDOS.length ? MUNDOS[k - 1] : { ...SEM_FIM, id: k, semente: sem(k) };
 }
 
-/** O mundo com os niveis do perfil (a mesa justa troca descarte, piedade e baralho a partir do nivel 4). */
+/** O mundo com os niveis do perfil (`porPerfil[perfil].niveis` por cima dos do mundo; hoje nenhum mundo usa). */
 export function mundoDoPerfil(def, perfil) {
-  if (perfil !== 'mesa-justa' || !def.justa) return def;
+  const ajuste = def.porPerfil && def.porPerfil[perfil];
+  if (!ajuste) return def;
   const niveis = { ...(def.niveis || {}) };
-  for (const [n, x] of Object.entries(def.justa.niveis || {})) niveis[n] = { ...(niveis[n] || {}), ...x };
+  for (const [n, x] of Object.entries(ajuste.niveis || {})) niveis[n] = { ...(niveis[n] || {}), ...x };
   return { ...def, niveis };
 }
 
@@ -195,15 +183,18 @@ export const faseGlobal = (mundo, nivel) => (mundo - 1) * POR_MUNDO + nivel;
 
 /**
  * Definicao da partida que comeca na fase global N (mundo e nivel), com o
- * kit do nivel. `tentativa` muda a semente a cada recomeco; `perfil` e a mesa
- * do teste A/B ('mesa-hoje' ou 'mesa-justa').
+ * kit do nivel. `tentativa` muda a semente a cada recomeco; `perfil` e a
+ * regra do teste A/B ('hoje' ou 'juntar': liga regras.juntar em todos os
+ * mundos, inclusive o sem fim).
  */
-export function faseDe(N, tentativa = 0, perfil = 'mesa-hoje') {
+export function faseDe(N, tentativa = 0, perfil = PERFIS[0]) {
   const id = Math.max(1, N | 0);
-  const def = mundoDoPerfil(mundoDef(mundoDe(id)), perfil);
+  const p = PERFIS.includes(perfil) ? perfil : PERFIS[0];
+  const def = mundoDoPerfil(mundoDef(mundoDe(id)), p);
   const nivel = posNoMundo(id);
+  const regras = p === 'juntar' ? { ...(def.regras || {}), juntar: true } : def.regras || {};
   const f = {
-    id, mundo: def.id, nivel, regras: def.regras || {}, perfil: PERFIS.includes(perfil) ? perfil : PERFIS[0],
+    id, mundo: def.id, nivel, regras, perfil: p,
     inicio: kitDoNivel(def, nivel), escada: escadaDoMundo(def),
     semente: (def.semente + nivel * 977 + (tentativa | 0) * 7919) >>> 0,
   };
@@ -225,11 +216,11 @@ export const CLASSICO = {
 };
 
 /**
- * Piso da curva em cada mundo, por perfil: em quantas partidas (%) o casual
- * passa o 2048 sem recomecar. Na mesa justa o casual ve a mesa encher (e o
- * "Continuar" gratis salva); no mundo sem fim, PISO_SEM_FIM.
+ * Piso da curva em cada mundo: em quantas partidas (%) o casual passa o 2048
+ * sem recomecar; no mundo sem fim, PISO_SEM_FIM. O mesmo nos dois perfis (o
+ * baralho e o mesmo; ver curvaSoPiso).
  */
-const PISO_CURVA = { 'mesa-hoje': [94, 92, 90, 80, 70], 'mesa-justa': [85, 85, 82, 78, 70] };
+const PISO_CURVA = [94, 92, 90, 80, 70];
 const PISO_SEM_FIM = 80;
 
 /**
@@ -240,24 +231,21 @@ const PISO_SEM_FIM = 80;
  * mundo. O simulador aceita `FAIXA_CASUAL` pontos em volta do alvo e nenhuma
  * queda maior que `QUEDA_MAX` de um nivel para o seguinte.
  */
-export function alvoCasual(N, perfil = 'mesa-hoje') {
+export function alvoCasual(N) {
   const u = (posNoMundo(N) - 1) / (POR_MUNDO - 1);
   const m = mundoDe(N);
-  const piso = m > MUNDOS.length ? PISO_SEM_FIM : (PISO_CURVA[perfil] || PISO_CURVA['mesa-hoje'])[m - 1];
+  const piso = m > MUNDOS.length ? PISO_SEM_FIM : PISO_CURVA[m - 1];
   return Math.round(100 - (100 - piso) * u * u);
 }
 export const FAIXA_CASUAL = 8;
 export const QUEDA_MAX = 12;
 
 /**
- * Regua da mesa justa (so no perfil 'mesa-justa'): jogar ao acaso nao passa.
- * ACASO_MAX: em quantas partidas (%) o jogador 100% ao acaso passa o nivel 5
- * sem recomecar; DISTRAIDO_MAX: em quantas (%) o distraido (metade das jogadas
- * ao acaso) fecha o mundo sem recomecar. Na mesa de hoje o distraido fechava
- * o mundo 1 em 74%.
+ * No perfil 'juntar' a curva vale so pelo piso: o verbo novo deixa o jogo
+ * mais facil de proposito, com o mesmo baralho (o teste A/B mede o verbo, nao
+ * um baralho diferente). As outras reguas (guloso, queda, ritmo) valem igual.
  */
-export const ACASO_MAX = 30;
-export const DISTRAIDO_MAX = 20;
+export const curvaSoPiso = (perfil) => perfil === 'juntar';
 
 /** Ritmo: jogadas por nivel (mediana do casual, com os recomecos) no maximo. O mundo 1 e curto de proposito (ver a nota dele). */
 export const ritmoMax = (n) => (mundoDe(n) === 1 ? 40 : 80);

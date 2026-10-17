@@ -1,7 +1,7 @@
 // Regras de colocacao e cascata (estrita, permissiva, especiais, teto).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { REGRAS_PADRAO, normalizarRegras, podeColocar, fundeCom } from '../src/jogo/regras.js';
+import { REGRAS_PADRAO, normalizarRegras, podeColocar, podeJuntar, fundeCom } from '../src/jogo/regras.js';
 import { colocar, cascata, completar, graduar } from '../src/jogo/colunas.js';
 
 const N = (v, id = v, extra = {}) => ({ id, tipo: 'normal', v, ...extra });
@@ -107,4 +107,19 @@ test('graduar tira da mesa so as cartas abaixo do piso', () => {
   assert.deepEqual(g.cartas.map((k) => [k.c, k.id, k.valor]), [[0, 4, 2], [3, 6, 2]]);
   assert.equal(graduar(cols, 2).colunas, cols, 'sem carta abaixo do piso, a mesa e a mesma');
   assert.equal(cascata([N(4), N(4)], R, 0, [], 1, []).col[0].v, 8);
+});
+
+test('podeJuntar: so topo igual de cartas normais, em colunas diferentes, com a regra ligada', () => {
+  const R = normalizarRegras({ juntar: true });
+  assert.equal(normalizarRegras({}).juntar, false);
+  const k = (v, id, extra = {}) => ({ id, tipo: 'normal', v, ...extra });
+  const cols = [[k(8, 1), k(4, 2)], [], [k(4, 3, { esp: true })], [k(2, 4)], [{ id: 5, tipo: 'coringa', v: 0 }]];
+  assert.deepEqual(podeJuntar(R, cols, 0, 2), { ok: true }, 'a marca do especial nao impede');
+  assert.deepEqual(podeJuntar(R, cols, 2, 0), { ok: true });
+  assert.equal(podeJuntar(R, cols, 0, 3).motivo, 'juntar');
+  assert.equal(podeJuntar(R, cols, 0, 1).motivo, 'vazia');
+  assert.equal(podeJuntar(R, cols, 1, 0).motivo, 'vazia');
+  assert.equal(podeJuntar(R, cols, 0, 0).motivo, 'mesma');
+  assert.equal(podeJuntar(R, cols, 4, 3).motivo, 'juntar', 'so cartas normais');
+  assert.equal(podeJuntar(normalizarRegras({}), cols, 0, 2).motivo, 'regra');
 });

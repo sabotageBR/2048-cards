@@ -5,7 +5,7 @@
 // Poki nem o DOM alem do canvas.
 // Um relogio so: o `agora` do main.js (ms) move a linha e os efeitos.
 import { calcularLayout } from './layout.js';
-import { desenharMesa, desenharMao, desenharGuia, faseGuia, CICLO_GUIA } from './mesa.js';
+import { desenharMesa, desenharMao, desenharGuia, CICLO_GUIA } from './mesa.js';
 import { criarLinha } from './linha.js';
 import { criarParticulas } from './particulas.js';
 import { temaDe } from './temas/index.js';
@@ -33,11 +33,9 @@ export function criarCena(canvas) {
   let tVis = 0, clarao = -1e9;
   /**
    * Opcoes de visual: ?visual=descarte (o descarte junto da fila, em teste);
-   * no desktop, o braço do teste A/B: teclas 'guia' (C: a seta do mouse e as
-   * teclas 1..N e o espaco com o gesto guiado) ou 'fixas' (D: sempre na
-   * mesa); ?guia=0..1 congela a fase do gesto (prints).
+   * ?guia=0..1 congela a fase do gesto (prints).
    */
-  let vis = { descarteFila: false, teclas: '', guiaU: -1 };
+  let vis = { descarteFila: false, guiaU: -1 };
   let txt = { naMao: 'in hand', descartar: 'discard', semCarga: 'empty', livre: 'Free!', combo: 'COMBO ×{n}' };
 
   const layout = () => calcularLayout({ W, H, topo, base, colunas: regras.colunas, pilhaMax: regras.pilhaMax, tamFila: regras.tamFila, descarteFila: vis.descarteFila });
@@ -110,19 +108,6 @@ export function criarCena(canvas) {
     canvas.width = canvas.width;
   }
 
-  /**
-   * Teclas do desktop (opcao em teste): com o gesto guiado na tela (ou sempre,
-   * nas fixas); a do alvo afunda quando a carta cai na coluna (no descarte,
-   * quando o cursor clica).
-   */
-  function teclasDe(mao, tGuia) {
-    if (!vis.teclas || (!mao && vis.teclas !== 'fixas')) return null;
-    const u = faseGuia(tGuia);
-    const [de, ate] = mao && mao.de ? [0.66, 0.86] : [0.4, 0.6];
-    const aperta = mao ? Math.max(0, Math.min(1, (u - de) / 0.04, (ate - u) / 0.04)) : 0;
-    return { alpha: vis.teclas === 'fixas' ? 0.5 : 0.75, alvo: mao ? (mao.de ? mao.c : 'desc') : -1, aperta };
-  }
-
   /** Agenda as animacoes de uma jogada. */
   function tocar(eventos, agora, info) {
     linha.montar(eventos, L, agora, info);
@@ -133,6 +118,11 @@ export function criarCena(canvas) {
 
   function efeito(e, agora) {
     if (e.tipo === 'completar') clarao = agora;
+    // o "COMBO xN" na coluna da beira nao sai da tela (largura estimada pelo tamanho da fonte do efeito)
+    if (e.tipo === 'combo' && e.n >= 2) {
+      const meia = (txt.combo.length * (22 + Math.min(10, e.n * 2)) * escala() * 0.62) / 2 + 8;
+      e = { ...e, x: Math.max(meia, Math.min(W - meia, e.x)) };
+    }
     tocarEfeito(e, { part, tema, esc: escala(), ch: L.ch, textos: txt });
   }
 
@@ -192,12 +182,11 @@ export function criarCena(canvas) {
     if (zoom !== 1) { ctx.translate(W / 2, H / 2); ctx.scale(zoom, zoom); ctx.translate(-W / 2, -H / 2); }
     const tGuia = vis.guiaU >= 0 ? vis.guiaU * CICLO_GUIA : tVis;
     if (q.estado) {
-      desenharMesa(ctx, q.estado, L, { pal, mesa: tema.mesa, agora: q.agora, t, dpr, linha, arrasto: q.arrasto, destaque: q.destaque, legal: q.legal, febre: q.febre || 0, semFila: q.semFila, alvo: q.alvo || '', textos: txt, teclas: teclasDe(q.mao, tGuia), perigo: q.perigo || null });
+      desenharMesa(ctx, q.estado, L, { pal, mesa: tema.mesa, agora: q.agora, t, dpr, linha, arrasto: q.arrasto, destaque: q.destaque, legal: q.legal, febre: q.febre || 0, semFila: q.semFila, alvo: q.alvo || '', textos: txt, perigo: q.perigo || null });
     }
     part.desenhar(ctx);
-    const comCursor = { cursor: !!vis.teclas, esc: Math.max(1, Math.min(1.7, L.cw / 70)) };
-    if (q.mao && q.mao.de) desenharGuia(ctx, q.mao, tGuia, dpr, comCursor);
-    else if (q.mao) desenharMao(ctx, q.mao.x, q.mao.y, tGuia, '#fff', comCursor);
+    if (q.mao && q.mao.de) desenharGuia(ctx, q.mao, tGuia, dpr);
+    else if (q.mao) desenharMao(ctx, q.mao.x, q.mao.y, tGuia, '#fff');
     ctx.restore();
     // a festa da subida de nivel: por cima da mesa, sem zoom e sem bloquear (pode comecar no futuro, depois da cascata)
     if (q.festa && q.agora >= q.festa.t0) {

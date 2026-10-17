@@ -1,17 +1,17 @@
 // Os 5 mundos (e o primeiro do mundo sem fim) tem esquema valido e cada nivel
 // e passavel pelo bot guloso sem recomecar (>= 82%; 78% no 2048), jogando o
-// mundo inteiro numa mesa so, nos dois perfis de mesa do teste A/B. A
-// dificuldade cresce aos poucos: o jogador casual fica perto da curva
-// (alvoCasual do perfil), nenhum nivel cai de repente em relacao ao anterior e
-// nenhum passa do ritmo. Na mesa justa, jogar ao acaso nao passa.
+// mundo inteiro numa mesa so, nos dois perfis de regra do teste A/B ('hoje'
+// e 'juntar'). A dificuldade cresce aos poucos: o jogador casual fica perto
+// da curva (alvoCasual; no 'juntar', so o piso), nenhum nivel cai de repente
+// em relacao ao anterior e nenhum passa do ritmo.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MUNDOS, NOVIDADES, FASES, CLASSICO, POR_MUNDO, TOTAL_FASES, PERFIS, faseDe, faseGlobal, mundoDe, posNoMundo, alvoDoNivel,
   pesosDoNivel, especiaisDoNivel, alvoCasual, FAIXA_CASUAL, QUEDA_MAX, ritmoMax, mundoDef, mundoDoPerfil, escadaDoMundo,
-  ACASO_MAX, DISTRAIDO_MAX,
+  curvaSoPiso,
 } from '../src/jogo/fases.js';
-import { jogarMundo, jogarSozinho, melhorJogada, PERFIL_CASUAL, PERFIL_ACASO, PERFIL_DISTRAIDO } from '../src/jogo/bot.js';
+import { jogarMundo, jogarSozinho, melhorJogada, PERFIL_CASUAL } from '../src/jogo/bot.js';
 import { criarPartida, jogar } from '../src/jogo/partida.js';
 import { ESPECIAIS } from '../src/jogo/baralho.js';
 
@@ -38,8 +38,6 @@ test('esquema dos mundos', () => {
         assert.ok(vs.length >= 2 && Math.min(...vs) >= 2 && Math.max(...vs) < alvoDoNivel(n), `${perfil} mundo ${m.id} nivel ${n}: ${vs}`);
       }
     }
-    // a mesa justa so mexe do nivel 4 em diante (nenhuma derrota nos primeiros minutos)
-    for (const n of Object.keys((m.justa || {}).niveis || {})) assert.ok(Number(n) >= 4, `mundo ${m.id}: a mesa justa mexe no nivel ${n}`);
     if (m.fila) assert.ok(m.fila.length <= 3, `mundo ${m.id}: a fila roteirizada tem ${m.fila.length} cartas`);
   });
   assert.deepEqual(especiaisDoNivel(MUNDOS[0], 1), {}, 'o nivel 1 do mundo 1 e so cartas');
@@ -61,16 +59,23 @@ test('esquema dos mundos', () => {
   assert.equal(CLASSICO.metas.length, 0);
 });
 
-test('mesa de hoje igual a da 0.4.4 e niveis 1 a 3 iguais nos dois perfis', () => {
+test('os dois perfis tem a mesma escada; so o juntar liga a regra', () => {
+  assert.deepEqual(PERFIS, ['hoje', 'juntar']);
   for (const m of MUNDOS) {
-    const hoje = escadaDoMundo(mundoDoPerfil(m, 'mesa-hoje'));
-    const justa = escadaDoMundo(mundoDoPerfil(m, 'mesa-justa'));
-    assert.deepEqual(hoje, escadaDoMundo(m), `mundo ${m.id}: a mesa de hoje mudou`);
-    for (const d of hoje) assert.ok(d.descarte === undefined && d.secas === undefined, `mundo ${m.id}: a mesa de hoje troca descarte ou piedade`);
-    for (let n = 0; n < 3; n++) assert.deepEqual(justa[n], hoje[n], `mundo ${m.id} nivel ${n + 1}: os perfis diferem`);
+    const hoje = escadaDoMundo(mundoDoPerfil(m, 'hoje'));
+    assert.deepEqual(hoje, escadaDoMundo(m), `mundo ${m.id}: a escada de hoje mudou`);
+    assert.deepEqual(escadaDoMundo(mundoDoPerfil(m, 'juntar')), hoje, `mundo ${m.id}: os perfis tem baralhos diferentes`);
+    for (const d of hoje) assert.ok(d.descarte === undefined && d.secas === undefined, `mundo ${m.id}: a escada troca descarte ou piedade`);
   }
-  assert.equal(faseDe(5, 0, 'mesa-justa').perfil, 'mesa-justa');
-  assert.equal(faseDe(5, 0, 'outro').perfil, 'mesa-hoje');
+  for (const N of [1, 9, 33, 41, 50]) {
+    assert.ok(!faseDe(N, 0, 'hoje').regras.juntar, `fase ${N}: o hoje juntando`);
+    assert.equal(faseDe(N, 0, 'juntar').regras.juntar, true, `fase ${N}: o juntar sem a regra`);
+  }
+  assert.equal(faseDe(41, 0, 'juntar').regras.descarteMax, 2, 'o juntar mantem as regras do mundo');
+  assert.equal(faseDe(5, 0, 'juntar').perfil, 'juntar');
+  assert.equal(faseDe(5, 0, 'mesa-justa').perfil, 'hoje');
+  assert.equal(faseDe(5).perfil, 'hoje');
+  assert.ok(curvaSoPiso('juntar') && !curvaSoPiso('hoje'));
 });
 
 /**
@@ -92,21 +97,23 @@ function medir(m, n, op = {}, desloc = 0) {
 
 /**
  * Joga a fase com o guloso (a mao de ajuda) ate sair do nivel 1 ou esgotar
- * `max` jogadas. Devolve { jogadas, nivel, degrau } (o maior degrau de cascata).
+ * `max` jogadas. Devolve { jogadas, nivel, degrau, juntou } (o maior degrau de
+ * cascata e quantas jogadas foram de juntar).
  */
-function abertura(tentativa, max) {
-  const f = faseDe(1, tentativa);
+function abertura(tentativa, max, perfil = 'hoje') {
+  const f = faseDe(1, tentativa, perfil);
   let e = criarPartida({}, f, f.semente);
-  let jogadas = 0, degrau = 0;
+  let jogadas = 0, degrau = 0, juntou = 0;
   while (jogadas < max && e.nivel === 1 && !e.fim) {
     const a = melhorJogada(e, jogadas * 900);
     if (!a) break;
     const r = jogar(e, { ...a, t: jogadas * 900 });
     for (const ev of r.eventos) if (ev.tipo === 'fundir') degrau = Math.max(degrau, ev.degrau);
+    if (a.tipo === 'juntar') juntou++;
     e = r.estado;
     jogadas++;
   }
-  return { jogadas, nivel: e.nivel, degrau };
+  return { jogadas, nivel: e.nivel, degrau, juntou };
 }
 
 test('abertura do mundo 1: a mao de ajuda faz o 16 em 3 jogadas com cascata', () => {
@@ -115,6 +122,7 @@ test('abertura do mundo 1: a mao de ajuda faz o 16 em 3 jogadas com cascata', ()
   assert.equal(a.nivel, 2, `fechou em ${a.jogadas} jogadas`);
   assert.equal(a.jogadas, 3);
   assert.ok(a.degrau >= 2, 'a ultima jogada cascateia');
+  assert.equal(a.juntou, 0);
   // recomecos do nivel 1 (semente nova): ainda curtos
   for (let t = 1; t <= 4; t++) {
     const r = abertura(t, 5);
@@ -122,8 +130,21 @@ test('abertura do mundo 1: a mao de ajuda faz o 16 em 3 jogadas com cascata', ()
   }
 });
 
-/** Os perfis que o mundo m tem (o mundo sem fim e igual nos dois). */
-const perfisDe = (m) => (m > MUNDOS.length ? [PERFIS[0]] : PERFIS);
+test('abertura do mundo 1 no juntar: o 16 em 2 jogadas, a segunda um juntar com cascata', () => {
+  // o 2 no 2 faz um 4 ao lado do 4 da coluna 1; o juntar leva um ate o outro: 8, cascata, 16
+  const a = abertura(0, 3, 'juntar');
+  assert.equal(a.nivel, 2, `fechou em ${a.jogadas} jogadas`);
+  assert.equal(a.jogadas, 2);
+  assert.equal(a.juntou, 1);
+  assert.ok(a.degrau >= 2, 'o juntar cascateia');
+  for (let t = 1; t <= 4; t++) {
+    const r = abertura(t, 5, 'juntar');
+    assert.equal(r.nivel, 2, `recomeco ${t}: ${r.jogadas} jogadas sem fechar o 16`);
+  }
+});
+
+/** Os perfis medidos em cada mundo (os dois em todos, inclusive o sem fim: o juntar vale nele tambem). */
+const perfisDe = () => PERFIS;
 
 test('o guloso passa cada nivel sem recomecar, nos dois perfis', () => {
   for (const m of MEDIDOS) for (const perfil of perfisDe(m)) {
@@ -145,39 +166,15 @@ test('curva gradual: o jogador casual segue alvoCasual e o ritmo, nos dois perfi
     for (let k = 0; k < POR_MUNDO; k++) {
       const F = faseGlobal(m, k + 1);
       const casual = Math.round((a[k].pct + b[k].pct) / 2);
-      const alvo = alvoCasual(F, perfil);
-      assert.ok(Math.abs(casual - alvo) <= FAIXA_CASUAL + folga, `${perfil} fase ${F}: casual ${casual}% (alvo ${alvo}%)`);
+      const alvo = alvoCasual(F);
+      assert.ok(casual >= alvo - FAIXA_CASUAL - folga, `${perfil} fase ${F}: casual ${casual}% (alvo ${alvo}%)`);
+      if (!curvaSoPiso(perfil)) assert.ok(casual <= alvo + FAIXA_CASUAL + folga, `${perfil} fase ${F}: casual ${casual}% (alvo ${alvo}%), facil demais`);
       if (ant !== null) assert.ok(ant - casual <= QUEDA_MAX + folga, `${perfil} fase ${F}: caiu de ${ant}% para ${casual}%`);
       const jog = Math.max(a[k].jogadas, b[k].jogadas);
       assert.ok(jog <= ritmoMax(F) * 1.15, `${perfil} fase ${F}: ${jog} jogadas (ritmo ${ritmoMax(F)})`);
       ant = casual;
     }
   }
-});
-
-test('mesa justa: jogar ao acaso nao passa e o casual ve a mesa encher', () => {
-  const n = 60, folga = 5;
-  for (const m of MUNDOS) {
-    let acaso = 0, distraido = 0;
-    for (let s = 1; s <= n; s++) {
-      const sem = m.semente + s * 104729 + 13;
-      if (jogarMundo(m.id, sem, { ...PERFIL_ACASO, perfil: 'mesa-justa', maxRecomecos: 0 }).niveis[4].passou) acaso++;
-      if (jogarMundo(m.id, sem, { ...PERFIL_DISTRAIDO, perfil: 'mesa-justa', maxRecomecos: 0 }).completou) distraido++;
-    }
-    assert.ok((acaso / n) * 100 <= ACASO_MAX + folga, `mundo ${m.id}: o acaso passa o nivel 5 em ${Math.round((acaso / n) * 100)}%`);
-    assert.ok((distraido / n) * 100 <= DISTRAIDO_MAX + folga, `mundo ${m.id}: o distraido fecha o mundo em ${Math.round((distraido / n) * 100)}%`);
-  }
-  // o casual ve de 0,8 a 2,5 mesas cheias por mundo (o "Continuar" gratis salva); na mesa de hoje, bem menos no mundo 1
-  const cheias = (m, perfil) => {
-    let c = 0;
-    for (let s = 1; s <= 40; s++) c += jogarMundo(m, mundoDef(m).semente + s * 7919, { ...PERFIL_CASUAL, perfil }).niveis.reduce((a, nv) => a + nv.cheias, 0);
-    return c / 40;
-  };
-  for (const m of [1, 2, 3, 4]) {
-    const c = cheias(m, 'mesa-justa');
-    assert.ok(c >= 0.8 && c <= 2.5, `mundo ${m}: o casual ve ${c.toFixed(2)} mesas cheias na mesa justa`);
-  }
-  assert.ok(cheias(1, 'mesa-hoje') < 0.6, 'a mesa de hoje do mundo 1 quase nunca enche');
 });
 
 /**

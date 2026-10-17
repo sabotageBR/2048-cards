@@ -12,22 +12,23 @@
 // animacao fazem isso.
 // Sem jogada legal e sem descarte: oferta de continuar (gratis 1x por nivel,
 // depois video) ou recomecar o nivel pela mesa pronta dele.
-// Teste A/B da 0.5.0 (src/core/variante.js): a mesa de hoje ou a mesa justa
-// (que enche de verdade e mostra o perigo sem texto) e, no computador, a mao,
-// a seta com as teclas no gesto ou as teclas sempre na mesa. Depois do mundo
-// 5 vem o mundo sem fim (fases.js, mundoDef).
+// Teste A/B da 0.6.0 (src/core/variante.js): a regra de hoje ou o juntar (a
+// carta do topo de uma coluna arrastada ate um topo igual em outra; a mao
+// guiada ensina, sem texto). Depois do mundo 5 vem o mundo sem fim (fases.js,
+// mundoDef), em que a mesa enche de verdade e o perigo aparece sem texto.
 
 import { criarCena } from './render/cena.js';
 import { Transicoes as Tr } from './render/transicoes.js';
-import { criarPartida, jogar, desfazerPara, jogadasLegais, perigo, VERSAO_ESTADO } from './jogo/partida.js';
+import { criarPartida, jogar, desfazerPara, jogadasLegais, paresDeJuntar, perigo, VERSAO_ESTADO } from './jogo/partida.js';
 import { melhorJogada } from './jogo/bot.js';
 import { ESPECIAIS } from './jogo/baralho.js';
+import { podeJuntar, topo } from './jogo/regras.js';
 import { MUNDOS, POR_MUNDO, TOTAL_FASES, faseDe, faseGlobal, mundoDe, posNoMundo, mundoDef } from './jogo/fases.js';
 import { progressoDoNivel } from './jogo/metas.js';
 import { criarAudio } from './core/audio.js';
 import { criarArmazem } from './core/armazenamento.js';
 import { lerDepuracao } from './core/depuracao.js';
-import { escolherVariante, ehComputador } from './core/variante.js';
+import { escolherVariante } from './core/variante.js';
 import { escolherIdioma, textos, textoMissao } from './i18n/textos.js';
 import { criarMissoes, progredir, renovar, missaoDaVez } from './jogo/missoes.js';
 import { vibrar } from './core/haptico.js';
@@ -56,16 +57,18 @@ if (dep.ganchos) {
  * por nivel caia de 82% para 70% bem ali (Player Fit Test de 2026-10-13).
  */
 const FASES_SEM_INTERVALO = 6;
-/**
- * Ajuda gratis (mao) por ocio ou recusas seguidas, nos dois primeiros mundos.
- * Na mesa justa a mao por ocio (que mostra a jogada do guloso) para na fase 3:
- * o jogador decide sozinho quando a mesa aperta; a ajuda por recusas continua.
- */
+/** Ajuda gratis (mao) por ocio ou recusas seguidas, nos dois primeiros mundos. */
 const AJUDA_ATE = POR_MUNDO * 2;
-const AJUDA_ATE_JUSTA = 3;
 const OCIO_AJUDA = 6000;
-/** Jogador novo na fase 1 (ate o primeiro 16) e a carta nova do mundo na frente da fila: o gesto guiado volta logo depois de cada jogada. */
+/**
+ * Jogador novo na fase 1 (ate o primeiro 16), a carta nova do mundo na frente
+ * da fila e, no juntar, o primeiro par de topos iguais: o gesto guiado volta
+ * logo depois de cada jogada.
+ */
 const OCIO_GUIA = 1000;
+/** Arrasto: anda mais que isso (px) e deixa de ser toque; no hoje, o arrasto de uma carta da mesa conta a partir de ARRASTO_MESA. */
+const ARRASTO_MIN = 8;
+const ARRASTO_MESA = 30;
 const RECUSAS_AJUDA = 3;
 // 2: a escada de valores (2026-10-13); o progresso da versao do duelo nao vale aqui
 const VERSAO_SAVE = 2;
@@ -94,24 +97,26 @@ const VISUAL = dep.visual.split(',');
  */
 const COM_MISSAO = VISUAL.includes('missao') || VISUAL.includes('missaob');
 /**
- * Os braços do teste A/B, guardados no save (quem volta fica no mesmo). Em
- * localhost vale o forcado por ?variante= e, no resto, o controle (mesa-hoje
- * e, no computador, desk-a): os prints ficam deterministicos e nada vai
- * para o save.
+ * O braço do teste A/B, guardado no save (quem volta fica no mesmo). Em
+ * localhost vale o forcado por ?variante= e, no resto, o controle (hoje): os
+ * prints ficam deterministicos e nada vai para o save.
  */
-const computador = dep.variante.some((x) => x.startsWith('desk-')) || ehComputador();
 const V = dep.local
-  ? escolherVariante(null, { computador, forcada: dep.variante, u: [0, 0] })
-  : escolherVariante(save.variante, { computador, forcada: dep.variante, u: [Math.random(), Math.random()] });
+  ? escolherVariante(null, { forcada: dep.variante, u: 0 })
+  : escolherVariante(save.variante, { forcada: dep.variante, u: Math.random() });
 if (!dep.local) save.variante = V;
-/** Mesa com o perigo visivel: a justa e o mundo sem fim (justa nos dois braços). */
-const mesaJusta = (e) => !!e && (e.perfil === 'mesa-justa' || e.mundo > MUNDOS.length);
+/** Mesa com o perigo visivel: o mundo sem fim (a mesa enche de verdade). */
+const comPerigo = (e) => !!e && e.mundo > MUNDOS.length;
 /** Minutos de jogo em que a telemetria marca o tempo (densos ate 10 min, para a integral da media; a cauda ate 60). */
 const MARCOS_MIN = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60];
+/** Os mesmos minutos com o braço na categoria (<braço>/N/min): Other Events le o tempo por braço direto. */
+const MARCOS_BRACO = new Set([1, 2, 3, 5, 7, 10, 15, 20]);
+/** Segundos sem tocar no jogo depois do carregamento (espera/N/s): quem nunca toca sai logo ou fica olhando? */
+const MARCOS_ESPERA = [5, 10, 20, 40];
 
 const J = {
   /** n: fase global (1..40) do nivel em jogo */
-  n: 1, e: null, tJogo: 0, marco: 0, tocou: false,
+  n: 1, e: null, tJogo: 0, marco: 0, tocou: false, tEspera: 0, marcoEspera: 0,
   /** 'jogando' | 'vitoria' | 'chance' | 'fim' | 'anuncio' | 'menu' */
   estado: 'jogando',
   /** trans: a transicao de fim de mundo (bloqueia); festa: a subida de nivel por cima do jogo (nao bloqueia); anuncio: o intervalo agendado para depois da festa */
@@ -120,13 +125,15 @@ const J = {
   tentativas: 0, autoProx: 0, febreAte: 0,
   /** novidade: a carta especial nova do mundo, que a mao guiada mostra na primeira vez (sem texto) */
   ajudaMedida: false, regraMaiorMedida: false, novidade: '', tChance: 0, itemPendente: '', bau: null, tAviso: 0,
+  /** medidas de uma vez por sessao: o primeiro juntar (juntou/N/first) e o primeiro arrasto de carta da mesa (regra/arrasto/first) */
+  juntouMedido: false, arrastoMesaMedido: false,
   /** guia da fase 1: passos aceitos com a mao na tela (telemetria guia/N/feito) */
   guiaPassos: 0,
   /** intervalos comerciais pedidos; subidas de nivel e jogo ativo desde o ultimo (espacamento proprio) */
   intervalos: 0, subidasDesdeIntervalo: 0, tJogoIntervalo: 0,
   /** videos (rewarded) do nivel: usado = ja deu o premio; visto = ja mediu o visible */
   video: { usado: {}, visto: {} },
-  /** perigo da mesa justa (partida.js): do estado `perigoDe`; o alerta tem intervalo minimo; a medida e uma por nivel */
+  /** perigo da mesa (partida.js): do estado `perigoDe`; o alerta tem intervalo minimo; a medida e uma por nivel */
   perigo: null, perigoDe: null, tAlerta: -1e9, perigoMedido: false,
   /** id da missao no chip (missaoDaVez: a mostrada fica ate ser cumprida) */
   missaoId: -1,
@@ -261,14 +268,14 @@ function carregarFase(n, entrada = true, retomar = false) {
   if (n !== J.n) J.tentativas = 0;
   // a partida salva so continua na mesma versao do estado e no mesmo braço do teste A/B
   const ps = save.partida && save.partida.e;
-  const salva = retomar && ps && ps.v === VERSAO_ESTADO && !ps.fim && (ps.perfil || 'mesa-hoje') === V.nucleo ? save.partida : null;
+  const salva = retomar && ps && ps.v === VERSAO_ESTADO && !ps.fim && (ps.perfil || 'hoje') === V.regra ? save.partida : null;
   let e;
   if (salva) {
     e = salva.e;
     J.tentativas = salva.tentativas || 0;
     n = faseGlobal(e.mundo, e.nivel);
   } else {
-    const f = faseDe(n, J.tentativas, V.nucleo);
+    const f = faseDe(n, J.tentativas, V.regra);
     e = comInventario(criarPartida(save.regras, f, f.semente));
   }
   J.n = n;
@@ -310,6 +317,20 @@ function novidadeVista(carta) {
 /** A fase 1 de quem nunca passou dela: o gesto guiado volta a cada jogada ate o primeiro 16. */
 const emGuia = () => J.n === 1 && save.max <= 1;
 
+/**
+ * Braço juntar: o primeiro par de topos iguais da mesa, enquanto o jogador
+ * nunca juntou (save.vistas 'juntar'), chama a mao guiada como a carta nova:
+ * ela arrasta um topo ate o outro, sem texto.
+ */
+const juntarPendente = () => !!J.e && J.e.regras.juntar && !save.vistas.includes('juntar') && paresDeJuntar(J.e).length > 0;
+
+/** O juntar que a mao mostra: o do guloso, se ele juntaria; senao o primeiro par. */
+function juntarDaMao(a) {
+  if (a && a.tipo === 'juntar') return a;
+  const p = paresDeJuntar(J.e)[0];
+  return p ? { tipo: 'juntar', de: p[0], c: p[1] } : a;
+}
+
 // ------------------------------------------------------------- acoes
 /**
  * Aplica uma acao do jogador. origem = retangulo de onde a carta saiu (fila ou arrasto).
@@ -318,7 +339,9 @@ const emGuia = () => J.n === 1 && save.max <= 1;
 function aplicar(acao, origem) {
   if (J.estado !== 'jogando' || !J.e) return false;
   const antes = J.e;
-  const carta = acao.tipo === 'colocar' ? antes.fila[antes.regras.filaLivre ? (acao.k | 0) : 0] : antes.fila[0];
+  const carta = acao.tipo === 'colocar' ? antes.fila[antes.regras.filaLivre ? (acao.k | 0) : 0]
+    : acao.tipo === 'juntar' ? (antes.colunas[acao.de] && topo(antes.colunas[acao.de])) || undefined
+      : antes.fila[0];
   const r = jogar(antes, { ...acao, t: J.agora });
   if (!r.eventos.length) return false;
   // a febre pode expirar na mesma acao: o primeiro evento nem sempre e a recusa
@@ -338,11 +361,16 @@ function aplicar(acao, origem) {
     return false;
   }
   // as primeiras jogadas da fase 1 de quem e novo: ate onde o jogador vai antes de sair (guia/N/feito)
-  if (emGuia() && acao.tipo === 'colocar' && J.guiaPassos < 5) { J.guiaPassos++; poki.measure('guia', String(J.guiaPassos), 'feito'); }
+  if (emGuia() && (acao.tipo === 'colocar' || acao.tipo === 'juntar') && J.guiaPassos < 5) { J.guiaPassos++; poki.measure('guia', String(J.guiaPassos), 'feito'); }
   J.hist = [antes];
   J.e = r.estado;
   avisarPerigo(antes, r.estado);
   if (acao.tipo === 'colocar') novidadeVista(carta);
+  if (acao.tipo === 'juntar') {
+    if (!save.vistas.includes('juntar')) save.vistas = [...save.vistas, 'juntar'];
+    // a descoberta do verbo: o primeiro juntar da sessao e a fase em que ele aconteceu
+    if (!J.juntouMedido) { J.juntouMedido = true; poki.measure('juntou', rotuloMedida(), 'first'); }
+  }
   cena.tocar(r.eventos, J.agora, { antes, depois: r.estado, origem, carta });
   J.ultimaAcao = J.agora;
   J.mao = null; J.maoCalc = 0;
@@ -403,17 +431,17 @@ function aplicar(acao, origem) {
 
 /**
  * O perigo entrou na mesa (uma coluna chegou a 1 carta do limite, ou o fio):
- * a medida `<braço>/N/perigo` sai uma vez por nivel nos dois braços (na mesa
- * de hoje quer dizer "o aviso teria aparecido"); o som grave e a vibracao, so
- * na mesa justa, no maximo um a cada 3 s.
+ * a medida `<braço>/N/perigo` sai uma vez por nivel nos dois braços (nos
+ * mundos 1 a 5 quer dizer "o aviso teria aparecido"); o som grave e a
+ * vibracao, so no mundo sem fim, no maximo um a cada 3 s.
  */
 function avisarPerigo(antes, depois) {
   if (depois.fim) return;
   const a = perigo(antes), d = perigo(depois);
   const entrou = (d.fio && !a.fio) || d.colunas.some((x, c) => x && !a.colunas[c]);
   if (!entrou) return;
-  if (!J.perigoMedido) { J.perigoMedido = true; poki.measure(V.nucleo, rotuloMedida(), 'perigo'); }
-  if (mesaJusta(depois) && J.agora - J.tAlerta > 3000) { J.tAlerta = J.agora; audio.alerta(); vibrar([30, 60, 30]); }
+  if (!J.perigoMedido) { J.perigoMedido = true; poki.measure(V.regra, rotuloMedida(), 'perigo'); }
+  if (comPerigo(depois) && J.agora - J.tAlerta > 3000) { J.tAlerta = J.agora; audio.alerta(); vibrar([30, 60, 30]); }
 }
 
 /** Origem visual de um item usado: o botao dele, embaixo. */
@@ -534,7 +562,7 @@ function terminar(motivo, medida = false) {
   poki.gameplayStop();
   J.festa = null; J.anuncio = null; // o cartao da mesa cheia tem o proprio fluxo (e o proprio intervalo)
   if (!medida) {
-    poki.measure(V.nucleo, rotuloMedida(), 'cheia');
+    poki.measure(V.regra, rotuloMedida(), 'cheia');
     if (mundoDe(J.n) === 1 && temGratis()) {
       // mundo 1: a segunda chance (o "Continuar" gratis) vem sozinha, sem cartao
       J.estado = 'chance';
@@ -556,7 +584,7 @@ function segundaChance() {
   J.estado = 'fim';
   continuar();
   if (J.estado !== 'jogando') { terminar('mesaCheia', true); return; }
-  poki.measure(V.nucleo, rotuloMedida(), 'salvo');
+  poki.measure(V.regra, rotuloMedida(), 'salvo');
   cena.part.texto(cena.W / 2, cena.L.mesa.y + cena.L.mesa.h / 2, T.segundaChance, '#ffd84a', 30);
 }
 
@@ -605,7 +633,17 @@ function atualizar(dt) {
   if (J.estado === 'jogando' && J.tocou) {
     J.tJogo += dt;
     const min = Math.floor(J.tJogo / 60000);
-    while (J.marco < MARCOS_MIN.length && min >= MARCOS_MIN[J.marco]) { poki.measure('tempo', String(MARCOS_MIN[J.marco]), 'min'); J.marco++; }
+    while (J.marco < MARCOS_MIN.length && min >= MARCOS_MIN[J.marco]) {
+      const m = MARCOS_MIN[J.marco];
+      poki.measure('tempo', String(m), 'min');
+      // o tempo por braço do teste A/B (os Funnels do painel so olham 10 eventos adiante)
+      if (MARCOS_BRACO.has(m)) poki.measure(V.regra, String(m), 'min');
+      J.marco++;
+    }
+  } else if (J.estado === 'jogando' && J.carregou && !dep.vitrine) {
+    // antes do primeiro toque: quanto tempo o jogador olha a mesa sem tocar
+    J.tEspera += dt;
+    while (J.marcoEspera < MARCOS_ESPERA.length && J.tEspera >= MARCOS_ESPERA[J.marcoEspera] * 1000) { poki.measure('espera', String(MARCOS_ESPERA[J.marcoEspera]), 's'); J.marcoEspera++; }
   }
   if (J.estado === 'chance') {
     if (J.agora - J.tChance > 700) segundaChance();
@@ -643,34 +681,43 @@ function atualizar(dt) {
   if (J.estado === 'jogando' && J.e && !J.arrasto && !dep.vitrine) {
     const parado = J.agora - J.ultimaAcao;
     const porRecusa = J.e.recusas >= RECUSAS_AJUDA;
-    const guia = emGuia() || novidadeNaFrente();
-    const ate = V.nucleo === 'mesa-justa' ? AJUDA_ATE_JUSTA : AJUDA_ATE;
-    const precisa = ((J.n <= ate || guia) && parado > (guia ? OCIO_GUIA : OCIO_AJUDA)) || porRecusa;
+    const pendente = juntarPendente();
+    const guia = emGuia() || novidadeNaFrente() || pendente;
+    const precisa = ((J.n <= AJUDA_ATE || guia) && parado > (guia ? OCIO_GUIA : OCIO_AJUDA)) || porRecusa;
     if (precisa && J.agora - J.maoCalc > 800) {
       J.maoCalc = J.agora;
       // uma medida por nivel: o jogador travou (parado) ou nao entendeu a regra (recusas); o guia (fase 1, carta nova) nao conta
       if (!J.ajudaMedida && !guia) { J.ajudaMedida = true; poki.measure('ajuda', rotuloMedida(), porRecusa ? 'recusa' : 'ocio'); }
       // guarda a jogada; a posicao sai do layout de cada quadro (maoNaTela)
-      const a = melhorJogada(J.e, J.agora);
-      J.mao = a && (a.tipo === 'colocar' || a.tipo === 'descartar') ? a : null;
+      // no juntar, o primeiro par de topos iguais vem antes (a carta nova da fila espera)
+      const b = melhorJogada(J.e, J.agora);
+      const a = pendente && !novidadeNaFrente() ? juntarDaMao(b) : b;
+      J.mao = a && (a.tipo === 'colocar' || a.tipo === 'descartar' || a.tipo === 'juntar') ? a : null;
     } else if (!precisa) J.mao = null;
   }
   if (dep.auto && J.estado === 'jogando' && J.e && J.agora >= J.autoProx) {
     J.autoProx = J.agora + dep.auto;
     const a = melhorJogada(J.e, J.agora);
-    if (a) aplicar(a, cena.L.filaPos(a.k || 0));
+    if (a) aplicar(a, a.tipo === 'juntar' ? undefined : cena.L.filaPos(a.k || 0));
   }
 }
 
 /**
  * A mao de ajuda na tela, pelo layout atual: no 'colocar', o gesto guiado da
- * carta da fila ate a coluna; no 'descartar', a mao apontando o descarte.
+ * carta da fila ate a coluna; no 'juntar', da carta do topo de uma coluna ate
+ * o topo igual da outra; no 'descartar', a mao apontando o descarte.
  */
 function maoNaTela() {
   const a = J.mao;
   if (!a || J.estado !== 'jogando' || J.arrasto || !J.e) return null;
   const L = cena.L;
   if (a.tipo === 'descartar') return { x: L.descarte.x + L.descarte.w / 2, y: L.descarte.y + L.descarte.h / 2 };
+  if (a.tipo === 'juntar') {
+    const de = J.e.colunas[a.de], para = J.e.colunas[a.c];
+    if (!de || !de.length || !para || !para.length) return null;
+    const o = L.carta(a.de, de.length - 1), p = L.carta(a.c, para.length - 1);
+    return { x: p.x + p.w / 2, y: p.y + p.h / 2, de: { x: o.x + o.w / 2, y: o.y + o.h / 2 }, carta: topo(de), w: o.w, h: o.h, c: a.c, juntar: true };
+  }
   const col = J.e.colunas[a.c], k = a.k || 0;
   if (!col || !J.e.fila[k]) return null;
   const p = L.carta(a.c, Math.min(col.length, L.pilhaMax - 1)), f = L.filaPos(k);
@@ -678,12 +725,12 @@ function maoNaTela() {
 }
 
 /**
- * Perigo desenhado (so na mesa justa): as colunas a 1 carta do limite e o
+ * Perigo desenhado (so no mundo sem fim): as colunas a 1 carta do limite e o
  * fio, recalculados quando o estado muda; na segunda chance do mundo 1, a
  * coluna que vai ser limpa (a mais cheia, como no motor) treme forte.
  */
 function perigoNaTela() {
-  if (!mesaJusta(J.e)) return null;
+  if (!comPerigo(J.e)) return null;
   if (J.perigoDe !== J.e) { J.perigoDe = J.e; J.perigo = perigo(J.e); }
   if (J.estado !== 'chance') return J.perigo;
   let forte = -1, qtd = -1;
@@ -765,15 +812,26 @@ function reserva() {
 }
 
 // ----------------------------------------------------------- entrada
+/** Retangulo da carta arrastada (1,1x: a da fila pelo tamanho da fila, a da mesa pelo da coluna). */
 function origemArrasto(a) {
-  const L = cena.L, p = L.filaPos(0);
-  return { x: a.x - p.w * 0.55, y: a.y - p.h * 0.55, w: p.w * 1.1, h: p.h * 1.1 };
+  const L = cena.L;
+  const w = a.origem === 'coluna' ? L.cw : L.filaPos(0).w, h = a.origem === 'coluna' ? L.ch : L.filaPos(0).h;
+  return { x: a.x - w * 0.55, y: a.y - h * 0.55, w: w * 1.1, h: h * 1.1 };
 }
 
 function legalEm(c) {
-  if (c < 0 || !J.e || !J.e.fila.length) return false;
+  if (c < 0 || !J.e) return false;
+  if (J.arrasto && J.arrasto.origem === 'coluna') return podeJuntar(J.e.regras, J.e.colunas, J.arrasto.de, c).ok;
+  if (!J.e.fila.length) return false;
   const k = J.arrasto ? J.arrasto.k : 0;
   return jogadasLegais(J.e, J.e.fila[k]).includes(c);
+}
+
+/** A primeira vez na sessao que o jogador arrasta uma carta da mesa (nos dois braços: no hoje, o gesto que nao existe). */
+function medirArrastoMesa() {
+  if (J.arrastoMesaMedido) return;
+  J.arrastoMesaMedido = true;
+  poki.measure('regra', 'arrasto', 'first');
 }
 
 /** Toque de jogo (ponteiro, tecla ou botao): abre a sessao de gameplay da Poki e marca o primeiro da sessao. */
@@ -781,6 +839,9 @@ function tocar() {
   poki.gameplayStart();
   if (!J.tocou) { J.tocou = true; poki.measure('game', 'toque', 'first'); }
 }
+
+/** No hoje, o toque numa coluna que joga a carta da mao; se o ponteiro seguir andando, o jogador tentava arrastar uma carta da mesa. */
+let toqueMesa = null;
 
 canvas.addEventListener('pointerdown', (e) => {
   audio.iniciar();
@@ -799,28 +860,49 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   const k = L.filaEm(x, y);
   const toque = e.pointerType === 'touch';
+  const desloc = toque ? Math.round(L.ch * 0.7) : 0;
   if (k >= 0 && (k === 0 || J.e.regras.filaLivre) && J.e.fila[k]) {
     try { canvas.setPointerCapture(e.pointerId); } catch { /* ignora */ }
-    const desloc = toque ? Math.round(L.ch * 0.7) : 0;
-    J.arrasto = { id: J.e.fila[k].id, k, x, y: y - desloc, x0: x, y0: y, desloc, pid: e.pointerId, moveu: false, rot: 0 };
+    J.arrasto = { origem: 'fila', id: J.e.fila[k].id, k, x, y: y - desloc, x0: x, y0: y, desloc, pid: e.pointerId, moveu: false, rot: 0 };
     J.destaque = -1;
     return;
   }
   const c = L.colunaEm(x, y);
-  if (c >= 0) { aplicar({ tipo: 'colocar', c, k: 0 }, L.filaPos(0)); return; }
+  // juntar: a coluna com cartas espera o soltar (toque = joga a carta da mao ali; arrasto = leva a carta de cima)
+  if (c >= 0 && J.e.regras.juntar && J.e.colunas[c].length) {
+    try { canvas.setPointerCapture(e.pointerId); } catch { /* ignora */ }
+    J.arrasto = { origem: 'coluna', de: c, id: topo(J.e.colunas[c]).id, k: 0, x, y: y - desloc, x0: x, y0: y, desloc, pid: e.pointerId, moveu: false, rot: 0 };
+    J.destaque = -1;
+    return;
+  }
+  if (c >= 0) {
+    toqueMesa = J.e.colunas[c].length ? { pid: e.pointerId, x0: x, y0: y } : null;
+    aplicar({ tipo: 'colocar', c, k: 0 }, L.filaPos(0));
+    return;
+  }
   if (L.descarteEm(x, y)) aplicar({ tipo: 'descartar' }, L.filaPos(0));
 });
 canvas.addEventListener('pointermove', (e) => {
+  if (toqueMesa && toqueMesa.pid === e.pointerId && Math.hypot(e.clientX - toqueMesa.x0, e.clientY - toqueMesa.y0) > ARRASTO_MESA) {
+    toqueMesa = null;
+    medirArrastoMesa();
+  }
   const a = J.arrasto;
   if (!a || a.pid !== e.pointerId) return;
   const dx = e.clientX - a.x;
   a.x = e.clientX; a.y = e.clientY - a.desloc;
   a.rot = Math.max(-0.2, Math.min(0.2, a.rot * 0.8 + dx * 0.004));
-  if (Math.hypot(e.clientX - a.x0, e.clientY - a.y0) > 8) a.moveu = true;
-  J.destaque = cena.L.colunaEm(a.x, a.y);
+  if (!a.moveu && Math.hypot(e.clientX - a.x0, e.clientY - a.y0) > ARRASTO_MIN) {
+    a.moveu = true;
+    if (a.origem === 'coluna') medirArrastoMesa();
+  }
+  const c = cena.L.colunaEm(a.x, a.y);
+  // a coluna de onde a carta da mesa saiu nao acende (nem o proibido)
+  J.destaque = a.origem === 'coluna' && (!a.moveu || c === a.de) ? -1 : c;
   J.legal = legalEm(J.destaque);
 });
 const soltar = (e) => {
+  if (toqueMesa && toqueMesa.pid === e.pointerId) toqueMesa = null;
   const a = J.arrasto;
   if (!a || a.pid !== e.pointerId) return;
   J.arrasto = null; J.destaque = -1;
@@ -828,6 +910,20 @@ const soltar = (e) => {
   if (J.estado !== 'jogando' || !J.e) return;
   const L = cena.L;
   const c = L.colunaEm(a.x, a.y);
+  if (a.origem === 'coluna') {
+    const col = J.e.colunas[a.de];
+    // teclas ou o desfazer podem ter mudado a mesa durante o arrasto: a carta tem de ser o topo ainda
+    const aindaTopo = !!col && col.length > 0 && topo(col).id === a.id;
+    if (!a.moveu) {
+      if (e.type !== 'pointercancel') aplicar({ tipo: 'colocar', c: a.de, k: 0 }, L.filaPos(0));
+      return;
+    }
+    if (!aindaTopo) return;
+    const volta = () => cena.linha.voltar(a.id, origemArrasto(a), L.carta(a.de, col.length - 1), J.agora);
+    if (c >= 0 && c !== a.de) { if (!aplicar({ tipo: 'juntar', de: a.de, c }, origemArrasto(a))) volta(); return; }
+    volta();
+    return;
+  }
   if (a.moveu && c >= 0) { if (!aplicar({ tipo: 'colocar', c, k: a.k }, origemArrasto(a))) cena.linha.voltar(a.id, origemArrasto(a), L.filaPos(a.k), J.agora); return; }
   if (a.moveu && L.descarteEm(a.x, a.y)) { if (!aplicar({ tipo: 'descartar' }, origemArrasto(a))) cena.linha.voltar(a.id, origemArrasto(a), L.filaPos(a.k), J.agora); return; }
   if (a.moveu) cena.linha.voltar(a.id, origemArrasto(a), L.filaPos(a.k), J.agora);
@@ -921,7 +1017,7 @@ const menus = criarMenus({
     aoFechar: () => { if (J.estado === 'menu') J.estado = 'jogando'; J.ultimaAcao = J.agora; },
     continuarGratis: () => {
       if (J.estado !== 'fim' || !temGratis()) return;
-      poki.measure(V.nucleo, rotuloMedida(), 'salvo');
+      poki.measure(V.regra, rotuloMedida(), 'salvo');
       continuar();
     },
     continuarVideo: async () => {
@@ -974,11 +1070,9 @@ poki.init().then(() => {
 audio.definirMudo(!!save.mudo);
 cena.definirTextos(T);
 if (dep.semAnim) document.body.classList.add('sem-animacao');
-// o braço do desktop (C: a seta e as teclas junto do gesto; D: as teclas sempre na mesa) e
 // as opcoes de visual em teste (so local): ?visual=descarte,escada,missao,missaob; ?guia=0..1
-const teclas = V.desktop === 'desk-c' ? 'guia' : V.desktop === 'desk-d' ? 'fixas' : '';
-if (dep.visual || dep.guia >= 0 || teclas) {
-  cena.definirVisual({ descarteFila: VISUAL.includes('descarte'), teclas, guiaU: dep.guia });
+if (dep.visual || dep.guia >= 0) {
+  cena.definirVisual({ descarteFila: VISUAL.includes('descarte'), guiaU: dep.guia });
   hud.mostrarEscada(VISUAL.includes('escada'));
 }
 hud.mostrarMissao(COM_MISSAO, VISUAL.includes('missaob'), () => { audio.completar(); vibrar([16, 40, 16]); });
@@ -999,7 +1093,7 @@ const VITRINE = {
 if (dep.vitrine) {
   const mundo = mundoDe(dep.nivel || 1);
   J.n = faseGlobal(mundo, 1);
-  const e = criarPartida(save.regras, { ...VITRINE, mundo, perfil: V.nucleo, regras: mundoDef(mundo).regras || {} }, 7);
+  const e = criarPartida(save.regras, { ...VITRINE, mundo, perfil: V.regra, regras: { ...(mundoDef(mundo).regras || {}), juntar: V.regra === 'juntar' } }, 7);
   const col = e.colunas[1];
   if (col.length) col[col.length - 1] = { ...col[col.length - 1], esp: true };
   const fila = mundo >= 4 ? ['dobro', 'quadruplo', 'bomba'] : ['coringa', 'bomba', 'dobro'];
@@ -1009,8 +1103,7 @@ if (dep.vitrine) {
   prepararPartida(e, false);
 } else {
   // a etiqueta do teste A/B vai antes do primeiro level/N/start (o funil do painel comeca nela)
-  poki.measure('variante', V.nucleo, 'start');
-  if (V.desktop) poki.measure('variante', V.desktop, 'start');
+  poki.measure('variante', V.regra, 'start');
   carregarFase(dep.nivel || save.fase || 1, !dep.fixo, !dep.nivel);
   // prints do voo (so local): a missao de ?missao= cumprida, com o premio ja no inventario e o voo congelado em ?voo=
   if (dep.voo >= 0 && COM_MISSAO && save.missoes.missoes[0]) {
@@ -1029,7 +1122,7 @@ if (dep.ganchos) {
   window.addEventListener('error', (ev) => { document.title = 'ERRO ' + ev.message; });
   window.addEventListener('unhandledrejection', (ev) => { document.title = 'ERRO ' + (ev.reason && ev.reason.message || ev.reason); });
   /** @type {any} */ (window).__c2 = {
-    J, cena, audio, poki, save, jogar: (a) => aplicar(a, cena.L.filaPos(0)),
+    J, cena, audio, poki, save, jogar: (a) => aplicar(a, a.tipo === 'juntar' ? undefined : cena.L.filaPos(0)),
     auto(ms) { dep.auto = ms; J.autoProx = J.agora; },
     /** forca a mesa cheia (banco de testes do SDK) */
     fimTeste() { if (J.estado === 'jogando') { J.e = { ...J.e, fim: 'mesaCheia' }; terminar('mesaCheia'); } },
@@ -1043,6 +1136,8 @@ function lerGestos() {
 function pontoDe(tok) {
   const L = cena.L;
   if (tok.startsWith('fila')) { const p = L.filaPos(Number(tok.slice(4)) || 0); return { x: p.x + p.w / 2, y: p.y + p.h / 2 }; }
+  // topoC: a carta de cima da coluna C (o arrasto do juntar); colC: a proxima casa vazia dela
+  if (tok.startsWith('topo')) { const c = Number(tok.slice(4)) || 0; const col = J.e.colunas[c]; const p = L.carta(c, Math.max(0, col.length - 1)); return { x: p.x + p.w / 2, y: p.y + p.h / 2 }; }
   if (tok.startsWith('col')) { const c = Number(tok.slice(3)) || 0; const col = J.e.colunas[c]; const p = L.carta(c, Math.min(col.length, L.pilhaMax - 1)); return { x: p.x + p.w / 2, y: p.y + p.h / 2 }; }
   if (tok === 'desc') return { x: L.descarte.x + L.descarte.w / 2, y: L.descarte.y + L.descarte.h / 2 };
   const [x, y] = tok.split(',').map(Number);
@@ -1053,11 +1148,13 @@ function fazerGesto(g) {
   if (g.cmd.startsWith('key:')) { window.dispatchEvent(new KeyboardEvent('keydown', { key: g.cmd.slice(4), bubbles: true })); return; }
   if (g.cmd.startsWith('click:')) { $(g.cmd.slice(6)).click(); return; }
   if (g.cmd.startsWith('tap:')) { const p = pontoDe(g.cmd.slice(4)); ev('pointerdown', p.x, p.y); ev('pointerup', p.x, p.y); return; }
-  const [de, para] = g.cmd.split('>');
+  // a>b arrasta e solta; a>b~ arrasta e segura (print do meio do arrasto)
+  const segura = g.cmd.endsWith('~');
+  const [de, para] = g.cmd.replace(/~$/, '').split('>');
   const a = pontoDe(de), b = pontoDe(para);
   ev('pointerdown', a.x, a.y);
   for (let k = 1; k <= 8; k++) ev('pointermove', a.x + ((b.x - a.x) * k) / 8, a.y + ((b.y - a.y) * k) / 8);
-  ev('pointerup', b.x, b.y);
+  if (!segura) ev('pointerup', b.x, b.y);
 }
 function resumo() {
   const e = J.e;

@@ -1,16 +1,15 @@
-// Regenera as tabelas de docs/curadoria.md, uma por perfil de mesa (o teste
-// A/B da 0.5.0): mede cada mundo com os jogadores do medir.mjs (guloso e
-// casual, o mundo inteiro numa mesa so; na mesa justa, tambem o acaso e o
-// distraido) e mostra, por nivel, o baralho (valores e especiais), o descarte
-// e a piedade e a nota do mundo, lida dos comentarios "// N: ..." acima de
-// cada mundo em src/jogo/fases.js. O texto fora dos marcadores
-// <!-- tabela --> e <!-- tabela-justa --> fica como esta.
+// Regenera as tabelas de docs/curadoria.md, uma por perfil de regra (o teste
+// A/B da 0.6.0): mede cada mundo com os jogadores do medir.mjs (guloso e
+// casual, o mundo inteiro numa mesa so) e mostra, por nivel, o baralho
+// (valores e especiais), os juntar do casual (no perfil 'juntar') e a nota do
+// mundo, lida dos comentarios "// N: ..." acima de cada mundo em
+// src/jogo/fases.js. O texto fora dos marcadores <!-- tabela --> e
+// <!-- tabela-juntar --> fica como esta.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { RAIZ } from './servir.mjs';
-import { MUNDOS, pesosDoNivel, especiaisDoNivel, mundoDoPerfil, escadaDoMundo } from '../src/jogo/fases.js';
-import { normalizarRegras } from '../src/jogo/regras.js';
-import { medirMundo, problemas, problemasMundo, GULOSO, CASUAL } from './medir.mjs';
+import { MUNDOS, pesosDoNivel, especiaisDoNivel, mundoDoPerfil } from '../src/jogo/fases.js';
+import { medirMundo, problemas, GULOSO, CASUAL } from './medir.mjs';
 
 const fonte = readFileSync(join(RAIZ, 'src/jogo/fases.js'), 'utf8');
 const notas = {};
@@ -18,18 +17,16 @@ const notas = {};
 for (const m of fonte.matchAll(/ {2}\/\/ (\d): ([^\n]+(?:\n {2}\/\/ [^\n]+)*)/g)) notas[Number(m[1])] = m[2].replace(/\n {2}\/\/ /g, ' ').trim().replace(/\.$/, '');
 const pct = (x) => `${Math.round(x * 100)}%`;
 
-/** A tabela de um perfil: uma linha por nivel e, na mesa justa, o acaso e o distraido de cada mundo. */
+/** A tabela de um perfil: uma linha por nivel e as mesas cheias de cada mundo. */
 function tabela(perfil) {
-  const justa = perfil === 'mesa-justa';
+  const juntar = perfil === 'juntar';
   const linhas = [
-    `| Fase | Mundo | Nível | Baralho | Especiais |${justa ? ' Descarte | Piedade |' : ''} Casual (alvo) | Guloso | Jogadas casual | Mesas cheias | Recomeços | Novidade / ajuste |`,
-    `|---|---|---|---|---|${justa ? '---|---|' : ''}---|---|---|---|---|---|`,
+    `| Fase | Mundo | Nível | Baralho | Especiais | Casual (alvo) | Guloso | Jogadas casual |${juntar ? ' Juntar casual |' : ''} Mesas cheias | Recomeços | Novidade / ajuste |`,
+    `|---|---|---|---|---|---|---|---|${juntar ? '---|' : ''}---|---|---|`,
   ];
   const rodape = [];
   for (const base of MUNDOS) {
     const def = mundoDoPerfil(base, perfil);
-    const escada = escadaDoMundo(def);
-    const descarte = normalizarRegras(def.regras).descarteMax;
     const mm = medirMundo(def.id, undefined, undefined, perfil);
     let ant = null;
     for (const nv of mm.niveis) {
@@ -37,20 +34,18 @@ function tabela(perfil) {
       const vs = Object.keys(pesosDoNivel(def, nv.n)).map(Number);
       const esp = Object.entries(especiaisDoNivel(def, nv.n)).map(([k, p]) => `${k} ${pct(p)}`).join(', ') || '—';
       const nota = nv.n === 1 ? notas[def.id] || '' : '';
-      const d = escada[nv.n - 1];
-      const extra = justa ? ` ${d.descarte ?? descarte} | ${d.secas === 0 ? 'só sem jogada' : `${d.secas ?? 2} secas`} |` : '';
-      linhas.push(`| ${nv.N} | ${def.id} | ${nv.alvoValor} | ${vs[0]}–${vs[vs.length - 1]} | ${esp} |${extra} ${nv.casual}% (${nv.alvo}%)${aviso} | ${nv.guloso}% | ${nv.jogadas} | ${nv.cheias.toFixed(2)} | ${nv.recomecos.toFixed(2)} | ${nota} |`);
+      const extra = juntar ? ` ${nv.juntou.toFixed(1)} |` : '';
+      linhas.push(`| ${nv.N} | ${def.id} | ${nv.alvoValor} | ${vs[0]}–${vs[vs.length - 1]} | ${esp} | ${nv.casual}% (${nv.alvo}%)${aviso} | ${nv.guloso}% | ${nv.jogadas} |${extra} ${nv.cheias.toFixed(2)} | ${nv.recomecos.toFixed(2)} | ${nota} |`);
       ant = nv;
     }
-    const avisoM = problemasMundo(mm).length ? ' ⚠' : '';
-    rodape.push(`- Mundo ${def.id}: o casual vê ${mm.cheias.toFixed(2)} mesas cheias; sem recomeçar, o acaso passa o nível 5 em ${mm.acaso}% e o distraído fecha o mundo em ${mm.distraido}%${avisoM}.`);
+    rodape.push(`- Mundo ${def.id}: o casual completa ${Math.round(mm.completou * 100)}% em ${mm.jogadasCasual} jogadas (mediana) e vê ${mm.cheias.toFixed(2)} mesas cheias.`);
   }
   return [...linhas, '', ...rodape].join('\n');
 }
 
 const arq = join(RAIZ, 'docs/curadoria.md');
 let doc = readFileSync(arq, 'utf8');
-for (const [perfil, marca] of [['mesa-hoje', 'tabela'], ['mesa-justa', 'tabela-justa']]) {
+for (const [perfil, marca] of [['hoje', 'tabela'], ['juntar', 'tabela-juntar']]) {
   const ini = `<!-- ${marca} -->`, fim = `<!-- /${marca} -->`;
   const bloco = `${ini}\n${tabela(perfil)}\n${fim}`;
   doc = doc.includes(ini) ? doc.replace(new RegExp(`${ini}[\\s\\S]*?${fim}`), bloco) : doc + '\n' + bloco + '\n';

@@ -2,9 +2,9 @@
 // os prints do jogo pelo Chrome headless em docs/mundos/prints/ (retrato,
 // paisagem, as regras na tela e a festa da subida de nivel) e fotografa
 // tools/mundos.html em docs/mundos/<folha>.png (a folha `festa` vai para
-// docs/escada/subida-de-nivel.png, a `desktop` para docs/escada/visual-desktop.png
+// docs/escada/subida-de-nivel.png, a `juntar` para docs/escada/juntar.png
 // e a `missao` para docs/escada/missao-na-mesa.png).
-// Uso: node tools/mundos.mjs [retrato|paisagem|cartas|regras|explosoes|festa|desktop|missao ...]   (padrao: todas)
+// Uso: node tools/mundos.mjs [retrato|paisagem|cartas|regras|explosoes|festa|juntar|missao ...]   (padrao: todas)
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,18 +13,21 @@ import { chrome, shot } from './shot.mjs';
 
 const PORTA = 5356;
 const PRINTS = join(RAIZ, 'docs/mundos/prints');
-const FOLHAS = { retrato: '2120x1130', paisagem: '2040x980', cartas: '1570x1700', regras: '1690x1090', explosoes: '1300x1960', festa: '1690x1130', desktop: '1990x1620', missao: '2120x1830' };
+const FOLHAS = { retrato: '2120x1130', paisagem: '2040x980', cartas: '1570x1700', regras: '1690x1090', explosoes: '1300x1960', festa: '1690x1130', juntar: '2120x2000', missao: '2120x1830' };
 /** Folhas que saem fora de docs/mundos/. */
-const SAIDA = { festa: 'docs/escada/subida-de-nivel.png', desktop: 'docs/escada/visual-desktop.png', missao: 'docs/escada/missao-na-mesa.png' };
+const SAIDA = { festa: 'docs/escada/subida-de-nivel.png', juntar: 'docs/escada/juntar.png', missao: 'docs/escada/missao-na-mesa.png' };
 const BASE = 'fixo&semanuncio&semanim&lang=pt';
 const MESA = 'vitrine&' + BASE;
 /** Fase global do comeco de cada mundo (o ?vitrine segue o mundo dela). */
 const INICIO = [1, 9, 17, 25, 33];
 /** Gestos das regras: tres descartes enchem a pilha (3/3); o video esvazia. */
 const ENCHER = 'nivel=2&semanuncio&semanim&lang=pt&gesto=key:d@600;key:d@1000;key:d@1400';
-/** Braços do desktop no teste A/B (?variante=): o gesto guiado do nivel 1 congelado em 3 fases (?guia=: clica, arrasta, solta). */
-const DESKTOP = [['a', ''], ['c', 'desk-c'], ['d', 'desk-d']];
-const FASES_GUIA = [0.06, 0.42, 0.74];
+/**
+ * O juntar (braço do teste A/B da 0.6.0) na abertura do nivel 1: a 1a jogada
+ * faz um 4 ao lado do 4 da coluna 1; a mao guiada arrasta um ate o outro
+ * (?guia= congela o gesto); topo2>topo0~ segura a carta da mesa no ar.
+ */
+const JUNTAR = `nivel=1&${BASE}&variante=juntar`;
 /** A abertura do nivel 1 (o 16 em 3 jogadas, com cascata) e uma 4a jogada durante a festa da subida. */
 const ABERTURA = 'nivel=1&fixo&semanuncio&semanim&lang=pt&gesto=fila0>col2@400;fila0>col2@1000;fila0>col0@1600;fila0>col1@3300';
 
@@ -45,11 +48,15 @@ function printsDe(folha) {
       [`${ENCHER};click:vDescarte@2000`, '390x844', 'regra-video.png', 14000],
     ];
   }
-  if (folha === 'desktop') {
-    const guia = DESKTOP.flatMap(([id, v]) => FASES_GUIA.map((u, i) => [`nivel=1&${BASE}&guia=${u}${v ? `&variante=${v}` : ''}`, '1031x580', `desktop-${id}-${i + 1}.png`, 2500]))
-      .filter(([, , arq]) => !/desktop-d-[12]/.test(arq)); // na D a folha so usa a soltura
-    // as teclas fixas sem o gesto: a mesa de demonstracao da Floresta e a do Cosmos (3 colunas)
-    return guia.concat([1, 33].map((N, i) => [`${MESA}&nivel=${N}&variante=desk-d`, '1031x580', `desktop-d-mesa${i + 1}.png`, 2500]));
+  if (folha === 'juntar') {
+    return [
+      [`${JUNTAR}&guia=0.45&gesto=fila0>col2@400`, '390x844', 'juntar-1.png', 3200],
+      [`${JUNTAR}&gesto=fila0>col2@400;topo2>topo0~@1400`, '390x844', 'juntar-2.png', 1900],
+      [`${JUNTAR}&gesto=topo2>topo0~@600`, '390x844', 'juntar-3.png', 1100],
+      [`${JUNTAR}&gesto=fila0>col2@400;topo2>topo0@1400`, '390x844', 'juntar-4.png', 1720],
+      [`${JUNTAR}&gesto=fila0>col2@400;topo2>topo0@1400`, '390x844', 'juntar-5.png', 2700],
+      [`${JUNTAR}&guia=0.45&gesto=fila0>col2@400`, '1280x720', 'juntar-paisagem.png', 3200],
+    ];
   }
   if (folha === 'missao') {
     // a missao fixa (?missao=) no nivel 2 da Floresta; o voo do premio congelado (?voo=)

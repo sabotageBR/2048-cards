@@ -1,6 +1,6 @@
 # Curadoria dos mundos
 
-Cada mundo foi ajustado e conferido pelo simulador (`npm run simular`; a tabela abaixo sai de `node tools/curadoria.mjs`, e o gráfico `docs/escada/curva.png` de `node tools/curva.mjs`). O bot joga **o mundo inteiro numa mesa só** (`jogarMundo` em `bot.js`): o nível sobe na mesma mesa; na mesa cheia vem o "Continuar" grátis do nível e, sem ele, o recomeço pela mesa pronta do nível (`[alvo/2] [alvo/4]`, semente nova). São duas réguas (`tools/medir.mjs`):
+Cada mundo foi ajustado e conferido pelo simulador (`npm run simular`; a tabela abaixo sai de `node tools/curadoria.mjs`, e o gráfico `docs/escada/curva.png` de `node tools/curva.mjs`). O bot joga **o mundo inteiro numa mesa só** (`jogarMundo` em `bot.js`): o nível sobe na mesma mesa; na mesa cheia vem o "Continuar" grátis do nível e, sem ele, o recomeço pela mesa pronta do nível (`[alvo/2] [alvo/4]`, semente nova). São duas réguas (`tools/medir.mjs`), nos dois perfis de regra do teste A/B (`hoje` e `juntar`, ver a seção da 0.6.0):
 
 - **Guloso** (25 partidas por mundo): prova que cada nível é passável por quem joga bem. Piso: passa o nível sem recomeçar em 82% das partidas que chegaram a ele (78% no 2048).
 - **Casual** (`PERFIL_CASUAL` em `bot.js`, 160 partidas em duas séries de sementes): erra 1 em 5 jogadas e usa o "Continuar" grátis. Mede a curva: em quantas partidas ele passa o nível sem recomeçar fica a até 8 pontos de `alvoCasual(N)` (`fases.js`), nenhum nível tem mais de 12 pontos a menos que o anterior, e a mediana de jogadas do nível (com os recomeços) fica dentro de `ritmoMax` (40 no mundo 1, 80 nos outros).
@@ -74,77 +74,77 @@ O teste passou, mas o funil (ver `docs/autoria.md`) mostrou 30% de perda por ní
 | 39 | 5 | 1024 | 8–256 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 81% (78%) | 84% | 44 | 0.68 | 0.19 |  |
 | 40 | 5 | 2048 | 8–512 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 70% (70%) | 84% | 55 | 1.18 | 0.44 |  |
 
-- Mundo 1: o casual vê 0.23 mesas cheias; sem recomeçar, o acaso passa o nível 5 em 24% e o distraído fecha o mundo em 72%.
-- Mundo 2: o casual vê 0.47 mesas cheias; sem recomeçar, o acaso passa o nível 5 em 13% e o distraído fecha o mundo em 24%.
-- Mundo 3: o casual vê 0.69 mesas cheias; sem recomeçar, o acaso passa o nível 5 em 22% e o distraído fecha o mundo em 22%.
-- Mundo 4: o casual vê 1.18 mesas cheias; sem recomeçar, o acaso passa o nível 5 em 9% e o distraído fecha o mundo em 8%.
-- Mundo 5: o casual vê 2.59 mesas cheias; sem recomeçar, o acaso passa o nível 5 em 12% e o distraído fecha o mundo em 4%.
+- Mundo 1: o casual completa 100% em 143 jogadas (mediana) e vê 0.23 mesas cheias.
+- Mundo 2: o casual completa 100% em 247 jogadas (mediana) e vê 0.47 mesas cheias.
+- Mundo 3: o casual completa 100% em 187 jogadas (mediana) e vê 0.69 mesas cheias.
+- Mundo 4: o casual completa 100% em 205 jogadas (mediana) e vê 1.18 mesas cheias.
+- Mundo 5: o casual completa 100% em 240 jogadas (mediana) e vê 2.59 mesas cheias.
 <!-- /tabela -->
 
-## 2026-10-16 · mesa justa (teste A/B da 0.5.0)
+## 2026-10-16 · mesa justa (teste A/B da 0.5.0, retirada na 0.6.0)
 
-O Player Fit Test da 0.4.4 passou (4m01s, 38% engajados), mas no mesmo lugar da 0.4.1: o jogador sai minuto a minuto, e o motor mostrou por quê. **O jogo se jogava sozinho:** jogando 100% ao acaso, 87% chegavam ao nível 4; o distraído (metade das jogadas ao acaso) fechava o mundo 1 sem recomeçar em 74% das partidas; o casual ocupava 8 das 24 vagas e via 0,23 mesa cheia no mundo 1 inteiro. O teste A/B da 0.5.0 sorteia por jogador a mesa de hoje (`mesa-hoje`, a tabela acima) e a **mesa justa** (`mesa-justa`, abaixo), que muda só do nível 4 em diante (os níveis 1 a 3 são iguais nos dois, sem derrota nos primeiros minutos):
+O Player Fit Test da 0.4.4 mostrou que o jogo se jogava sozinho (jogando 100% ao acaso, 87% chegavam ao nível 4), e a 0.5.0 sorteou por jogador a mesa de hoje contra a **mesa justa**: do nível 4 em diante, descarte de 2 lugares, a piedade das 2 jogadas secas desligada ou espaçada e, no mundo 1, um baralho de 6 valores. No simulador, o casual do mundo 1 passou a ver 1,56 mesa cheia (eram 0,23) e o distraído fechava o mundo 1 em 10% (eram 74%). **No Player Fit Test da 0.5.2 os dois braços empataram** (3 min: 27% × 26%; 7 min: 10% × 10%), e a mesa justa saiu dos mundos 1 a 5 na 0.6.0, com as réguas do acaso e do distraído. Ficou só no mundo sem fim, que já era justo de fábrica.
 
-- **Descarte** de 2 lugares do nível 5 em diante nos mundos 1 a 3 (o 4 já tinha 2).
-- **Piedade:** o gatilho das 2 jogadas secas some (`secas: 0`, só fica a piedade "sem jogada legal") ou espaça para 3, alternando por nível.
-- **Mundo 1:** baralho de 6 valores quase iguais do nível 5 em diante (`[3, 3, 3, 3, 2.5, 2]`): um valor pequeno a mais atravanca a mesa.
-- A pilha continua com 6 cartas: com 5 ou 6 o resultado do casual é o mesmo (a mesa trava pela regra estrita, não pela altura), e mudar a pilha mexeria no layout no meio do teste.
-- O mundo 5 já era justo (o casual vê 2,4 mesas cheias) e é igual nos dois perfis.
+Também na 0.5.0: **a entrada dos mundos 2 e 3 é roteirizada** (`fila` em `MUNDOS`): o dobro e o ×4 vêm na segunda carta e fazem o 16 em cascata (antes chegavam à frente no nível 1 em 5 a 7% das partidas). Depois do mundo 5 vem o **mundo sem fim** (`mundoDef`: 6, 7, ...), com todas as cartas, o descarte de 2 lugares e a piedade espaçada ou desligada do nível 4 em diante (piso da curva 80; `node tools/simular.mjs 6`).
 
-Réguas novas, só na mesa justa (`ACASO_MAX` e `DISTRAIDO_MAX` em `fases.js`; `PERFIL_ACASO` e `PERFIL_DISTRAIDO` em `bot.js`): o acaso passa o nível 5 sem recomeçar em no máximo 30% das partidas, e o distraído fecha o mundo em no máximo 20%. A curva do casual tem piso próprio (`[85, 85, 82, 78, 70]`). O ritmo de jogadas não muda.
+## 2026-10-17 · o juntar (teste A/B da 0.6.0)
 
-Também na 0.5.0, nos dois perfis: **a entrada dos mundos 2 e 3 é roteirizada** (`fila` em `MUNDOS`): o dobro e o ×4 vêm na segunda carta e fazem o 16 em cascata (antes chegavam à frente no nível 1 em 5 a 7% das partidas). Depois do mundo 5 vem o **mundo sem fim** (`mundoDef`: 6, 7, ...), com todas as cartas, descarte de 2 lugares e a mesa justa de fábrica (piso da curva 80; `node tools/simular.mjs 6`).
+Depois do Player Fit Test da 0.5.2 (ver `docs/autoria.md`), o teste A/B sorteia por jogador a regra de hoje (`hoje`, a tabela acima) e o **juntar** (`juntar`, abaixo): a carta do topo de uma coluna vai até outra coluna com o mesmo valor no topo e funde, com a cascata, sem gastar a carta da mão (`regras.juntar`, `podeJuntar` em `regras.js`, a ação `juntar` em `partida.js`). **Os baralhos, o descarte e a piedade são os mesmos nos dois perfis:** o teste mede o verbo, não um baralho novo. O bot guloso e o casual usam o juntar sempre que ele é a melhor jogada (`acoesLegais` traz os pares); o erro do casual continua só nas colocações.
 
-<!-- tabela-justa -->
-| Fase | Mundo | Nível | Baralho | Especiais | Descarte | Piedade | Casual (alvo) | Guloso | Jogadas casual | Mesas cheias | Recomeços | Novidade / ajuste |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 1 | 16 | 2–4 | — | 3 | 2 secas | 100% (100%) | 100% | 2 | 0.00 | 0.00 | a abertura roteirizada (o 16 em 3 jogadas com cascata); o coringa entra no nivel 2 e a bomba no 4. Niveis curtos: cartas do alvo/4 para baixo e menos 2 no baralho (o Player Fit Test da 0.4.1 perdia 30% por nivel do 128 ao 512) |
-| 2 | 1 | 32 | 2–8 | coringa 5% | 3 | 2 secas | 100% (100%) | 100% | 9 | 0.00 | 0.00 |  |
-| 3 | 1 | 64 | 2–16 | coringa 5% | 3 | 2 secas | 100% (99%) | 100% | 12 | 0.00 | 0.00 |  |
-| 4 | 1 | 128 | 2–32 | coringa 5%, bomba 6% | 3 | só sem jogada | 100% (97%) | 100% | 21 | 0.04 | 0.00 |  |
-| 5 | 1 | 256 | 2–64 | coringa 5%, bomba 6% | 2 | 3 secas | 96% (95%) | 100% | 20 | 0.18 | 0.04 |  |
-| 6 | 1 | 512 | 4–128 | coringa 5%, bomba 6% | 2 | 3 secas | 88% (92%) | 100% | 23 | 0.46 | 0.13 |  |
-| 7 | 1 | 1024 | 8–256 | coringa 5%, bomba 6% | 2 | só sem jogada | 90% (89%) | 96% | 21 | 0.39 | 0.10 |  |
-| 8 | 1 | 2048 | 16–512 | coringa 5%, bomba 6% | 2 | só sem jogada | 88% (85%) | 100% | 23 | 0.49 | 0.14 |  |
-| 9 | 2 | 16 | 2–4 | coringa 4%, bomba 4%, dobro 6% | 3 | 2 secas | 100% (100%) | 100% | 2 | 0.00 | 0.00 | o dobro (dobra o topo e cascateia). O 2048 tem o baralho largo (6 valores). A entrada traz o dobro na segunda carta: no 4 sobre o 8, ele faz o 16 em cascata |
-| 10 | 2 | 32 | 2–4 | coringa 4%, bomba 4%, dobro 6% | 3 | 2 secas | 100% (100%) | 100% | 12 | 0.00 | 0.00 |  |
-| 11 | 2 | 64 | 2–8 | coringa 4%, bomba 4%, dobro 6% | 3 | 2 secas | 100% (99%) | 100% | 15 | 0.00 | 0.00 |  |
-| 12 | 2 | 128 | 2–16 | coringa 4%, bomba 4%, dobro 6% | 3 | só sem jogada | 100% (97%) | 100% | 27 | 0.01 | 0.00 |  |
-| 13 | 2 | 256 | 2–32 | coringa 4%, bomba 4%, dobro 6% | 2 | 3 secas | 100% (95%) | 100% | 39 | 0.08 | 0.00 |  |
-| 14 | 2 | 512 | 4–64 | coringa 4%, bomba 4%, dobro 6% | 2 | só sem jogada | 92% (92%) | 96% | 44 | 0.34 | 0.09 |  |
-| 15 | 2 | 1024 | 8–128 | coringa 4%, bomba 4%, dobro 6% | 2 | só sem jogada | 94% (89%) | 100% | 42 | 0.34 | 0.06 |  |
-| 16 | 2 | 2048 | 8–256 | coringa 4%, bomba 4%, dobro 6% | 2 | só sem jogada | 83% (85%) | 100% | 64 | 0.76 | 0.24 |  |
-| 17 | 3 | 16 | 2–4 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 3 | 2 secas | 100% (100%) | 100% | 2 | 0.00 | 0.00 | a carta x4 (o topo vezes 4, sem passar do 2048, e cascateia). Ela ajuda muito: o baralho e largo (6 valores) e o 1024 e o 2048 tem cartas grandes (do alvo/4 para baixo, 6 e 7 valores). A entrada traz o x4 na segunda carta: no 2 sobre o 8, ele faz o 16 em cascata |
-| 18 | 3 | 32 | 2–4 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 3 | 2 secas | 100% (100%) | 100% | 0 | 0.00 | 0.00 |  |
-| 19 | 3 | 64 | 2–8 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 3 | 2 secas | 100% (99%) | 100% | 17 | 0.00 | 0.00 |  |
-| 20 | 3 | 128 | 2–16 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 3 | só sem jogada | 100% (97%) | 100% | 20 | 0.00 | 0.00 |  |
-| 21 | 3 | 256 | 2–32 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 2 | 3 secas | 99% (94%) | 100% | 23 | 0.06 | 0.01 |  |
-| 22 | 3 | 512 | 2–64 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 2 | só sem jogada | 88% (91%) | 100% | 51 | 0.41 | 0.14 |  |
-| 23 | 3 | 1024 | 8–256 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 2 | 3 secas | 86% (87%) | 100% | 27 | 0.46 | 0.14 |  |
-| 24 | 3 | 2048 | 8–512 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 2 | só sem jogada | 84% (82%) | 92% | 39 | 0.56 | 0.19 |  |
-| 25 | 4 | 16 | 2–4 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 2 | 2 secas | 100% (100%) | 100% | 5 | 0.00 | 0.00 | o descarte aperta (2 lugares por nivel), com todos os especiais. O baralho e largo (6 valores) e o 1024 e o 2048 tem cartas grandes |
-| 26 | 4 | 32 | 2–4 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 2 | 2 secas | 100% (100%) | 100% | 9 | 0.00 | 0.00 |  |
-| 27 | 4 | 64 | 2–8 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 2 | 2 secas | 100% (98%) | 100% | 14 | 0.00 | 0.00 |  |
-| 28 | 4 | 128 | 2–16 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 2 | só sem jogada | 100% (96%) | 100% | 18 | 0.00 | 0.00 |  |
-| 29 | 4 | 256 | 2–32 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 2 | 3 secas | 99% (93%) | 100% | 29 | 0.04 | 0.01 |  |
-| 30 | 4 | 512 | 2–64 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 2 | só sem jogada | 88% (89%) | 100% | 52 | 0.44 | 0.13 |  |
-| 31 | 4 | 1024 | 8–256 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 2 | 3 secas | 87% (84%) | 100% | 27 | 0.47 | 0.14 |  |
-| 32 | 4 | 2048 | 8–512 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 2 | só sem jogada | 81% (78%) | 96% | 41 | 0.62 | 0.23 |  |
-| 33 | 5 | 16 | 2–4 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 3 | 2 secas | 100% (100%) | 100% | 5 | 0.00 | 0.00 | tudo junto em 3 colunas. O 1024 e o 2048 tem baralho largo de cartas grandes (do alvo/4 para baixo, 6 e 7 valores) |
-| 34 | 5 | 32 | 2–4 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 3 | 2 secas | 100% (99%) | 100% | 9 | 0.00 | 0.00 |  |
-| 35 | 5 | 64 | 2–8 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 3 | 2 secas | 100% (98%) | 100% | 15 | 0.01 | 0.00 |  |
-| 36 | 5 | 128 | 2–16 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 3 | 2 secas | 100% (94%) | 100% | 20 | 0.01 | 0.00 |  |
-| 37 | 5 | 256 | 2–32 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 3 | 2 secas | 95% (90%) | 100% | 35 | 0.20 | 0.06 |  |
-| 38 | 5 | 512 | 4–64 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 3 | 2 secas | 83% (85%) | 88% | 42 | 0.52 | 0.17 |  |
-| 39 | 5 | 1024 | 8–256 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 3 | 2 secas | 81% (78%) | 84% | 44 | 0.68 | 0.19 |  |
-| 40 | 5 | 2048 | 8–512 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 3 | 2 secas | 70% (70%) | 84% | 55 | 1.18 | 0.44 |  |
+- **O juntar deixa o jogo bem mais fácil**, como esperado: o casual passa todos os níveis, joga 25 a 40% menos por mundo (mundo 1: 102 jogadas, eram 143) e quase nunca vê a mesa cheia (0,03 a 0,19 por mundo, eram 0,23 a 2,59). Ele junta de 1 a 6 vezes por nível (a coluna "Juntar casual"). Por isso a curva do perfil `juntar` vale só pelo piso (`curvaSoPiso` em `fases.js`): o "FACIL" não é falha nele; o guloso, a queda e o ritmo valem igual.
+- **A abertura do nível 1 ensina o verbo:** com o 2 no 2, fica um 4 ao lado do 4 da coluna 1, e a mão guiada (o guloso) leva um até o outro: 8, cascata, 16, em 2 jogadas (no `hoje` são 3).
+- Um jogador real não vê todos os pares como o bot. Se o juntar ganhar o teste, a dificuldade dele é a próxima conversa.
 
-- Mundo 1: o casual vê 1.56 mesas cheias; sem recomeçar, o acaso passa o nível 5 em 12% e o distraído fecha o mundo em 10%.
-- Mundo 2: o casual vê 1.53 mesas cheias; sem recomeçar, o acaso passa o nível 5 em 4% e o distraído fecha o mundo em 4%.
-- Mundo 3: o casual vê 1.49 mesas cheias; sem recomeçar, o acaso passa o nível 5 em 9% e o distraído fecha o mundo em 4%.
-- Mundo 4: o casual vê 1.57 mesas cheias; sem recomeçar, o acaso passa o nível 5 em 8% e o distraído fecha o mundo em 4%.
-- Mundo 5: o casual vê 2.59 mesas cheias; sem recomeçar, o acaso passa o nível 5 em 12% e o distraído fecha o mundo em 4%.
-<!-- /tabela-justa -->
+<!-- tabela-juntar -->
+| Fase | Mundo | Nível | Baralho | Especiais | Casual (alvo) | Guloso | Jogadas casual | Juntar casual | Mesas cheias | Recomeços | Novidade / ajuste |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 1 | 16 | 2–4 | — | 100% (100%) | 100% | 2 | 0.5 | 0.00 | 0.00 | a abertura roteirizada (o 16 em 3 jogadas com cascata); o coringa entra no nivel 2 e a bomba no 4. Niveis curtos: cartas do alvo/4 para baixo e menos 2 no baralho (o Player Fit Test da 0.4.1 perdia 30% por nivel do 128 ao 512) |
+| 2 | 1 | 32 | 2–8 | coringa 5% | 100% (100%) | 100% | 7 | 1.3 | 0.00 | 0.00 |  |
+| 3 | 1 | 64 | 2–16 | coringa 5% | 100% (100%) | 100% | 10 | 1.7 | 0.00 | 0.00 |  |
+| 4 | 1 | 128 | 2–32 | coringa 5%, bomba 6% | 100% (99%) | 100% | 13 | 2.5 | 0.00 | 0.00 |  |
+| 5 | 1 | 256 | 4–64 | coringa 5%, bomba 6% | 100% (98%) | 100% | 17 | 2.8 | 0.00 | 0.00 |  |
+| 6 | 1 | 512 | 8–128 | coringa 5%, bomba 6% | 100% (97%) | 100% | 15 | 2.8 | 0.01 | 0.00 |  |
+| 7 | 1 | 1024 | 16–256 | coringa 5%, bomba 6% | 100% (96%) | 100% | 16 | 2.7 | 0.01 | 0.00 |  |
+| 8 | 1 | 2048 | 32–512 | coringa 5%, bomba 6% | 100% (94%) | 100% | 16 | 2.8 | 0.01 | 0.00 |  |
+| 9 | 2 | 16 | 2–4 | coringa 4%, bomba 4%, dobro 6% | 100% (100%) | 100% | 2 | 0.8 | 0.00 | 0.00 | o dobro (dobra o topo e cascateia). O 2048 tem o baralho largo (6 valores). A entrada traz o dobro na segunda carta: no 4 sobre o 8, ele faz o 16 em cascata |
+| 10 | 2 | 32 | 2–4 | coringa 4%, bomba 4%, dobro 6% | 100% (100%) | 100% | 1 | 0.5 | 0.00 | 0.00 |  |
+| 11 | 2 | 64 | 2–8 | coringa 4%, bomba 4%, dobro 6% | 100% (99%) | 100% | 12 | 1.9 | 0.00 | 0.00 |  |
+| 12 | 2 | 128 | 2–16 | coringa 4%, bomba 4%, dobro 6% | 100% (99%) | 100% | 17 | 3.0 | 0.00 | 0.00 |  |
+| 13 | 2 | 256 | 2–32 | coringa 4%, bomba 4%, dobro 6% | 100% (97%) | 100% | 26 | 4.7 | 0.00 | 0.00 |  |
+| 14 | 2 | 512 | 4–64 | coringa 4%, bomba 4%, dobro 6% | 100% (96%) | 100% | 26 | 4.5 | 0.00 | 0.00 |  |
+| 15 | 2 | 1024 | 8–128 | coringa 4%, bomba 4%, dobro 6% | 100% (94%) | 100% | 26 | 4.5 | 0.00 | 0.00 |  |
+| 16 | 2 | 2048 | 8–256 | coringa 4%, bomba 4%, dobro 6% | 100% (92%) | 100% | 32 | 5.9 | 0.00 | 0.00 |  |
+| 17 | 3 | 16 | 2–4 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (100%) | 100% | 2 | 0.0 | 0.00 | 0.00 | a carta x4 (o topo vezes 4, sem passar do 2048, e cascateia). Ela ajuda muito: o baralho e largo (6 valores) e o 1024 e o 2048 tem cartas grandes (do alvo/4 para baixo, 6 e 7 valores). A entrada traz o x4 na segunda carta: no 2 sobre o 8, ele faz o 16 em cascata |
+| 18 | 3 | 32 | 2–4 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (100%) | 100% | 0 | 0.4 | 0.00 | 0.00 |  |
+| 19 | 3 | 64 | 2–8 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (99%) | 100% | 12 | 2.0 | 0.00 | 0.00 |  |
+| 20 | 3 | 128 | 2–16 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (98%) | 100% | 14 | 2.5 | 0.00 | 0.00 |  |
+| 21 | 3 | 256 | 2–32 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (97%) | 100% | 19 | 3.5 | 0.00 | 0.00 |  |
+| 22 | 3 | 512 | 2–64 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (95%) | 100% | 29 | 5.3 | 0.00 | 0.00 |  |
+| 23 | 3 | 1024 | 8–256 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 99% (93%) | 100% | 20 | 2.9 | 0.03 | 0.01 |  |
+| 24 | 3 | 2048 | 8–512 | coringa 4%, bomba 4%, dobro 3%, quadruplo 5% | 100% (90%) | 100% | 19 | 4.3 | 0.01 | 0.00 |  |
+| 25 | 4 | 16 | 2–4 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 100% (100%) | 100% | 3 | 0.8 | 0.00 | 0.00 | o descarte aperta (2 lugares por nivel), com todos os especiais. O baralho e largo (6 valores) e o 1024 e o 2048 tem cartas grandes |
+| 26 | 4 | 32 | 2–4 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 100% (100%) | 100% | 7 | 1.1 | 0.00 | 0.00 |  |
+| 27 | 4 | 64 | 2–8 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 100% (98%) | 100% | 12 | 1.8 | 0.00 | 0.00 |  |
+| 28 | 4 | 128 | 2–16 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 100% (96%) | 100% | 16 | 2.7 | 0.00 | 0.00 |  |
+| 29 | 4 | 256 | 2–32 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 100% (93%) | 100% | 22 | 3.7 | 0.00 | 0.00 |  |
+| 30 | 4 | 512 | 2–64 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 100% (90%) | 100% | 29 | 5.6 | 0.00 | 0.00 |  |
+| 31 | 4 | 1024 | 8–256 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 98% (85%) | 100% | 21 | 3.6 | 0.07 | 0.02 |  |
+| 32 | 4 | 2048 | 8–512 | coringa 4%, bomba 4%, dobro 4%, quadruplo 4% | 99% (80%) | 100% | 23 | 4.5 | 0.01 | 0.01 |  |
+| 33 | 5 | 16 | 2–4 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 100% (100%) | 100% | 3 | 0.8 | 0.00 | 0.00 | tudo junto em 3 colunas. O 1024 e o 2048 tem baralho largo de cartas grandes (do alvo/4 para baixo, 6 e 7 valores) |
+| 34 | 5 | 32 | 2–4 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 100% (99%) | 100% | 6 | 1.0 | 0.00 | 0.00 |  |
+| 35 | 5 | 64 | 2–8 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 100% (98%) | 100% | 11 | 1.6 | 0.00 | 0.00 |  |
+| 36 | 5 | 128 | 2–16 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 100% (94%) | 100% | 17 | 2.5 | 0.00 | 0.00 |  |
+| 37 | 5 | 256 | 2–32 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 100% (90%) | 100% | 22 | 3.5 | 0.00 | 0.00 |  |
+| 38 | 5 | 512 | 4–64 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 99% (85%) | 100% | 28 | 3.5 | 0.03 | 0.01 |  |
+| 39 | 5 | 1024 | 8–256 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 97% (78%) | 96% | 24 | 3.3 | 0.11 | 0.03 |  |
+| 40 | 5 | 2048 | 8–512 | coringa 5%, bomba 5%, dobro 5%, quadruplo 4% | 99% (70%) | 100% | 35 | 5.2 | 0.05 | 0.01 |  |
+
+- Mundo 1: o casual completa 100% em 102 jogadas (mediana) e vê 0.03 mesas cheias.
+- Mundo 2: o casual completa 100% em 150 jogadas (mediana) e vê 0.00 mesas cheias.
+- Mundo 3: o casual completa 100% em 127 jogadas (mediana) e vê 0.03 mesas cheias.
+- Mundo 4: o casual completa 100% em 139 jogadas (mediana) e vê 0.08 mesas cheias.
+- Mundo 5: o casual completa 100% em 148 jogadas (mediana) e vê 0.19 mesas cheias.
+<!-- /tabela-juntar -->
 
 
 ## Histórico: o duelo contra monstros (`master`)

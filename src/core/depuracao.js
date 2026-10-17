@@ -6,14 +6,15 @@
 //   ?semanuncio      nao pede intervalo comercial (prints e testes longos)
 //   ?lang=pt         forca o idioma (en, pt, es)
 //   ?regras={"colunas":5}     regras do laboratorio (JSON)
-//   ?gesto=fila0>col2@300;tap:col1@900;tap:desc@1200;key:z@1500   gestos simulados (ms)
+//   ?gesto=fila0>col2@300;topo2>topo0@600;tap:col1@900;tap:desc@1200;key:z@1500   gestos
+//                    simulados (ms); colC e a proxima casa vazia da coluna, topoC a carta de cima
 //   ?vitrine         mesa de demonstracao (todos os valores e os especiais)
 //   ?semhud          esconde o HUD (thumb)
 //   ?menu            abre o menu ao carregar
 //   ?visual=descarte,escada,missao   opcoes de visual em teste (prints para o usuario escolher;
 //                    missao: a missao ativa no painel, ate a aprovacao da folha)
-//   ?variante=mesa-justa,desk-d   forca os braços do teste A/B (src/core/variante.js); nao vai
-//                    para o save. Sem ele, em localhost valem os controles (mesa-hoje, desk-a)
+//   ?variante=juntar forca o braço do teste A/B (src/core/variante.js); nao vai para o
+//                    save. Sem ele, em localhost vale o controle (hoje)
 //   ?guia=0.7        congela o gesto guiado nessa fase (0..1: clica, arrasta, solta), para os prints
 //   ?missao=cascata:3:1:coringa   fixa a missao do painel (tipo:alvo:atual:premio), para os prints
 //   ?voo=0.5         congela o voo do premio da missao nessa fase (0..1), para os prints

@@ -1,7 +1,7 @@
 // Reducer da partida: imutabilidade, eventos, descarte, itens, febre, fim.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { criarPartida, jogar, acoesLegais, temJogada, desfazerPara, perigo } from '../src/jogo/partida.js';
+import { criarPartida, jogar, acoesLegais, temJogada, desfazerPara, perigo, paresDeJuntar, presa } from '../src/jogo/partida.js';
 import { progresso, progressoDoNivel } from '../src/jogo/metas.js';
 import { faseDe, faseGlobal, alvoDoNivel, MUNDOS, kitDoNivel } from '../src/jogo/fases.js';
 
@@ -370,29 +370,30 @@ test('fila roteirizada: as primeiras cartas vem da fase, o especial zera o espac
   assert.equal(r9.fila, undefined);
 });
 
-test('mesa justa: o descarte e a piedade trocam na subida de nivel', () => {
-  // mundo 1, nivel 4 da mesa justa: descarte de 3 e piedade desligada; no 5, descarte de 2 e piedade em 3 secas
-  const f = faseDe(faseGlobal(1, 4), 0, 'mesa-justa');
+test('degrau: o descarte e a piedade trocam na subida de nivel', () => {
+  // mundo sem fim, nivel 4: piedade desligada; no 5, piedade em 3 secas (o descarte fica em 2)
+  const f = faseDe(faseGlobal(6, 4));
   let e = criarPartida({}, f, f.semente);
-  assert.equal(e.perfil, 'mesa-justa');
-  assert.equal(e.regras.descarteMax, 3);
+  assert.equal(e.regras.descarteMax, 2);
   assert.equal(e.baralho.secas, 0);
-  // forca a subida: um 64 sobre o 64 faz o 128
   e = { ...e, colunas: [[{ id: 800, tipo: 'normal', v: 64 }], [], [], []], fila: [{ id: 801, tipo: 'normal', v: 64 }, ...e.fila.slice(1)] };
-  e = jogar(e, { tipo: 'descartar', t: 0 }).estado; // a 64 vai para o descarte: 2 lugares livres
+  e = jogar(e, { tipo: 'descartar', t: 0 }).estado; // a 64 vai para o descarte: 1 lugar livre
   e = { ...e, fila: [{ id: 802, tipo: 'normal', v: 64 }, ...e.fila.slice(1)] };
   const r = jogar(e, { tipo: 'colocar', c: 0, t: 1 });
   const vazio = r.eventos.find((ev) => ev.tipo === 'descarteVazio');
   assert.equal(r.estado.nivel, 5);
   assert.equal(vazio.n, 1, 'o descarte vazio conta os lugares do nivel de antes');
-  assert.equal(r.estado.regras.descarteMax, 2);
   assert.equal(r.estado.descarteCarga, 2);
   assert.equal(r.estado.baralho.secas, 3);
-  // na mesa de hoje nada muda
-  const h = faseDe(faseGlobal(1, 5), 0, 'mesa-hoje');
-  const eh = criarPartida({}, h, h.semente);
-  assert.equal(eh.regras.descarteMax, 3);
-  assert.equal(eh.baralho.secas, undefined);
+  // um degrau com `descarte` troca os lugares (escada feita a mao)
+  const escada = [{ alvo: 16, pesos: { 2: 1, 4: 1 }, especiais: {} }, { alvo: 32, pesos: { 4: 1, 8: 1 }, especiais: {}, descarte: 1 }];
+  let d = criarPartida({}, { ...fase(), escada, nivel: 1, inicio: [[8], [], [], []] }, 3);
+  assert.equal(d.regras.descarteMax, 3);
+  d = { ...d, fila: [{ id: 900, tipo: 'normal', v: 8 }, ...d.fila.slice(1)] };
+  const s2 = jogar(d, { tipo: 'colocar', c: 0, t: 0 }).estado;
+  assert.equal(s2.nivel, 2);
+  assert.equal(s2.regras.descarteMax, 1);
+  assert.equal(s2.descarteCarga, 1);
 });
 
 test('perigo: coluna a 1 carta do limite e o fio (a frente nao cabe e o descarte tem 1 lugar)', () => {
@@ -407,4 +408,94 @@ test('perigo: coluna a 1 carta do limite e o fio (a frente nao cabe e o descarte
   assert.equal(perigo(fio).fio, true);
   assert.equal(perigo({ ...fio, descarteCarga: 2 }).fio, false);
   assert.equal(perigo({ ...fio, fila: [k(2, 21)] }).fio, false);
+});
+
+// ------------------------------------------------------------ juntar
+
+/** Partida com a regra juntar (ou sem ela) e a mesa `mesa` (valores, fundo -> topo). */
+function comJuntar(mesa, extra = {}, juntar = true) {
+  let id = 500;
+  const e = criarPartida({}, fase({ regras: { juntar }, ...extra }), 7);
+  return { ...e, colunas: mesa.map((col) => col.map((v) => ({ id: id++, tipo: 'normal', v }))) };
+}
+const valores = (e) => e.colunas.map((c) => c.map((k) => k.v));
+
+test('juntar: o topo vai ate o topo igual, funde e cascateia sem gastar a mao', () => {
+  const e0 = congelar(comJuntar([[8, 4], [], [4], []]));
+  const fila = e0.fila.map((k) => k.id);
+  const r = jogar(e0, { tipo: 'juntar', de: 2, c: 0, t: 0 });
+  assert.deepEqual(valores(r.estado), [[16], [], [], []]);
+  assert.deepEqual(r.eventos.map((ev) => ev.tipo).slice(0, 3), ['juntar', 'fundir', 'fundir']);
+  const j = r.eventos[0];
+  assert.deepEqual([j.de, j.c, j.id], [2, 0, e0.colunas[2][0].id]);
+  assert.equal(r.eventos[1].idEntra, j.id, 'a carta que voa e a do topo de origem');
+  assert.deepEqual(r.estado.fila.map((k) => k.id), fila, 'a fila nao anda');
+  assert.ok(!r.eventos.some((ev) => ev.tipo === 'fila'));
+  assert.equal(r.estado.n, 1);
+  assert.equal(r.estado.pontos, 8 + 16 * 2);
+  assert.equal(r.estado.fusoesSeguidas, 1);
+});
+
+test('juntar: recusa topo diferente, coluna vazia, a mesma coluna e a regra desligada', () => {
+  const e0 = comJuntar([[8, 4], [], [8], [2]]);
+  for (const [de, c, motivo] of [[0, 2, 'juntar'], [1, 0, 'vazia'], [0, 1, 'vazia'], [0, 0, 'mesma']]) {
+    const r = jogar(e0, { tipo: 'juntar', de, c, t: 0 });
+    assert.equal(r.estado.colunas, e0.colunas, `${de}->${c}: a mesa mudou`);
+    const rec = r.eventos.find((ev) => ev.tipo === 'recusar');
+    assert.equal(rec.motivo, motivo, `${de}->${c}`);
+    assert.equal(rec.de, de);
+  }
+  const sem = comJuntar([[4], [4], [], []], {}, false);
+  const r = jogar(sem, { tipo: 'juntar', de: 0, c: 1, t: 0 });
+  assert.equal(r.eventos[0].motivo, 'regra');
+  assert.deepEqual(valores(r.estado), [[4], [4], [], []]);
+  assert.deepEqual(paresDeJuntar(sem), []);
+  assert.ok(!acoesLegais(sem).some((a) => a.tipo === 'juntar'));
+});
+
+test('juntar: a marca de especial nao impede e sai na fusao', () => {
+  const e0 = comJuntar([[4], [], [4], []]);
+  const marcado = { ...e0, colunas: [[{ ...e0.colunas[0][0], esp: true }], [], e0.colunas[2], []] };
+  const r = jogar(marcado, { tipo: 'juntar', de: 2, c: 0, t: 0 });
+  assert.deepEqual(valores(r.estado), [[8], [], [], []]);
+  assert.equal(r.estado.colunas[0][0].esp, undefined);
+});
+
+test('juntar: o 2048 sai da mesa e fecha o mundo', () => {
+  const k = (v, id) => ({ id, tipo: 'normal', v });
+  const e0 = { ...naEscada(2, 8, [[1024], [], [], []], [4, 4, 4]), colunas: [[k(1024, 600)], [k(512, 601), k(1024, 602)], [], []] };
+  const r = jogar({ ...e0, regras: { ...e0.regras, juntar: true } }, { tipo: 'juntar', de: 1, c: 0, t: 0 });
+  assert.ok(r.eventos.some((ev) => ev.tipo === 'completar' && ev.valor === 2048));
+  assert.deepEqual(valores(r.estado), [[], [512], [], []]);
+  assert.equal(r.estado.fim, 'venceu');
+});
+
+test('juntar: acoesLegais traz os pares; a mesa com dois topos iguais nao esta presa', () => {
+  const e0 = comJuntar([[8, 4], [16], [4], [2]]);
+  assert.deepEqual(paresDeJuntar(e0), [[0, 2], [2, 0]]);
+  assert.deepEqual(acoesLegais(e0).filter((a) => a.tipo === 'juntar').map((a) => [a.de, a.c]), [[0, 2], [2, 0]]);
+  // fila com uma carta que nao cabe, sem descarte e sem itens: presa, a nao ser que haja um juntar
+  const k = (v, id) => ({ id, tipo: 'normal', v });
+  const travada = { ...comJuntar([[4], [2], [8], [16]]), fila: [k(64, 700)], descarteCarga: 0 };
+  assert.equal(presa(travada), true);
+  const comPar = { ...comJuntar([[4], [4], [8], [16]]), fila: [k(64, 700)], descarteCarga: 0 };
+  assert.equal(presa(comPar), false);
+  assert.equal(presa({ ...comPar, regras: { ...comPar.regras, juntar: false } }), true);
+});
+
+test('juntar: desfazer volta a mesa de antes', () => {
+  const e0 = comJuntar([[8, 4], [], [4], []]);
+  const r = jogar(e0, { tipo: 'juntar', de: 2, c: 0, t: 0 });
+  const d = desfazerPara(e0);
+  assert.deepEqual(valores(d), [[8, 4], [], [4], []]);
+  assert.equal(d.itens.desfazer, e0.itens.desfazer - 1);
+  assert.notDeepEqual(valores(r.estado), valores(d));
+});
+
+test('juntar: o bot guloso usa o juntar quando ele fecha o nivel', async () => {
+  const { melhorJogada } = await import('../src/jogo/bot.js');
+  const f = faseDe(1, 0, 'juntar');
+  let e = criarPartida({}, f, f.semente);
+  e = jogar(e, { tipo: 'colocar', c: 2, t: 0 }).estado; // o 2 no 2: um 4 ao lado do 4
+  assert.deepEqual(melhorJogada(e, 900), { tipo: 'juntar', de: 2, c: 0 });
 });

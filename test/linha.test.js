@@ -78,3 +78,31 @@ test('recusa mostra o proibido na coluna; a pilha do descarte sai na subida de n
   for (let t = 0; t <= 1500; t += 20) if (l2.fantasmas(t).some((x) => x.carta.id === 950)) visto.push(t);
   assert.ok(visto.length > 0, 'a carta do descarte aparece saindo');
 });
+
+test('juntar: a carta do topo voa da coluna de origem ate o topo igual; a coluna de origem nao pula', async () => {
+  const { faseDe } = await import('../src/jogo/fases.js');
+  const L = calcularLayout({ W: 390, H: 844, topo: 72, colunas: 4, pilhaMax: 6, tamFila: 3 });
+  const f = { ...faseDe(1, 0, 'juntar'), inicio: [[8, 4], [], [16, 4], []] };
+  const antes = criarPartida({}, f, 1);
+  const r = jogar(antes, { tipo: 'juntar', de: 2, c: 0, t: 0 });
+  assert.equal(r.eventos[0].tipo, 'juntar');
+  const movida = antes.colunas[2][1];
+  const linha = criarLinha();
+  // sem origem: a carta sai do lugar dela na coluna (o arrasto passa a origem dele)
+  linha.montar(r.eventos, L, 0, { antes, depois: r.estado, carta: movida });
+  const g0 = linha.fantasmas(0).find((x) => x.carta.id === movida.id);
+  const de = L.carta(2, 1);
+  assert.ok(g0 && Math.abs(g0.x - de.x) < 1 && Math.abs(g0.y - de.y) < 1, 'parte do topo da coluna de origem');
+  const g1 = linha.fantasmas(170).find((x) => x.carta.id === movida.id);
+  const alvo = L.carta(0, 1);
+  assert.ok(g1 && Math.abs(g1.x - alvo.x) < 6 && Math.abs(g1.y - alvo.y) < 12, 'chega ao topo da coluna de destino');
+  // o 16 que ficou na coluna de origem nao se mexe
+  const fica = antes.colunas[2][0];
+  for (const t of [0, 100, 300]) {
+    const p = linha.pose(fica.id, t);
+    assert.ok(!p || p.x === undefined || (Math.abs(p.x - L.carta(2, 0).x) < 1 && Math.abs(p.y - L.carta(2, 0).y) < 1), `o 16 da origem pulou em ${t} ms`);
+  }
+  // a fusao e a cascata: 8 e depois 16 no topo do destino
+  const efeitos = linha.drenarEfeitos(2000).filter((e) => e.tipo === 'fusao');
+  assert.deepEqual(efeitos.map((e) => e.valor), [8, 16]);
+});

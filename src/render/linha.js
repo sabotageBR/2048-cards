@@ -222,7 +222,7 @@ export function criarLinha() {
     }
   }
 
-  /** Carta arrastada e solta fora: volta para a fila. */
+  /** Carta arrastada e solta fora (ou recusada): volta para a fila ou, no juntar, para o topo da coluna. */
   function voltar(id, de, para, agora) {
     tweens.push({ id, tipo: 'volta', ini: agora, fim: agora + DUR.volta, de, para, arco: 0 });
   }
@@ -234,7 +234,8 @@ export function criarLinha() {
       if (tw.id !== id || agora < tw.ini || agora > tw.fim) continue;
       const comeco = tw.mov !== undefined ? tw.mov : tw.ini;
       const u = easeOut((agora - comeco) / Math.max(1, tw.fim - comeco));
-      r = { ...lerpRect(tw.de, tw.para, u), esc: 1, escY: 1, alpha: 1, voando: tw.tipo === 'voo' };
+      // a volta de um arrasto recusado tambem passa por cima (a carta da mesa nao some atras das vizinhas)
+      r = { ...lerpRect(tw.de, tw.para, u), esc: 1, escY: 1, alpha: 1, voando: tw.tipo === 'voo' || tw.tipo === 'volta' };
       if (tw.arco) r.y -= Math.sin(u * Math.PI) * tw.para.h * 0.25 * tw.arco;
       if (tw.tipo === 'voo') r.esc = 1 + Math.sin(u * Math.PI) * 0.08;
     }

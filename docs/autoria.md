@@ -322,3 +322,50 @@ Pedidos do usuário, jogando a 0.5.0: "a musiquinha quando conquista um número 
 - **Fim do mundo** (depois de ouvir os WAVs: "esse barulho do mundo depois me incomoda, mude"): tocavam três sons empilhados, o `completar()` e o `critico()` quando o 2048 sai da mesa (arpejo com zumbido, chiado, estrondo e serrote) e a fanfarra meio segundo depois. Agora é um baque grave e macio quando o 2048 sai e, meio segundo depois, `audio.mundo()`: um acorde de sino com as notas juntas, sem melodia, que se apaga em ~1,3 s (7 dB mais baixo na média).
 - **Prêmio** (vídeo, missão cumprida, baú): o `completar()` virou um "ding" de uma nota, 12 dB mais baixo.
 - **Fusão** ("o barulho da fusão também não me agrada, coloque um mais agradável"): o estalo de ruído e a "nota sem fim" (sete senos em oitavas, timbre de órgão oco, do memecats) viraram uma batida de marimba: a nota redonda e um toque curto de baqueta 4 vezes acima, sem ruído (5 dB mais baixo no pico, o mesmo volume médio). Continua subindo com a cascata, agora pela pentatônica de dó (duas oitavas e volta), afinada com o sino da subida. Alternativas ouvidas em WAV: bolha e kalimba. Saiu na **0.5.2**.
+
+## 2026-10-17 · Player Fit Test da 0.5.2 e a 0.6.0 (o verbo "juntar")
+
+Pedido do usuário: "Analise o player fit test [da 0.5.2] e crie um plano de como aumentar drasticamente a retenção do jogo". Análise e plano em `~/.claude/plans/analise-o-player-fit-wobbly-thimble.md`.
+
+**O Player Fit Test da 0.5.2 (16 Oct, 500 gameplays):** média 3m53s, 35% com 3 min ou mais (0.4.4: 4m01s e 38%; 0.4.1: 4m05s e 38%). Histograma: 0–1 min 30%, 1–2 min 24%, 2–3 min 12%, 3–4 min 8%, 4–5 min 6%, 5 min ou mais 21%.
+
+**Game Events da 0.5.2 (637 gameplays: 281 desktop, 285 celular):**
+
+| Métrica | Geral | Desktop | Celular |
+|---|---|---|---|
+| Toque no jogo | 81% | 69% | 93% |
+| Nível 1 completo | 77% | 67% | 86% |
+| `tempo/N/min` 1 / 3 / 5 / 7 / 10 / 15 min | 57 / 30 / 18 / 14 / 9 / 5% | 51 / 27 / 17 / 13 / 10 / 6% | 63 / 33 / 20 / 13 / 8 / – |
+
+- **A curva não se mexeu em quatro versões.** O jogador sai por minuto: 30% de quem toca sai no 1º minuto, ~21% por minuto do 2º ao 5º, ~10% depois do 6º. O nível 3 é o mais furado (74% completam; 16% recebem a mão de ócio ali).
+- **Os dois testes A/B da 0.5.0 empataram** (Funnels a partir de `variante/<braço>/start`): mesa de hoje × mesa justa, do nível 3 ao 10, 24% × 19%; em tempo, 3 min 27% × 26% e 7 min 10% × 10%. desk-a × desk-c × desk-d: toque 73% × 72% × 69%, nível 1 67% × 69% × 61%.
+- **A regra confunde e a mesa trava:** 61% tentam a carta maior sobre a menor; 39% enchem o descarte (o vídeo "Esvaziar" aparece). Na gravação de 1:10 (desktop), o jogador ficou com dois 16 lado a lado e um 16 sobre um 8, encheu o descarte no nível 2 e saiu. Tocar numa coluna joga a carta da mão ali: quem tenta arrastar uma carta da mesa joga a da mão sem querer.
+- Rewarded: descarte 39% veem e 16% dos que veem clicam; coringa 30% e 3,7%; continuar 3,5%.
+- Os Funnels do painel só olham 10 eventos adiante: `variante → tempo/1/min` dá 5% (o certo seria ~60%). O tempo por braço precisa de medida própria.
+
+| Pergunta | Opções vistas | Escolha |
+|---|---|---|
+| Qual mudança na regra entra no teste A/B | hoje × livre × juntar (recomendada) · hoje × livre · hoje × juntar · hoje × livre+juntar | **Hoje × Juntar** |
+| Os braços da 0.5.0, que empataram | mesa de hoje + desk-a (recomendada) · mesa justa + desk-a · manter os dois testes | **Mesa de hoje + desk-a** |
+| Missão na mesa nesta versão | depois (recomendada) · A no painel · B no vão dos botões | **Depois** |
+
+**O que entrou na 0.6.0:**
+- **O juntar** (braço `juntar`, sorteado por jogador em todos os aparelhos): a carta do topo de uma coluna é arrastada até outra coluna com o mesmo valor no topo e funde, com a cascata, sem gastar a carta da mão. Topo diferente, coluna vazia ou a mesma coluna é recusa, com o proibido. Vale em todos os mundos, inclusive o sem fim. Folha: `docs/escada/juntar.png`.
+- **Saíram** a mesa justa dos mundos 1 a 5 (com as réguas do acaso e do distraído) e os braços desk-c e desk-d (a seta e as teclas na mesa). O mundo sem fim continua com o perigo vermelho e a piedade espaçada.
+- **Medidas novas:**
+  - `<braço>/N/min`: o tempo por braço, lido direto em Other Events;
+  - `juntou/N/first`: a descoberta do verbo;
+  - `regra/arrasto/first`: quem arrasta uma carta da mesa, nos dois braços;
+  - `espera/N/s`: quanto tempo quem não toca fica olhando.
+
+**Decisões minhas, para o usuário conferir:**
+- **O baralho é o mesmo nos dois braços.** O teste mede o verbo, não um baralho novo. Com isso o juntar fica bem mais fácil: no simulador, o casual passa todos os níveis, joga 25 a 40% menos por mundo e quase nunca vê a mesa cheia. A régua da curva do juntar olha só o piso (`curvaSoPiso`). Um jogador real não vê todos os pares como o bot; se o juntar ganhar, a dificuldade dele é a próxima conversa.
+- **A abertura ensina o verbo sem texto:** com o 2 no 2, fica um 4 ao lado do 4 da coluna 1, e a mão guiada arrasta um até o outro (8, cascata, 16): o 16 sai em 2 jogadas. Na primeira vez que aparecem dois topos iguais (até o jogador juntar uma vez), a mão guiada mostra o gesto depois de 1 s parado.
+- **O toque numa coluna** continua jogando a carta da mão ali. No braço juntar, ele espera o dedo subir, para distinguir do arrasto. No braço hoje fica como na 0.5.2 (no `pointerdown`).
+- **"COMBO ×2" na coluna da beira** ficava cortado pela borda da tela; agora o texto é empurrado para dentro. No juntar isso aparece já na abertura (duas fusões seguidas).
+- **Encontrado e não mexido:** em `linha.js`, o `DUR.reflow` não existe, e as cartas que mudam de altura na coluna (na limpeza da subida) pulam em vez de deslizar. Consertar mudaria a animação da limpeza, que não era o assunto.
+- `VERSAO_ESTADO` 10: a partida salva da 0.5.x é descartada. O braço salvo da 0.5.x é sorteado de novo. Versão 0.6.0.
+
+**Aprovação (mesmo dia).** Vista a folha `docs/escada/juntar.png` e jogado o protótipo (`?variante=juntar`), o usuário respondeu: "Aprovado, gera a build da 0.6.0". Pacote: `dist-poki/2048-cards-0.6.0.zip`.
+
+**Fica para o usuário:** enviar a 0.6.0 e pedir dois Player Fit Tests. Metas do juntar contra o hoje: 3 min +8 pontos, 7 min +5, nível 3 completo ≥ 85%, `juntou` em ≥ 70% de quem chega ao nível 2.

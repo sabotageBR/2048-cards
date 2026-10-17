@@ -28,7 +28,7 @@
 //   ?folha=regras    o proibido, o contador do descarte e o video de esvaziar
 //   ?folha=explosoes a explosao de cada mundo (fusao, 2048 e a festa da subida), quadros deterministicos
 //   ?folha=festa     a subida de nivel sem pausa: o "16!" piscando enquanto o jogador joga (prints do jogo)
-//   ?folha=desktop   braços do desktop no teste A/B: a mao de hoje, a seta e as teclas no gesto, as teclas sempre (prints do jogo)
+//   ?folha=juntar    o braço juntar do teste A/B da 0.6.0: a mao guiada, o arrasto da carta da mesa, o proibido e a cascata (prints do jogo)
 //   ?folha=missao    a missao ativa na mesa (A no painel, B no vao dos botoes), o voo do premio e os 7 icones nos 5 mundos
 import { TEMAS } from '../src/render/temas/index.js';
 import { definirRotulos } from '../src/render/temas/kit.js';
@@ -122,30 +122,20 @@ if (folha === 'retrato') {
   g.appendChild(fig(`${P}festa-3.png`, '3. Festa cheia', 'Confete nas cores do mundo. O painel já diz "Faça um 32"; a fila continua livre.'));
   g.appendChild(fig(`${P}festa-4.png`, '4. Jogando por baixo', 'O jogador já soltou a carta seguinte na coluna vazia enquanto o "16!" sobe e some.'));
   pronto();
-} else if (folha === 'desktop') {
-  $('titulo').textContent = 'Desktop: a mão, a seta com as teclas no gesto e as teclas sempre (teste A/B da 0.5.0)';
-  $('sub').textContent = 'O gesto guiado da abertura do nível 1, congelado em três momentos (clica, arrasta, solta). Na 0.4.4, 31% de quem jogou no computador nunca clicou. Nenhum texto: só o desenho. A, C e D são sorteadas entre os jogadores de computador; a que segurar mais gente fica. No celular fica a mão. (A seta sozinha, a antiga B, saiu: no Clock Tinker ela não mudou o toque.)';
-  $('sub').style.maxWidth = '1880px';
-  const g = $('grade'); g.style.gridTemplateColumns = 'repeat(3, 620px)';
-  const linha = (titulo, texto) => {
-    const h = document.createElement('div');
-    h.style.gridColumn = '1 / -1'; h.style.marginTop = '8px';
-    h.innerHTML = `<b style="font-size:24px">${titulo}</b><span style="color:#cfc6da;font-size:15.5px;margin-left:12px">${texto}</span>`;
-    g.appendChild(h);
-  };
-  const fases = ['Clica', 'Arrasta', 'Solta'];
-  const OPCOES = [
-    ['a', 'A · Hoje: a mão', 'O dedo aperta a carta da fila e a leva até a coluna. No computador ela lembra toque, não mouse.', ['O dedo aperta a carta da frente.', 'A carta vai junto, meio transparente.', 'Solta na coluna e some.']],
-    ['c', 'C · A seta e as teclas no gesto', 'Junto com o gesto, as teclas 1 a 4 aparecem no pé das colunas e o espaço sob o descarte; a da coluna certa fica dourada e afunda quando a carta cai.', ['As teclas entram com o gesto; a 3 já está acesa.', 'A seta leva a carta.', 'A tecla 3 afunda quando a carta cai.']],
-  ];
-  for (const [id, titulo, texto, legendas] of OPCOES) {
-    linha(titulo, texto);
-    fases.forEach((f, i) => g.appendChild(fig(`${P}desktop-${id}-${i + 1}.png`, `${i + 1}. ${f}`, legendas[i], 620)));
-  }
-  linha('D · A seta e as teclas sempre na mesa', 'As teclas ficam no pé das colunas o tempo todo, discretas; no gesto, a da coluna certa acende como na C.');
-  g.appendChild(fig(`${P}desktop-d-mesa1.png`, 'Jogando, Floresta', 'Sem gesto: as teclas ficam meio apagadas; a pilha cheia cobre a sua tecla.', 620));
-  g.appendChild(fig(`${P}desktop-d-mesa2.png`, 'Jogando, Cosmos (3 colunas)', 'As teclas acompanham o número de colunas e a mesa do mundo.', 620));
-  g.appendChild(fig(`${P}desktop-d-3.png`, 'No gesto', 'A tecla 3 acende e afunda quando a carta cai.', 620));
+} else if (folha === 'juntar') {
+  $('titulo').textContent = 'Juntar: a carta de cima de uma coluna vai até um topo igual (teste A/B da 0.6.0)';
+  $('sub').textContent = 'No Player Fit Test da 0.5.2, o jogador ficava com dois 16 lado a lado sem jeito de juntar e saía. No braço juntar, a carta do topo de uma coluna é arrastada até outra coluna com o mesmo valor no topo: funde e cascateia como uma carta da mão, sem gastar a carta da mão. Nenhum texto: na abertura do nível 1 a mão guiada mostra o gesto (o 16 sai em 2 jogadas), e o topo diferente recebe o proibido. Metade dos jogadores fica com a regra de hoje.';
+  $('sub').style.maxWidth = '2050px';
+  const g = $('grade'); g.style.gridTemplateColumns = 'repeat(5, 390px)';
+  g.appendChild(fig(`${P}juntar-1.png`, '1. A mão mostra', 'Depois do 2 no 2, há um 4 na coluna 3 e outro na coluna 1. Parado 1 s, a mão leva um até o outro, em loop.', 390));
+  g.appendChild(fig(`${P}juntar-2.png`, '2. O jogador arrasta', 'A carta sai da coluna e segue o dedo; a coluna com o 4 acende.', 390));
+  g.appendChild(fig(`${P}juntar-3.png`, '3. Topo diferente: proibido', 'O 2 sobre o 4 não junta: a coluna fica vermelha com o proibido, e a carta volta ao lugar.', 390));
+  g.appendChild(fig(`${P}juntar-4.png`, '4. Funde e cascateia', '4 com 4 dá 8, que encadeia no 8 de baixo: 16.', 390));
+  g.appendChild(fig(`${P}juntar-5.png`, '5. O 16 em 2 jogadas', 'A festa da subida, sem pausa. A carta da mão (o 2) continua lá.', 390));
+  const pais = document.createElement('div');
+  pais.style.gridColumn = '1 / span 4';
+  pais.appendChild(fig(`${P}juntar-paisagem.png`, 'Paisagem (computador)', 'O mesmo gesto com o mouse: aperta a carta de cima, arrasta e solta.', 1190));
+  g.appendChild(pais);
   pronto();
 } else if (folha === 'missao') {
   await document.fonts.load('700 20px Fredoka');

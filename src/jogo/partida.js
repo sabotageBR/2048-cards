@@ -4,15 +4,18 @@
 //
 // Acoes:
 //   { tipo: 'colocar', c, k?, t }   joga a carta da frente (ou a k-esima, com filaLivre) na coluna c
+//   { tipo: 'juntar', de, c, t }    leva o topo da coluna `de` ate o topo igual da coluna c (regras.juntar)
 //   { tipo: 'descartar', t }        manda a carta da frente para o descarte
 //   { tipo: 'item', item, c?, t }   coringa (c), martelo (c), troca
 //   { tipo: 'retomar', t }          continuar depois da mesa cheia: limpa a coluna mais cheia
 //   { tipo: 'esvaziar', t }         esvazia a pilha do descarte (premio do video)
 //
-// Eventos (na ordem em que acontecem): colocar, recusar, fundir, completar,
-// bomba, dobro, martelo, troca, item, descartar, combo, comboFim, febre, meta,
-// nivel, graduar, descarteVazio, fila, limpar, fimFase, fimPartida. fundir,
-// dobro e completar levam `pontos`: os pontos daquela fusao.
+// Eventos (na ordem em que acontecem): colocar, juntar, recusar, fundir,
+// completar, bomba, dobro, martelo, troca, item, descartar, combo, comboFim,
+// febre, meta, nivel, graduar, descarteVazio, fila, limpar, fimFase,
+// fimPartida. fundir, dobro e completar levam `pontos`: os pontos daquela
+// fusao. `juntar { de, c, id }` vem antes do `fundir` da carta que saiu da
+// coluna `de` (o idEntra dele); o juntar nao gasta a carta da mao.
 //
 // Descarte: uma pilha com `regras.descarteMax` lugares por nivel
 // (`descarteCarga` = lugares livres; `descarte` = a carta de cima). Cheia,
@@ -25,11 +28,11 @@
 // (`graduar`). O desfazer, o "Continuar" gratis e o descarte renovam. No ultimo nivel a
 // partida e vencida. Sem escada, a fase tem as metas dela e termina nelas.
 // Um degrau pode trocar os lugares do descarte (`descarte`) e o gatilho da
-// piedade (`secas`, ver baralho.js): a mesa justa (fases.js) faz isso.
+// piedade (`secas`, ver baralho.js): o mundo sem fim (fases.js) faz isso.
 //
 // `fase.fila`: as primeiras cartas da fila (numero = carta normal, texto =
 // especial), a abertura roteirizada do mundo; o resto vem do sorteio.
-import { normalizarRegras, podeColocar, topo } from './regras.js';
+import { normalizarRegras, podeColocar, podeJuntar, topo } from './regras.js';
 import { colocar, cascata, completar, graduar, dobrada } from './colunas.js';
 import { encherFila, jogadasLegais, PESOS_PADRAO } from './baralho.js';
 import { criarMetas, avaliar, todasFeitas } from './metas.js';
@@ -41,8 +44,9 @@ import { criarMetas, avaliar, todasFeitas } from './metas.js';
 // 8: a escada nova da 0.4.2 (coringa e bomba no mundo 1, baralho curto, os
 // mundos 2 a 4 deslocados); 9: o perfil de mesa (teste A/B da 0.5.0), o
 // descarte e a piedade por nivel, a abertura roteirizada de cada mundo e o
-// mundo sem fim (2026-10-16).
-export const VERSAO_ESTADO = 9;
+// mundo sem fim (2026-10-16); 10: os perfis 'hoje' e 'juntar' (teste A/B da
+// 0.6.0) e a regra juntar (2026-10-17).
+export const VERSAO_ESTADO = 10;
 
 /** Mesa inicial: as cartas de `inicio` (fundo -> topo) em cada coluna. */
 function montarMesa(fase, regras, proxId) {
@@ -75,7 +79,7 @@ export function criarPartida(regrasBase, fase, semente) {
   const ab = filaRoteirizada(fase.fila, regras, mesa.proxId);
   let e = {
     v: VERSAO_ESTADO, regras, faseId: fase.id, mundo: fase.mundo || 0, modo: fase.modo || 'aventura',
-    perfil: fase.perfil || 'mesa-hoje', descarteBase,
+    perfil: fase.perfil || 'hoje', descarteBase,
     rng: (semente >>> 0) || 1, proxId: ab.proxId, n: 0,
     colunas: mesa.colunas, escada, nivel,
     baralho: degrau
@@ -116,6 +120,7 @@ export function acoesLegais(e) {
   if (e.itens.coringa > 0) for (const c of jogadasLegais(e, { tipo: 'coringa', v: 0 })) r.push({ tipo: 'item', item: 'coringa', c });
   if (e.itens.martelo > 0) e.colunas.forEach((col, c) => { if (col.length) r.push({ tipo: 'item', item: 'martelo', c }); });
   if (e.itens.troca > 0 && e.fila.length >= 2) r.push({ tipo: 'item', item: 'troca' });
+  for (const [de, c] of paresDeJuntar(e)) r.push({ tipo: 'juntar', de, c });
   return r;
 }
 
@@ -124,6 +129,15 @@ export function temJogada(e) {
   if (!e.fila.length) return false;
   const idx = e.regras.filaLivre ? e.fila.map((_, k) => k) : [0];
   return idx.some((k) => jogadasLegais(e, e.fila[k]).length > 0);
+}
+
+/** Os juntar legais agora: [de, c] (as duas direcoes de cada par de topos iguais; vazio com a regra desligada). */
+export function paresDeJuntar(e) {
+  const r = [];
+  if (!e.regras.juntar || e.fim) return r;
+  const n = e.colunas.length;
+  for (let de = 0; de < n; de++) for (let c = 0; c < n; c++) if (podeJuntar(e.regras, e.colunas, de, c).ok) r.push([de, c]);
+  return r;
 }
 
 /** Estado para onde o desfazer volta (gasta 1 uso). */
@@ -238,6 +252,25 @@ function acColocar(e, acao, eventos) {
   return { e: n, aplicou: true };
 }
 
+function acJuntar(e, acao, eventos) {
+  const de = acao.de | 0, c = acao.c | 0;
+  const r = podeJuntar(e.regras, e.colunas, de, c);
+  if (!r.ok) {
+    const t = e.colunas[de] && topo(e.colunas[de]);
+    eventos.push({ tipo: 'recusar', c, de, motivo: r.motivo, id: t ? t.id : undefined });
+    return { e: { ...e, recusas: e.recusas + 1 }, aplicou: false };
+  }
+  const carta = topo(e.colunas[de]);
+  eventos.push({ tipo: 'juntar', de, c, id: carta.id });
+  const colunas = e.colunas.slice();
+  colunas[de] = colunas[de].slice(0, -1);
+  let n = { ...e, colunas, recusas: 0 };
+  n = aplicarCarta(n, carta, c, 'fusao', eventos);
+  n = ligarFebre(n, acao.t || 0, eventos);
+  n = contarJogada(n);
+  return { e: n, aplicou: true };
+}
+
 function acDescartar(e, acao, eventos) {
   if (e.descarteCarga <= 0 || !e.fila.length) {
     eventos.push({ tipo: 'recusar', c: -1, motivo: 'semDescarte' });
@@ -310,7 +343,7 @@ function acRetomar(e, acao, eventos) {
 }
 
 /**
- * Perigo que a mesa justa mostra (sem texto: a coluna treme e avermelha):
+ * Perigo que o mundo sem fim mostra (sem texto: a coluna treme e avermelha):
  * colunas a 1 carta do limite e o "fio" (a carta da frente nao cabe em coluna
  * nenhuma e o descarte tem no maximo 1 lugar).
  * @returns {{ colunas: number[], fio: boolean }}
@@ -322,10 +355,10 @@ export function perigo(e) {
   return { colunas, fio };
 }
 
-/** Sem jogada, sem descarte e sem item que salve: a mesa esta cheia. */
+/** Sem jogada, sem juntar, sem descarte e sem item que salve: a mesa esta cheia. */
 export function presa(e) {
   const martela = e.itens.martelo > 0 && e.colunas.some((col) => col.length);
-  return !temJogada(e) && e.descarteCarga <= 0 && !(e.itens.coringa > 0 && jogadasLegais(e, { tipo: 'coringa', v: 0 }).length) && !martela;
+  return !temJogada(e) && !paresDeJuntar(e).length && e.descarteCarga <= 0 && !(e.itens.coringa > 0 && jogadasLegais(e, { tipo: 'coringa', v: 0 }).length) && !martela;
 }
 
 /**
@@ -394,6 +427,7 @@ export function jogar(estado, acao) {
   let r;
   switch (acao.tipo) {
     case 'colocar': r = acColocar(e, acao, eventos); break;
+    case 'juntar': r = acJuntar(e, acao, eventos); break;
     case 'descartar': r = acDescartar(e, acao, eventos); break;
     case 'item': r = acItem(e, acao, eventos); break;
     case 'retomar': r = acRetomar(e, acao, eventos); break;
