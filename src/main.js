@@ -1,21 +1,21 @@
 // Ponto de entrada do 2048 Cards: liga motor, cena, entrada, HUD, menus, som
-// e Poki. Unico modulo que importa core/poki.js.
+// e o portal. Unico modulo que importa core/portal.js.
 //
 // Fluxo: o mundo entra (zoom recuando) -> o jogador arrasta ou toca para
 // jogar a carta da frente da fila numa coluna -> fusoes em cascata -> fez o
 // valor do nivel, o nivel sobe na mesma mesa sem parar o jogo: a festa (o
 // valor feito piscando, confete e a explosao do mundo) corre por cima da mesa
 // enquanto o jogador continua; o intervalo comercial, se for a hora (a partir
-// da fase 7, com espaco entre dois; a Poki decide a frequencia), vem logo
+// da fase 7, com espaco entre dois; o portal decide a frequencia), vem logo
 // depois da festa e nunca no meio de um arrasto. No 2048 o mundo termina e o
 // proximo entra. Nenhum texto explica regra: o desenho, a mao guiada e a
 // animacao fazem isso.
 // Sem jogada legal e sem descarte: oferta de continuar (gratis 1x por nivel,
 // depois video) ou recomecar o nivel pela mesa pronta dele.
-// Teste A/B da 0.6.0 (src/core/variante.js): a regra de hoje ou o juntar (a
-// carta do topo de uma coluna arrastada ate um topo igual em outra; a mao
-// guiada ensina, sem texto). Depois do mundo 5 vem o mundo sem fim (fases.js,
-// mundoDef), em que a mesa enche de verdade e o perigo aparece sem texto.
+// A regra e uma so, o juntar (REGRA_DO_JOGO em fases.js): a carta do topo de
+// uma coluna arrastada ate um topo igual em outra; a mao guiada ensina, sem
+// texto. Depois do mundo 5 vem o mundo sem fim (fases.js, mundoDef), em que a
+// mesa enche de verdade e o perigo aparece sem texto.
 
 import { criarCena } from './render/cena.js';
 import { Transicoes as Tr } from './render/transicoes.js';
@@ -23,16 +23,15 @@ import { criarPartida, jogar, desfazerPara, jogadasLegais, paresDeJuntar, perigo
 import { melhorJogada } from './jogo/bot.js';
 import { ESPECIAIS } from './jogo/baralho.js';
 import { podeJuntar, topo } from './jogo/regras.js';
-import { MUNDOS, POR_MUNDO, TOTAL_FASES, faseDe, faseGlobal, mundoDe, posNoMundo, mundoDef } from './jogo/fases.js';
+import { MUNDOS, POR_MUNDO, REGRA_DO_JOGO, TOTAL_FASES, faseDe, faseGlobal, mundoDe, posNoMundo, mundoDef } from './jogo/fases.js';
 import { progressoDoNivel } from './jogo/metas.js';
 import { criarAudio } from './core/audio.js';
 import { criarArmazem } from './core/armazenamento.js';
 import { lerDepuracao } from './core/depuracao.js';
-import { escolherVariante } from './core/variante.js';
 import { escolherIdioma, textos, textoMissao } from './i18n/textos.js';
 import { criarMissoes, progredir, renovar, missaoDaVez } from './jogo/missoes.js';
 import { vibrar } from './core/haptico.js';
-import { poki } from './core/poki.js';
+import { portal } from './core/portal.js';
 import { criarHud } from './ui/hud.js';
 import { criarMenus } from './ui/menus.js';
 import { ICONES } from './ui/icones.js';
@@ -47,14 +46,14 @@ const T = textos(dep.lang || escolherIdioma());
 /** Ultimas medidas mandadas, so com os ganchos de teste (o resumo do ?gesto= mostra). */
 const medidas = [];
 if (dep.ganchos) {
-  const medir = poki.measure.bind(poki);
-  poki.measure = (c, o, a) => { medidas.push(`${c}/${o}/${a}`); if (medidas.length > 60) medidas.shift(); medir(c, o, a); };
+  const medir = portal.measure.bind(portal);
+  portal.measure = (c, o, a) => { medidas.push(`${c}/${o}/${a}`); if (medidas.length > 60) medidas.shift(); medir(c, o, a); };
 }
 
 /**
  * Fases sem intervalo comercial no comeco da sessao: o primeiro vem na entrada
  * da fase 7 (ou com 5 min de jogo). Na 0.4.1 vinha na fase 5 e a retencao
- * por nivel caia de 82% para 70% bem ali (Player Fit Test de 2026-10-13).
+ * por nivel caia de 82% para 70% bem ali.
  */
 const FASES_SEM_INTERVALO = 6;
 /** Ajuda gratis (mao) por ocio ou recusas seguidas, nos dois primeiros mundos. */
@@ -66,9 +65,8 @@ const OCIO_AJUDA = 6000;
  * logo depois de cada jogada.
  */
 const OCIO_GUIA = 1000;
-/** Arrasto: anda mais que isso (px) e deixa de ser toque; no hoje, o arrasto de uma carta da mesa conta a partir de ARRASTO_MESA. */
+/** Arrasto: anda mais que isso (px) e deixa de ser toque. */
 const ARRASTO_MIN = 8;
-const ARRASTO_MESA = 30;
 const RECUSAS_AJUDA = 3;
 // 2: a escada de valores (2026-10-13); o progresso da versao do duelo nao vale aqui
 const VERSAO_SAVE = 2;
@@ -76,7 +74,7 @@ const VERSAO_SAVE = 2;
 const salvo = armazem.ler('save', null);
 const padraoSave = {
   v: VERSAO_SAVE, fase: 1, max: 1, mudo: false, regras: {},
-  itens: { coringa: 0, martelo: 0, troca: 0 }, baus: {}, partida: null, vistas: [], missoes: null, variante: null,
+  itens: { coringa: 0, martelo: 0, troca: 0 }, baus: {}, partida: null, vistas: [], missoes: null,
 };
 const save = salvo && salvo.v === VERSAO_SAVE ? { ...padraoSave, ...salvo, itens: { ...padraoSave.itens, ...(salvo.itens || {}) }, vistas: salvo.vistas || [] } : { ...padraoSave };
 if (dep.regras) save.regras = dep.regras;
@@ -96,20 +94,11 @@ const VISUAL = dep.visual.split(',');
  * o aviso "Mission done!" de antes.
  */
 const COM_MISSAO = VISUAL.includes('missao') || VISUAL.includes('missaob');
-/**
- * O braço do teste A/B, guardado no save (quem volta fica no mesmo). Em
- * localhost vale o forcado por ?variante= e, no resto, o controle (hoje): os
- * prints ficam deterministicos e nada vai para o save.
- */
-const V = dep.local
-  ? escolherVariante(null, { forcada: dep.variante, u: 0 })
-  : escolherVariante(save.variante, { forcada: dep.variante, u: Math.random() });
-if (!dep.local) save.variante = V;
 /** Mesa com o perigo visivel: o mundo sem fim (a mesa enche de verdade). */
 const comPerigo = (e) => !!e && e.mundo > MUNDOS.length;
 /** Minutos de jogo em que a telemetria marca o tempo (densos ate 10 min, para a integral da media; a cauda ate 60). */
 const MARCOS_MIN = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60];
-/** Os mesmos minutos com o braço na categoria (<braço>/N/min): Other Events le o tempo por braço direto. */
+/** Os mesmos minutos com a regra na categoria (juntar/N/min), lidos direto em Other Events. */
 const MARCOS_BRACO = new Set([1, 2, 3, 5, 7, 10, 15, 20]);
 /** Segundos sem tocar no jogo depois do carregamento (espera/N/s): quem nunca toca sai logo ou fica olhando? */
 const MARCOS_ESPERA = [5, 10, 20, 40];
@@ -137,6 +126,10 @@ const J = {
   perigo: null, perigoDe: null, tAlerta: -1e9, perigoMedido: false,
   /** id da missao no chip (missaoDaVez: a mostrada fica ate ser cumprida) */
   missaoId: -1,
+  /** pausa do portal (anuncio ou foco perdido): o relogio para; desconto e o tempo ja parado */
+  pausado: false, pausadoEm: 0, desconto: 0,
+  /** prazos que andam no relogio do jogo (depois): { em, fn } */
+  agenda: [],
 };
 
 function salvar() {
@@ -155,6 +148,8 @@ function layout() {
   document.documentElement.style.setProperty('--febreY', `${Math.round(rp.bottom + 8)}px`);
   cena.redimensionar(W, H, dpr, topo, base);
   posAviso();
+  // pausado o laco nao desenha: o canvas redimensionado ficaria em branco
+  if (J.pausado && J.e) quadroSeguro();
 }
 
 /** O aviso aparece no meio da mesa (no comeco da fase quase sempre vazio). */
@@ -175,7 +170,7 @@ function atualizarHud() {
   for (const tipo of Object.keys(videos)) {
     if (!videos[tipo] || J.video.visto[tipo]) continue;
     J.video.visto[tipo] = true;
-    poki.measure('rewarded', tipo, 'visible');
+    portal.measure('rewarded', tipo, 'visible');
   }
   hud.atualizar(J.e, { rotulo: rotulo(), podeDesfazer: J.hist.length > 0 && J.estado === 'jogando', itemPendente: J.itemPendente || '', videos, missao: missaoNaTela() });
 }
@@ -206,12 +201,12 @@ function videosLivres() {
 /** Video escolhido na barra de baixo: so premia com true. */
 async function premioVideo(tipo) {
   if (J.estado !== 'jogando' || !videosLivres()[tipo]) return;
-  poki.measure('rewarded', tipo, 'interact');
+  portal.measure('rewarded', tipo, 'interact');
   J.estado = 'anuncio';
   const ok = await recompensa();
   if (J.estado === 'anuncio') J.estado = 'jogando';
   // o tempo do video nao conta como ocio
-  J.agora = Math.max(J.agora, performance.now());
+  J.agora = Math.max(J.agora, relogio());
   J.ultimaAcao = J.agora;
   if (!ok || !J.e || J.estado !== 'jogando') { atualizarHud(); return; }
   J.video.usado[tipo] = true;
@@ -266,16 +261,16 @@ function guardarPartida() {
 function carregarFase(n, entrada = true, retomar = false) {
   n = Math.max(1, n);
   if (n !== J.n) J.tentativas = 0;
-  // a partida salva so continua na mesma versao do estado e no mesmo braço do teste A/B
+  // a partida salva so continua na mesma versao do estado e na regra do jogo
   const ps = save.partida && save.partida.e;
-  const salva = retomar && ps && ps.v === VERSAO_ESTADO && !ps.fim && (ps.perfil || 'hoje') === V.regra ? save.partida : null;
+  const salva = retomar && ps && ps.v === VERSAO_ESTADO && !ps.fim && ps.perfil === REGRA_DO_JOGO && ps.regras && ps.regras.juntar ? save.partida : null;
   let e;
   if (salva) {
     e = salva.e;
     J.tentativas = salva.tentativas || 0;
     n = faseGlobal(e.mundo, e.nivel);
   } else {
-    const f = faseDe(n, J.tentativas, V.regra);
+    const f = faseDe(n, J.tentativas, REGRA_DO_JOGO);
     e = comInventario(criarPartida(save.regras, f, f.semente));
   }
   J.n = n;
@@ -285,7 +280,7 @@ function carregarFase(n, entrada = true, retomar = false) {
   prepararNovidade();
   guardarPartida();
   salvar();
-  poki.measure('level', String(n), 'start');
+  portal.measure('level', String(n), 'start');
 }
 
 /**
@@ -356,12 +351,12 @@ function aplicar(acao, origem) {
     audio.recusa();
     vibrar(10);
     // a regra estrita (maior sobre menor), medida uma vez por sessao; sem texto: o proibido e o tremor explicam
-    if (!J.regraMaiorMedida && r.eventos.some((ev) => ev.tipo === 'recusar' && ev.motivo === 'maior')) { J.regraMaiorMedida = true; poki.measure('regra', 'maior', 'first'); }
+    if (!J.regraMaiorMedida && r.eventos.some((ev) => ev.tipo === 'recusar' && ev.motivo === 'maior')) { J.regraMaiorMedida = true; portal.measure('regra', 'maior', 'first'); }
     J.ultimaAcao = J.agora;
     return false;
   }
   // as primeiras jogadas da fase 1 de quem e novo: ate onde o jogador vai antes de sair (guia/N/feito)
-  if (emGuia() && (acao.tipo === 'colocar' || acao.tipo === 'juntar') && J.guiaPassos < 5) { J.guiaPassos++; poki.measure('guia', String(J.guiaPassos), 'feito'); }
+  if (emGuia() && (acao.tipo === 'colocar' || acao.tipo === 'juntar') && J.guiaPassos < 5) { J.guiaPassos++; portal.measure('guia', String(J.guiaPassos), 'feito'); }
   J.hist = [antes];
   J.e = r.estado;
   avisarPerigo(antes, r.estado);
@@ -369,7 +364,7 @@ function aplicar(acao, origem) {
   if (acao.tipo === 'juntar') {
     if (!save.vistas.includes('juntar')) save.vistas = [...save.vistas, 'juntar'];
     // a descoberta do verbo: o primeiro juntar da sessao e a fase em que ele aconteceu
-    if (!J.juntouMedido) { J.juntouMedido = true; poki.measure('juntou', rotuloMedida(), 'first'); }
+    if (!J.juntouMedido) { J.juntouMedido = true; portal.measure('juntou', rotuloMedida(), 'first'); }
   }
   cena.tocar(r.eventos, J.agora, { antes, depois: r.estado, origem, carta });
   J.ultimaAcao = J.agora;
@@ -391,10 +386,10 @@ function aplicar(acao, origem) {
       if (COM_MISSAO) hud.celebrar(m, J.agora + atraso);
       else {
         const titulo = T.missaoFeita, texto = `${textoMissao(T, m)} · ${ICONES[m.premio]}+1`;
-        if (atraso) setTimeout(() => avisar(titulo, texto), atraso); else avisar(titulo, texto);
+        if (atraso) depois(atraso, () => avisar(titulo, texto)); else avisar(titulo, texto);
       }
       // fora do funil de progresso (start/complete/fail): cai em Other Events
-      poki.measure('missao', m.tipo, 'feita');
+      portal.measure('missao', m.tipo, 'feita');
     }
     if (pm.concluidas.length) save.missoes = renovar(save.missoes);
   }
@@ -403,9 +398,9 @@ function aplicar(acao, origem) {
   // pula um nivel inteiro comeca e termina ele aqui mesmo.
   const niveis = r.eventos.filter((ev) => ev.tipo === 'nivel');
   niveis.forEach((ev) => {
-    poki.measure('level', String(J.n), 'complete');
+    portal.measure('level', String(J.n), 'complete');
     J.n = faseGlobal(J.e.mundo, ev.n);
-    poki.measure('level', String(J.n), 'start');
+    portal.measure('level', String(J.n), 'start');
   });
   if (niveis.length) {
     J.tentativas = 0;
@@ -431,7 +426,7 @@ function aplicar(acao, origem) {
 
 /**
  * O perigo entrou na mesa (uma coluna chegou a 1 carta do limite, ou o fio):
- * a medida `<braço>/N/perigo` sai uma vez por nivel nos dois braços (nos
+ * a medida `juntar/N/perigo` sai uma vez por nivel (nos
  * mundos 1 a 5 quer dizer "o aviso teria aparecido"); o som grave e a
  * vibracao, so no mundo sem fim, no maximo um a cada 3 s.
  */
@@ -440,7 +435,7 @@ function avisarPerigo(antes, depois) {
   const a = perigo(antes), d = perigo(depois);
   const entrou = (d.fio && !a.fio) || d.colunas.some((x, c) => x && !a.colunas[c]);
   if (!entrou) return;
-  if (!J.perigoMedido) { J.perigoMedido = true; poki.measure(V.regra, rotuloMedida(), 'perigo'); }
+  if (!J.perigoMedido) { J.perigoMedido = true; portal.measure(REGRA_DO_JOGO, rotuloMedida(), 'perigo'); }
   if (comPerigo(depois) && J.agora - J.tAlerta > 3000) { J.tAlerta = J.agora; audio.alerta(); vibrar([30, 60, 30]); }
 }
 
@@ -468,7 +463,7 @@ function recomecar() {
 
 /** Jogo ativo (ms) antes do primeiro intervalo fora da passagem de fase. */
 const CARENCIA_MS = 300000;
-/** Entre dois intervalos: pelo menos 2 subidas de nivel e 150 s de jogo ativo (a Poki ainda decide a frequencia). */
+/** Entre dois intervalos: pelo menos 2 subidas de nivel e 150 s de jogo ativo (o portal ainda decide a frequencia). */
 const ESPACO_SUBIDAS = 2;
 const ESPACO_MS = 150000;
 /** O intervalo da subida de nivel vem depois do valor feito piscar (ms depois do comeco da festa), fora de arrasto. */
@@ -478,7 +473,7 @@ const espacoOk = () => J.intervalos === 0 || (J.subidasDesdeIntervalo >= ESPACO_
  * Intervalo comercial na subida de nivel: so depois da carencia (fase 7 ou 5
  * min de jogo), com espaco do anterior e a partir do nivel 3 de cada mundo. O
  * fim do mundo nao tem intervalo: a entrada de cada mundo era onde o funil
- * mais caia (fase 17: 33% saiam, Player Fit Test da 0.4.4); o intervalo devido
+ * mais caia (fase 17: 33% saiam); o intervalo devido
  * cai na 2a subida do mundo novo.
  */
 const podeIntervalo = () => !dep.semAnuncio && (J.n > FASES_SEM_INTERVALO || J.tJogo >= CARENCIA_MS) && posNoMundo(J.n) >= 3 && espacoOk();
@@ -506,8 +501,8 @@ function subirNivel(niveis) {
 function vencer() {
   J.estado = 'vitoria';
   J.festa = null; J.anuncio = null; // o "2048!" e o intervalo do fim do mundo tomam o lugar
-  poki.gameplayStop();
-  poki.measure('level', String(J.n), 'complete');
+  portal.gameplayStop();
+  portal.measure('level', String(J.n), 'complete');
   J.subidasDesdeIntervalo++;
   save.max = Math.max(save.max, J.n + 1);
   save.fase = J.n + 1;
@@ -546,8 +541,8 @@ function avisar(titulo, texto, ms = 2600) {
   $('avisoTxt').textContent = texto;
   el.hidden = false;
   audio.completar();
-  clearTimeout(J.tAviso);
-  J.tAviso = setTimeout(() => { el.hidden = true; }, ms);
+  J.tAviso = J.agora + ms;
+  depois(ms, () => { if (J.agora >= J.tAviso) el.hidden = true; });
 }
 
 /** O "Continuar" gratis do nivel ainda nao foi usado? (o motor renova a cada nivel) */
@@ -559,10 +554,10 @@ const temGratis = () => !!J.e && J.e.continuacoes === 0;
  * O progresso do mundo fica salvo: recomecar volta so ao comeco do nivel.
  */
 function terminar(motivo, medida = false) {
-  poki.gameplayStop();
+  portal.gameplayStop();
   J.festa = null; J.anuncio = null; // o cartao da mesa cheia tem o proprio fluxo (e o proprio intervalo)
   if (!medida) {
-    poki.measure(V.regra, rotuloMedida(), 'cheia');
+    portal.measure(REGRA_DO_JOGO, rotuloMedida(), 'cheia');
     if (mundoDe(J.n) === 1 && temGratis()) {
       // mundo 1: a segunda chance (o "Continuar" gratis) vem sozinha, sem cartao
       J.estado = 'chance';
@@ -574,8 +569,8 @@ function terminar(motivo, medida = false) {
   audio.fim();
   salvar();
   const gratis = motivo === 'mesaCheia' && temGratis();
-  const comVideo = motivo === 'mesaCheia' && !gratis && (poki.sdkPronto || dep.local);
-  if (comVideo) poki.measure('rewarded', 'continuar', 'visible');
+  const comVideo = motivo === 'mesaCheia' && !gratis && (portal.sdkPronto || dep.local);
+  if (comVideo) portal.measure('rewarded', 'continuar', 'visible');
   menus.mostrarFim({ titulo: T.semJogadas, pontos: J.e.pontos, nivel: rotulo(), gratis, video: comVideo });
 }
 
@@ -584,7 +579,7 @@ function segundaChance() {
   J.estado = 'fim';
   continuar();
   if (J.estado !== 'jogando') { terminar('mesaCheia', true); return; }
-  poki.measure(V.regra, rotuloMedida(), 'salvo');
+  portal.measure(REGRA_DO_JOGO, rotuloMedida(), 'salvo');
   cena.part.texto(cena.W / 2, cena.L.mesa.y + cena.L.mesa.h / 2, T.segundaChance, '#ffd84a', 30);
 }
 
@@ -603,8 +598,23 @@ function continuar() {
 }
 
 // ------------------------------------------------------------ loop
+/**
+ * Um prazo no relogio do jogo: a pausa do portal para o prazo junto. Tudo que
+ * o jogador ve anda aqui, nunca em setTimeout.
+ * @param {number} ms @param {() => void} fn
+ */
+function depois(ms, fn) { J.agenda.push({ em: J.agora + ms, fn }); }
+
+function rodarAgenda() {
+  const vencidos = J.agenda.filter((a) => J.agora >= a.em);
+  if (!vencidos.length) return;
+  J.agenda = J.agenda.filter((a) => J.agora < a.em);
+  for (const a of vencidos) a.fn();
+}
+
 function atualizar(dt) {
   J.tVis += dt / 1000;
+  rodarAgenda();
   const efeitos = cena.atualizar(dt / 1000, J.agora);
   // o premio da missao voando ate o botao (?voo= congela, para os prints)
   if (COM_MISSAO) hud.animar(J.agora, dep.voo);
@@ -635,15 +645,15 @@ function atualizar(dt) {
     const min = Math.floor(J.tJogo / 60000);
     while (J.marco < MARCOS_MIN.length && min >= MARCOS_MIN[J.marco]) {
       const m = MARCOS_MIN[J.marco];
-      poki.measure('tempo', String(m), 'min');
-      // o tempo por braço do teste A/B (os Funnels do painel so olham 10 eventos adiante)
-      if (MARCOS_BRACO.has(m)) poki.measure(V.regra, String(m), 'min');
+      portal.measure('tempo', String(m), 'min');
+      // o tempo com a regra na categoria (os Funnels do painel so olham 10 eventos adiante)
+      if (MARCOS_BRACO.has(m)) portal.measure(REGRA_DO_JOGO, String(m), 'min');
       J.marco++;
     }
   } else if (J.estado === 'jogando' && J.carregou && !dep.vitrine) {
     // antes do primeiro toque: quanto tempo o jogador olha a mesa sem tocar
     J.tEspera += dt;
-    while (J.marcoEspera < MARCOS_ESPERA.length && J.tEspera >= MARCOS_ESPERA[J.marcoEspera] * 1000) { poki.measure('espera', String(MARCOS_ESPERA[J.marcoEspera]), 's'); J.marcoEspera++; }
+    while (J.marcoEspera < MARCOS_ESPERA.length && J.tEspera >= MARCOS_ESPERA[J.marcoEspera] * 1000) { portal.measure('espera', String(MARCOS_ESPERA[J.marcoEspera]), 's'); J.marcoEspera++; }
   }
   if (J.estado === 'chance') {
     if (J.agora - J.tChance > 700) segundaChance();
@@ -663,7 +673,7 @@ function atualizar(dt) {
       J.ultimaAcao = J.agora;
       atualizarHud();
     };
-    poki.commercialBreak().then(voltar, voltar);
+    portal.commercialBreak().then(voltar, voltar);
   }
   // fim do mundo: a transicao bloqueia ate o mundo novo entrar
   if (J.trans) {
@@ -687,7 +697,7 @@ function atualizar(dt) {
     if (precisa && J.agora - J.maoCalc > 800) {
       J.maoCalc = J.agora;
       // uma medida por nivel: o jogador travou (parado) ou nao entendeu a regra (recusas); o guia (fase 1, carta nova) nao conta
-      if (!J.ajudaMedida && !guia) { J.ajudaMedida = true; poki.measure('ajuda', rotuloMedida(), porRecusa ? 'recusa' : 'ocio'); }
+      if (!J.ajudaMedida && !guia) { J.ajudaMedida = true; portal.measure('ajuda', rotuloMedida(), porRecusa ? 'recusa' : 'ocio'); }
       // guarda a jogada; a posicao sai do layout de cada quadro (maoNaTela)
       // no juntar, o primeiro par de topos iguais vem antes (a carta nova da fila espera)
       const b = melhorJogada(J.e, J.agora);
@@ -748,13 +758,43 @@ function quadro() {
 }
 
 let ultimo = performance.now();
+
+/**
+ * O relogio do jogo. Todo prazo le J.agora (a linha do tempo, a festa, a
+ * febre, a transicao, a mao, os avisos), entao a pausa para o jogo inteiro:
+ * J.desconto tira da conta o tempo parado e, parado, o relogio nao anda. So
+ * os portais pedem a pausa; sem ela isto e o performance.now().
+ * Quem precisar de um instante usa isto, nunca performance.now() direto: um
+ * Math.max(J.agora, performance.now()) saltaria todo o tempo ja pausado.
+ */
+function relogio() { return (J.pausado ? J.pausadoEm : performance.now()) - J.desconto; }
+
+/**
+ * Anuncio ou foco perdido (portal.onPausa).
+ * @param {boolean} parar
+ */
+function pausarJogo(parar) {
+  if (parar === J.pausado) return;
+  if (parar) {
+    J.pausadoEm = performance.now();
+    J.pausado = true;
+  } else {
+    J.desconto += performance.now() - J.pausadoEm;
+    J.pausado = false;
+    ultimo = relogio();
+    J.agora = Math.max(J.agora, ultimo);
+  }
+  document.body.classList.toggle('pausado', parar);
+}
+
 function frame() {
   // o proximo quadro sai agendado antes de desenhar: um erro no desenho perde
   // um quadro e nao congela a tela (na 0.4.1/0.4.2, o canvas 0x0 do iPad e o
   // roundRect do Safari antigo paravam o laco de vez)
   requestAnimationFrame(frame);
+  if (J.pausado) return;
   // um relogio so: o carimbo do requestAnimationFrame pode ficar atras do performance.now()
-  const agora = performance.now();
+  const agora = relogio();
   const dt = Math.max(0, Math.min(100, agora - ultimo));
   ultimo = agora;
   J.agora = agora;
@@ -764,7 +804,7 @@ function frame() {
   } catch (err) { relatarErro(err); }
 }
 
-/** Desenha o quadro e, no primeiro, tira a tela de carregamento da Poki. */
+/** Desenha o quadro e, no primeiro, tira a tela de carregamento do portal. */
 function quadroSeguro() {
   try {
     quadro();
@@ -780,7 +820,7 @@ function quadroSeguro() {
 const errosRelatados = new Set();
 /**
  * O laco segue; o erro e lancado de novo fora dele (uma vez por mensagem),
- * para a Poki e o titulo de depuracao continuarem vendo a pilha.
+ * para o portal e o titulo de depuracao continuarem vendo a pilha.
  */
 function relatarErro(err) {
   const msg = String((err && err.message) || err);
@@ -790,19 +830,20 @@ function relatarErro(err) {
 }
 
 /**
- * A Poki tira a tela de carregamento aqui: so com a fonte pronta e a mesa
+ * O portal tira a tela de carregamento aqui: so com a fonte pronta e a mesa
  * desenhada (na 0.4.1 era antes do primeiro quadro, e 25% dos jogadores de
  * desktop nunca tocavam no jogo). Uma vez por sessao.
  */
 function carregou() {
   if (J.carregou) return;
   J.carregou = true;
-  poki.gameLoadingFinished();
+  portal.gameLoadingFinished();
 }
 
 /** Reserva: se o requestAnimationFrame parar com a pagina visivel, a simulacao anda por timer. */
 function reserva() {
-  const agora = performance.now();
+  if (J.pausado) return;
+  const agora = relogio();
   if (!document.hidden && agora - ultimo > 120) {
     const dt = Math.min(100, agora - ultimo);
     ultimo = agora;
@@ -827,25 +868,22 @@ function legalEm(c) {
   return jogadasLegais(J.e, J.e.fila[k]).includes(c);
 }
 
-/** A primeira vez na sessao que o jogador arrasta uma carta da mesa (nos dois braços: no hoje, o gesto que nao existe). */
+/** A primeira vez na sessao que o jogador arrasta uma carta da mesa. */
 function medirArrastoMesa() {
   if (J.arrastoMesaMedido) return;
   J.arrastoMesaMedido = true;
-  poki.measure('regra', 'arrasto', 'first');
+  portal.measure('regra', 'arrasto', 'first');
 }
 
-/** Toque de jogo (ponteiro, tecla ou botao): abre a sessao de gameplay da Poki e marca o primeiro da sessao. */
+/** Toque de jogo (ponteiro, tecla ou botao): abre a sessao de gameplay do portal e marca o primeiro da sessao. */
 function tocar() {
-  poki.gameplayStart();
-  if (!J.tocou) { J.tocou = true; poki.measure('game', 'toque', 'first'); }
+  portal.gameplayStart();
+  if (!J.tocou) { J.tocou = true; portal.measure('game', 'toque', 'first'); }
 }
-
-/** No hoje, o toque numa coluna que joga a carta da mao; se o ponteiro seguir andando, o jogador tentava arrastar uma carta da mesa. */
-let toqueMesa = null;
 
 canvas.addEventListener('pointerdown', (e) => {
   audio.iniciar();
-  J.agora = Math.max(J.agora, performance.now());
+  J.agora = Math.max(J.agora, relogio());
   if (J.estado !== 'jogando' || J.agora < J.bloqueio || !J.e) return;
   tocar();
   const L = cena.L;
@@ -876,17 +914,12 @@ canvas.addEventListener('pointerdown', (e) => {
     return;
   }
   if (c >= 0) {
-    toqueMesa = J.e.colunas[c].length ? { pid: e.pointerId, x0: x, y0: y } : null;
     aplicar({ tipo: 'colocar', c, k: 0 }, L.filaPos(0));
     return;
   }
   if (L.descarteEm(x, y)) aplicar({ tipo: 'descartar' }, L.filaPos(0));
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (toqueMesa && toqueMesa.pid === e.pointerId && Math.hypot(e.clientX - toqueMesa.x0, e.clientY - toqueMesa.y0) > ARRASTO_MESA) {
-    toqueMesa = null;
-    medirArrastoMesa();
-  }
   const a = J.arrasto;
   if (!a || a.pid !== e.pointerId) return;
   const dx = e.clientX - a.x;
@@ -902,7 +935,6 @@ canvas.addEventListener('pointermove', (e) => {
   J.legal = legalEm(J.destaque);
 });
 const soltar = (e) => {
-  if (toqueMesa && toqueMesa.pid === e.pointerId) toqueMesa = null;
   const a = J.arrasto;
   if (!a || a.pid !== e.pointerId) return;
   J.arrasto = null; J.destaque = -1;
@@ -953,7 +985,7 @@ window.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
 // --------------------------------------------------------- anuncios
 /** Rewarded: so premia com true. Sem SDK, so no teste local (anuncio simulado). */
 async function recompensa() {
-  if (poki.sdkPronto) return poki.rewardedBreak();
+  if (portal.sdkPronto) return portal.rewardedBreak();
   if (dep.local) return anuncioLocal();
   return false;
 }
@@ -1000,7 +1032,7 @@ botao('vCoringa', () => premioVideo('coringa'));
 
 function abrirMenu() {
   if (J.estado !== 'jogando') return;
-  poki.gameplayStop();
+  portal.gameplayStop();
   J.estado = 'menu';
   menus.abrir();
 }
@@ -1017,23 +1049,23 @@ const menus = criarMenus({
     aoFechar: () => { if (J.estado === 'menu') J.estado = 'jogando'; J.ultimaAcao = J.agora; },
     continuarGratis: () => {
       if (J.estado !== 'fim' || !temGratis()) return;
-      poki.measure(V.regra, rotuloMedida(), 'salvo');
+      portal.measure(REGRA_DO_JOGO, rotuloMedida(), 'salvo');
       continuar();
     },
     continuarVideo: async () => {
       if (J.estado !== 'fim') return;
-      poki.measure('rewarded', 'continuar', 'interact');
+      portal.measure('rewarded', 'continuar', 'interact');
       J.estado = 'anuncio';
       const ok = await recompensa();
       J.estado = 'fim';
-      J.agora = Math.max(J.agora, performance.now());
+      J.agora = Math.max(J.agora, relogio());
       J.ultimaAcao = J.agora;
       if (ok) { menus.esconderFim(); continuar(); }
     },
     deNovo: () => {
-      poki.measure('level', rotuloMedida(), 'fail');
+      portal.measure('level', rotuloMedida(), 'fail');
       const ir = () => { J.trans = null; recomecar(); };
-      if (podeIntervaloDeNovo() && J.estado !== 'anuncio') { marcarIntervalo(); J.estado = 'anuncio'; poki.commercialBreak().then(ir, ir); } else ir();
+      if (podeIntervaloDeNovo() && J.estado !== 'anuncio') { marcarIntervalo(); J.estado = 'anuncio'; portal.commercialBreak().then(ir, ir); } else ir();
     },
     missoes: () => save.missoes.missoes.map((m) => ({ ...m, texto: textoMissao(T, m), icone: ICONES[m.premio] })),
   },
@@ -1056,16 +1088,22 @@ botao('bPausa', abrirMenu);
 document.addEventListener('visibilitychange', () => {
   audio.pausarAba(document.hidden);
   // a volta da aba nao conta como ocio
-  if (!document.hidden) J.ultimaAcao = Math.max(J.agora, performance.now());
+  if (!document.hidden) J.ultimaAcao = Math.max(J.agora, relogio());
 });
 addEventListener('resize', layout);
 
 // ------------------------------------------------------------- init
-poki.onAdStart = () => audio.mudoParaAnuncio();
-poki.onAdEnd = () => audio.voltarDoAnuncio();
-poki.init().then(() => {
-  if (!poki.sdkPronto && !dep.local) document.body.classList.add('sem-anuncio');
-  poki.movePill(0, 64);
+portal.onAdStart = () => audio.mudoParaAnuncio();
+portal.onAdEnd = () => audio.voltarDoAnuncio();
+// os tres ganchos abaixo so existem nos adaptadores da Y8 e da CrazyGames
+portal.onPausa = pausarJogo;
+portal.aoAnuncios = (ligados) => document.body.classList.toggle('sem-anuncio', !ligados && !dep.local);
+if (portal.ligarIdioma && !dep.lang) portal.ligarIdioma(trocarIdioma);
+// os botoes de video so aparecem com o SDK de pe: ate la, e sem ele, somem
+if (!dep.local) document.body.classList.add('sem-anuncio');
+portal.init().then(() => {
+  document.body.classList.toggle('sem-anuncio', !portal.sdkPronto && !dep.local);
+  portal.movePill(0, 64);
 });
 audio.definirMudo(!!save.mudo);
 cena.definirTextos(T);
@@ -1078,7 +1116,7 @@ if (dep.visual || dep.guia >= 0) {
 hud.mostrarMissao(COM_MISSAO, VISUAL.includes('missaob'), () => { audio.completar(); vibrar([16, 40, 16]); });
 aplicarVisual();
 layout();
-J.agora = performance.now();
+J.agora = relogio();
 /**
  * Mesa de demonstracao (prints e laboratorio): todos os valores, os especiais
  * na fila, um topo que ja recebeu especial e a pilha do descarte com 2 cartas.
@@ -1093,7 +1131,7 @@ const VITRINE = {
 if (dep.vitrine) {
   const mundo = mundoDe(dep.nivel || 1);
   J.n = faseGlobal(mundo, 1);
-  const e = criarPartida(save.regras, { ...VITRINE, mundo, perfil: V.regra, regras: { ...(mundoDef(mundo).regras || {}), juntar: V.regra === 'juntar' } }, 7);
+  const e = criarPartida(save.regras, { ...VITRINE, mundo, perfil: REGRA_DO_JOGO, regras: { ...(mundoDef(mundo).regras || {}), juntar: REGRA_DO_JOGO === 'juntar' } }, 7);
   const col = e.colunas[1];
   if (col.length) col[col.length - 1] = { ...col[col.length - 1], esp: true };
   const fila = mundo >= 4 ? ['dobro', 'quadruplo', 'bomba'] : ['coringa', 'bomba', 'dobro'];
@@ -1102,8 +1140,6 @@ if (dep.vitrine) {
   e.descarteCarga = Math.max(0, e.regras.descarteMax - 2);
   prepararPartida(e, false);
 } else {
-  // a etiqueta do teste A/B vai antes do primeiro level/N/start (o funil do painel comeca nela)
-  poki.measure('variante', V.regra, 'start');
   carregarFase(dep.nivel || save.fase || 1, !dep.fixo, !dep.nivel);
   // prints do voo (so local): a missao de ?missao= cumprida, com o premio ja no inventario e o voo congelado em ?voo=
   if (dep.voo >= 0 && COM_MISSAO && save.missoes.missoes[0]) {
@@ -1113,16 +1149,33 @@ if (dep.vitrine) {
     atualizarHud();
   }
 }
-document.querySelectorAll('[aria-label]').forEach((el) => {
+function rotular() {
   const mapa = { bDesfazer: T.desfazer, bMenu: T.menu, bPausa: T.pausa, bFechar: T.fechar, iCoringa: T.coringa, iMartelo: T.martelo, iTroca: T.troca, bSom: T.som, vDescarte: T.videoEsvaziarRotulo, vCoringa: T.videoCoringaRotulo };
-  if (mapa[el.id]) el.setAttribute('aria-label', mapa[el.id]);
-});
+  document.querySelectorAll('[aria-label]').forEach((el) => {
+    if (mapa[el.id]) el.setAttribute('aria-label', mapa[el.id]);
+  });
+}
+rotular();
+
+/**
+ * O idioma do portal chega depois do init: T e o mesmo objeto para todos, e o
+ * que ja foi escrito na tela ou pintado nas cartas e refeito aqui.
+ * @param {string} cod
+ */
+function trocarIdioma(cod) {
+  Object.assign(T, textos(escolherIdioma([cod])));
+  cena.definirTextos(T);
+  hud.rotular();
+  menus.rotular();
+  rotular();
+  if (J.e) atualizarHud();
+}
 
 if (dep.ganchos) {
   window.addEventListener('error', (ev) => { document.title = 'ERRO ' + ev.message; });
   window.addEventListener('unhandledrejection', (ev) => { document.title = 'ERRO ' + (ev.reason && ev.reason.message || ev.reason); });
   /** @type {any} */ (window).__c2 = {
-    J, cena, audio, poki, save, jogar: (a) => aplicar(a, a.tipo === 'juntar' ? undefined : cena.L.filaPos(0)),
+    J, cena, audio, portal, save, relogio, jogar: (a) => aplicar(a, a.tipo === 'juntar' ? undefined : cena.L.filaPos(0)),
     auto(ms) { dep.auto = ms; J.autoProx = J.agora; },
     /** forca a mesa cheia (banco de testes do SDK) */
     fimTeste() { if (J.estado === 'jogando') { J.e = { ...J.e, fim: 'mesaCheia' }; terminar('mesaCheia'); } },
@@ -1162,7 +1215,7 @@ function resumo() {
     estado: J.estado, festa: !!J.festa, anuncio: !!J.anuncio, menu: menus.aberto, fimAberto: menus.fimAberto, pontos: e.pontos, n: e.n, recusas: e.recusas, hist: J.hist.length,
     colunas: e.colunas.map((c) => c.map((k) => k.tipo === 'normal' ? k.v : k.tipo)), fila: e.fila.map((k) => k.tipo === 'normal' ? k.v : k.tipo),
     descarte: e.descarte ? e.descarte.v : null, carga: e.descarteCarga, fim: e.fim, fase: J.n, mundo: e.mundo, nivel: e.nivel, barra: $('barra').style.width, progresso: Number(progressoDoNivel(e).toFixed(3)),
-    poki: { jogando: poki.jogando, jaJogou: poki.jaJogou }, variante: V, perfil: e.perfil, perigo: perigo(e), intervalos: J.intervalos, medidas,
+    portal: { jogando: portal.jogando, jaJogou: portal.jaJogou }, perfil: e.perfil, perigo: perigo(e), intervalos: J.intervalos, medidas,
   });
 }
 
@@ -1173,13 +1226,13 @@ const comecar = () => {
     setTimeout(() => { document.body.dataset.estado = resumo(); document.title = 'PRONTO'; }, Math.max(...gs.map((g) => g.ms)) + 600);
   }
   if (dep.menu) abrirMenu();
-  ultimo = performance.now();
+  ultimo = relogio();
   requestAnimationFrame(frame);
   setInterval(reserva, 50);
-  // reserva: se o requestAnimationFrame nao andar (aba escondida ao carregar), desenha um quadro e avisa a Poki
+  // reserva: se o requestAnimationFrame nao andar (aba escondida ao carregar), desenha um quadro e avisa o portal
   setTimeout(() => {
     if (J.carregou) return;
-    J.agora = performance.now();
+    J.agora = relogio();
     try { quadroSeguro(); } catch (err) { relatarErro(err); }
     carregou();
   }, 800);

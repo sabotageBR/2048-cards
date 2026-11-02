@@ -1,6 +1,6 @@
 // Armazenamento com reserva em memoria (porte de carimbador-maluco/src/core/armazenamento.js).
 //
-// A Poki exige que o jogo continue jogavel em janela anonima, com cookies
+// O portal exige que o jogo continue jogavel em janela anonima, com cookies
 // bloqueados e com o disco cheio. Nesses casos o localStorage lanca em
 // qualquer acesso, inclusive no getter (window.localStorage), por isso ate a
 // obtencao do objeto fica dentro de try. Nada aqui lanca.

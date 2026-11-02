@@ -27,7 +27,7 @@ const ENCHER = 'nivel=2&semanuncio&semanim&lang=pt&gesto=key:d@600;key:d@1000;ke
  * faz um 4 ao lado do 4 da coluna 1; a mao guiada arrasta um ate o outro
  * (?guia= congela o gesto); topo2>topo0~ segura a carta da mesa no ar.
  */
-const JUNTAR = `nivel=1&${BASE}&variante=juntar`;
+const JUNTAR = `nivel=1&${BASE}`;
 /** A abertura do nivel 1 (o 16 em 3 jogadas, com cascata) e uma 4a jogada durante a festa da subida. */
 const ABERTURA = 'nivel=1&fixo&semanuncio&semanim&lang=pt&gesto=fila0>col2@400;fila0>col2@1000;fila0>col0@1600;fila0>col1@3300';
 

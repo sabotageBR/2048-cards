@@ -19,6 +19,8 @@ html,body{margin:0;overflow:hidden;background:#000}canvas{display:block}
 //   ?opcao=fusao&grade       folha de conferencia: tiles de 314 a 94 px sobre o #83FFE7
 //   ?opcao=fusao&medir       mede a thumb de 628 px e escreve o JSON em #medidas
 //   ?opcao=fusao&perto       a thumb de 628 px com os pixels perto do #83FFE7 em magenta (para achar o que reprova)
+//   ?capa&l=1920&a=1080      capa de portal em qualquer proporcao: a cena da cascata com a pilha
+//                            inteira, recomposta, com o titulo. Deixa o PNG exato em #medidas (dataURL)
 // (A thumb do duelo, opcao h com o Gosmo, esta na master.)
 import { desenharCarta } from '../src/render/cartas.js';
 import { temaDe } from '../src/render/temas/index.js';
@@ -48,10 +50,13 @@ const O = OPCOES[opcao];
 
 let ctx = null;
 let k = 1; // tudo num quadrado virtual de 600
+// Capa de portal: o canvas nao e quadrado e a cena anda (ox, oy, em px).
+let ox = 0, oy = 0;
+const esc = () => { ctx.translate(ox, oy); ctx.scale(k, k); };
 
 function carta(v, x, y, w, rot, alpha = 1) {
   ctx.save();
-  ctx.scale(k, k);
+  esc();
   desenharCarta(ctx, { id: v, tipo: 'normal', v }, { x, y, w, h: w / 0.72, alpha, rot, dpr: k, t: 0.4 });
   ctx.restore();
 }
@@ -59,7 +64,7 @@ function carta(v, x, y, w, rot, alpha = 1) {
 /** Carta com sombra macia (profundidade) desenhada por baixo. */
 function cartaSombra(v, x, y, w, rot) {
   const h = w / 0.72;
-  ctx.save(); ctx.scale(k, k);
+  ctx.save(); esc();
   ctx.translate(x + w / 2, y + h / 2 + 10); ctx.rotate(rot);
   ctx.shadowColor = 'rgba(8,2,20,0.55)'; ctx.shadowBlur = 26; ctx.shadowOffsetY = 10;
   rr(ctx, -w / 2 + 6, -h / 2 + 6, w - 12, h - 12, 18); ctx.fillStyle = 'rgba(8,2,20,0.5)'; ctx.fill();
@@ -70,7 +75,7 @@ function cartaSombra(v, x, y, w, rot) {
 /** Carta 2048 com brilho dourado atras. */
 function carta2048(x, y, w, rot) {
   const h = w / 0.72;
-  ctx.save(); ctx.scale(k, k);
+  ctx.save(); esc();
   ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot);
   ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = 70;
   rr(ctx, -w / 2 - 8, -h / 2 - 8, w + 16, h + 16, 28); ctx.fillStyle = 'rgba(255,216,74,0.55)'; ctx.fill();
@@ -79,7 +84,7 @@ function carta2048(x, y, w, rot) {
 }
 
 function faiscas(cx, cy, raioMin, raioMax, n, semente) {
-  ctx.save(); ctx.scale(k, k);
+  ctx.save(); esc();
   let s = semente;
   const r = () => { s = (s * 1103515245 + 12345) >>> 0; return s / 4294967296; };
   for (let i = 0; i < n; i++) {
@@ -92,7 +97,7 @@ function faiscas(cx, cy, raioMin, raioMax, n, semente) {
 
 /** Estouro (sem texto): estrela de quadrinho com miolo branco e brilho. */
 function estouro(x, y, r) {
-  ctx.save(); ctx.scale(k, k);
+  ctx.save(); esc();
   const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 1.8);
   g.addColorStop(0, 'rgba(255,240,170,0.9)'); g.addColorStop(0.5, 'rgba(255,190,60,0.35)'); g.addColorStop(1, 'rgba(255,160,40,0)');
   ctx.fillStyle = g; circulo(ctx, x, y, r * 1.8); ctx.fill();
@@ -105,7 +110,7 @@ function estouro(x, y, r) {
 
 /** Linhas de velocidade (ang: direcao do movimento; as linhas ficam atras). */
 function velocidade(x, y, ang, linhas) {
-  ctx.save(); ctx.scale(k, k);
+  ctx.save(); esc();
   ctx.translate(x, y); ctx.rotate(ang);
   ctx.lineCap = 'round';
   for (const [dy, x0, comp, larg] of linhas) {
@@ -120,7 +125,7 @@ function velocidade(x, y, ang, linhas) {
 /** Fundo limpo: degrade radial a partir do foco, raios de luz girando dele, brilhos e vinheta. */
 function fundo() {
   const [a, b, c] = O.fundo, [fx, fy] = O.foco;
-  ctx.save(); ctx.scale(k, k);
+  ctx.save(); esc();
   const g = ctx.createRadialGradient(fx, fy, 10, fx, fy, 640);
   g.addColorStop(0, a); g.addColorStop(0.42, b); g.addColorStop(1, c);
   ctx.fillStyle = g; ctx.fillRect(0, 0, 600, 600);
@@ -159,20 +164,26 @@ function cenaFusao() {
   faiscas(300, 190, 150, 200, 12, 9);
 }
 
-/** cascata: a pilha da mesa a esquerda; o 2048 sai voando do topo dela para a direita. */
-function cenaCascata() {
-  [[1024, 292], [512, 340], [256, 388], [128, 436]].forEach(([v, y]) => cartaSombra(v, 30, y, 150, 0));
+/**
+ * cascata: a pilha da mesa a esquerda; o 2048 sai voando do topo dela para a direita.
+ * sobe: quanto a pilha sobe (px virtuais); a capa nao corta a ultima carta na beirada.
+ */
+function cenaCascata(sobe = 0) {
+  const pilha = () => [[1024, 292], [512, 340], [256, 388], [128, 436]].forEach(([v, y]) => cartaSombra(v, 30, y - sobe, 150, 0));
+  // na capa os numeros da pilha ficam limpos: o rastro passa por tras e as faiscas, por fora
+  if (!sobe) pilha();
   // rastro de luz do topo da pilha ate a carta
-  ctx.save(); ctx.scale(k, k);
-  const g = ctx.createLinearGradient(110, 300, 360, 200);
+  ctx.save(); esc();
+  const g = ctx.createLinearGradient(110, 300 - sobe, 360, 200);
   g.addColorStop(0, 'rgba(255,226,122,0)'); g.addColorStop(1, 'rgba(255,226,122,0.75)');
-  ctx.beginPath(); ctx.moveTo(90, 300); ctx.quadraticCurveTo(170, 150, 330, 170); ctx.lineTo(340, 260); ctx.quadraticCurveTo(200, 250, 140, 320); ctx.closePath();
+  ctx.beginPath(); ctx.moveTo(90, 300 - sobe); ctx.quadraticCurveTo(170, 150, 330, 170); ctx.lineTo(340, 260); ctx.quadraticCurveTo(200, 250, 140, 320 - sobe); ctx.closePath();
   ctx.fillStyle = g; ctx.fill();
   ctx.restore();
+  if (sobe) pilha();
   velocidade(330, 215, -0.32, [[-55, -40, 150, 11], [0, -70, 190, 15], [55, -40, 140, 11]]);
   carta2048(300, 40, 236, 0.13);
   faiscas(418, 205, 165, 225, 16, 3);
-  faiscas(105, 300, 30, 90, 8, 12);
+  faiscas(105, 300 - sobe, sobe ? 105 : 30, sobe ? 135 : 90, 8, 12);
 }
 
 /** leque: uma mao de cartas; o 2048 no meio, na frente e mais alto. */
@@ -196,7 +207,7 @@ function cenaLeque() {
 /** escada: os valores subindo da esquerda para a direita ate o 2048, no alto. */
 function cenaEscada() {
   // a trilha de luz da escada
-  ctx.save(); ctx.scale(k, k);
+  ctx.save(); esc();
   const g = ctx.createLinearGradient(40, 560, 500, 120);
   g.addColorStop(0, 'rgba(255,226,122,0)'); g.addColorStop(1, 'rgba(255,226,122,0.6)');
   ctx.beginPath(); ctx.moveTo(10, 600); ctx.quadraticCurveTo(250, 470, 470, 150); ctx.lineTo(540, 210); ctx.quadraticCurveTo(320, 540, 120, 640); ctx.closePath();
@@ -212,7 +223,7 @@ function cenaEscada() {
 function desenhar(s) {
   k = s / 600;
   fundo();
-  ({ fusao: cenaFusao, cascata: cenaCascata, leque: cenaLeque, escada: cenaEscada })[opcao]();
+  ({ fusao: cenaFusao, cascata: () => cenaCascata(), leque: cenaLeque, escada: cenaEscada })[opcao]();
 }
 
 function thumb(cv, s) {
@@ -253,6 +264,89 @@ function rgb(h, sat, l) {
   const c = (1 - Math.abs(2 * l - 1)) * sat, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
   const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
   return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+
+/**
+ * Composicao de cada proporcao: esc = escala da cena (1 = a cena preenche o lado menor), cx e cy =
+ * centro da cena em fracoes da capa, titulo = centro e largura em fracoes da capa, linhas do
+ * titulo. Nada encosta na beirada: os portais mostram a capa em muitos tamanhos e cortam.
+ */
+const COMPOSICOES = [
+  { max: 0.62, esc: 1.0, cx: 0.5, cy: 0.655, titulo: [0.5, 0.2, 0.74], linhas: 2 }, // 9:16
+  { max: 0.8, esc: 0.95, cx: 0.5, cy: 0.665, titulo: [0.5, 0.195, 0.64], linhas: 2 }, // 2:3
+  { max: 1.15, esc: 0.78, cx: 0.5, cy: 0.6, titulo: [0.5, 0.125, 0.82], linhas: 1 }, // 1:1
+  { max: 1.5, esc: 0.82, cx: 0.7, cy: 0.5, titulo: [0.215, 0.5, 0.33], linhas: 2 }, // 4:3
+  { max: 9, esc: 0.9, cx: 0.7, cy: 0.5, titulo: [0.235, 0.5, 0.36], linhas: 2 }, // 16:9
+];
+
+/** Fundo da capa: o mesmo da thumb (degrade do foco, raios, brilhos e vinheta), em px, em qualquer proporcao. */
+function fundoCapa(L, Al, fx, fy) {
+  const [a, b, c] = O.fundo, R = Math.hypot(L, Al) * 0.8;
+  const g = ctx.createRadialGradient(fx, fy, 10, fx, fy, R);
+  g.addColorStop(0, a); g.addColorStop(0.42, b); g.addColorStop(1, c);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, L, Al);
+  const n = 18;
+  for (let i = 0; i < n; i++) {
+    const ang = 0.13 + (i * Math.PI * 2) / n;
+    const r = ctx.createRadialGradient(fx, fy, 0, fx, fy, R * 1.05);
+    r.addColorStop(0, 'rgba(255,255,255,0.16)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath(); ctx.moveTo(fx, fy); ctx.arc(fx, fy, R * 1.4, ang, ang + (Math.PI / n) * 0.8); ctx.closePath();
+    ctx.fillStyle = r; ctx.fill();
+  }
+  let s = 41;
+  const rnd = () => { s = (s * 1103515245 + 12345) >>> 0; return s / 4294967296; };
+  const u = Math.max(L, Al) / 600;
+  for (let i = 0; i < 44; i++) {
+    const x = rnd() * L, y = rnd() * Al, t = (2 + rnd() * 4) * u * 0.7;
+    estrela(ctx, x, y, t, t * 0.4, 4, 0); ctx.fillStyle = `rgba(255,255,255,${0.25 + rnd() * 0.45})`; ctx.fill();
+  }
+  const v = ctx.createRadialGradient(fx, fy, R * 0.34, fx, fy, R);
+  v.addColorStop(0, 'rgba(6,2,16,0)'); v.addColorStop(1, 'rgba(6,2,16,0.55)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, L, Al);
+}
+
+/** Uma palavra do titulo: contorno de adesivo, a tinta do jogo e o preenchimento em degrade. */
+function palavra(texto, x, y, f, cores) {
+  ctx.font = `700 ${f}px Fredoka`;
+  ctx.textBaseline = 'alphabetic';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = f * 0.24; ctx.strokeStyle = '#ffffff'; ctx.strokeText(texto, x, y);
+  ctx.lineWidth = f * 0.13; ctx.strokeStyle = TINTA; ctx.strokeText(texto, x, y);
+  const v = ctx.createLinearGradient(0, y - f * 0.75, 0, y + f * 0.05);
+  v.addColorStop(0, cores[0]); v.addColorStop(1, cores[1]);
+  ctx.fillStyle = v; ctx.fillText(texto, x, y);
+}
+
+/** "2048 Cards" com larg px de largura, centrado em (cx, cy): o numero em ouro, a palavra em branco e azul. */
+function titulo(cx, cy, larg, linhas) {
+  const OURO = ['#fff3b0', '#ffb52e'], GELO = ['#ffffff', '#a9d4ff'];
+  ctx.font = '700 100px Fredoka';
+  const l1 = ctx.measureText('2048').width, l2 = ctx.measureText('Cards').width, esp = ctx.measureText(' ').width;
+  if (linhas === 1) {
+    const f = (100 * larg) / (l1 + esp + l2);
+    const x = cx - larg / 2, y = cy + f * 0.34;
+    palavra('2048', x, y, f, OURO);
+    palavra('Cards', x + ((l1 + esp) * f) / 100, y, f, GELO);
+    return;
+  }
+  const f = (100 * larg) / Math.max(l1, l2);
+  palavra('2048', cx - (l1 * f) / 200, cy - f * 0.14, f, OURO);
+  palavra('Cards', cx - (l2 * f) / 200, cy + f * 0.84, f, GELO);
+}
+
+/** Capa de portal LxA: o fundo da thumb, a cascata recomposta com a pilha inteira e o titulo. */
+function capa(cv, L, Al) {
+  cv.width = L; cv.height = Al;
+  ctx = cv.getContext('2d');
+  const C = COMPOSICOES.find((c) => L / Al <= c.max);
+  k = (Math.min(L, Al) / 600) * C.esc;
+  ox = L * C.cx - 300 * k;
+  oy = Al * C.cy - 300 * k;
+  fundoCapa(L, Al, ox + 390 * k, oy + 190 * k);
+  cenaCascata(70);
+  ox = 0; oy = 0;
+  const [tx, ty, tl] = C.titulo;
+  titulo(L * tx, Al * ty, L * tl, C.linhas);
 }
 
 // ------------------------------------------------------------ medidas
@@ -336,6 +430,9 @@ const pronto = () => {
   } else if (q.has('medir')) {
     thumb(cv, 628);
     document.getElementById('medidas').textContent = JSON.stringify(medir(cv));
+  } else if (q.has('capa')) {
+    capa(cv, parseInt(q.get('l') || '1920', 10), parseInt(q.get('a') || '1080', 10));
+    document.getElementById('medidas').textContent = cv.toDataURL('image/png');
   } else thumb(cv, S);
   document.title = 'PRONTO';
 };

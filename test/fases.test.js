@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MUNDOS, NOVIDADES, FASES, CLASSICO, POR_MUNDO, TOTAL_FASES, PERFIS, faseDe, faseGlobal, mundoDe, posNoMundo, alvoDoNivel,
+  MUNDOS, NOVIDADES, FASES, CLASSICO, POR_MUNDO, REGRA_DO_JOGO, TOTAL_FASES, PERFIS, faseDe, faseGlobal, mundoDe, posNoMundo, alvoDoNivel,
   pesosDoNivel, especiaisDoNivel, alvoCasual, FAIXA_CASUAL, QUEDA_MAX, ritmoMax, mundoDef, mundoDoPerfil, escadaDoMundo,
   curvaSoPiso,
 } from '../src/jogo/fases.js';
@@ -73,8 +73,11 @@ test('os dois perfis tem a mesma escada; so o juntar liga a regra', () => {
   }
   assert.equal(faseDe(41, 0, 'juntar').regras.descarteMax, 2, 'o juntar mantem as regras do mundo');
   assert.equal(faseDe(5, 0, 'juntar').perfil, 'juntar');
-  assert.equal(faseDe(5, 0, 'mesa-justa').perfil, 'hoje');
-  assert.equal(faseDe(5).perfil, 'hoje');
+  // sem pedido explicito, e com perfil desconhecido, vale a regra do jogo
+  assert.equal(REGRA_DO_JOGO, 'juntar');
+  assert.equal(faseDe(5, 0, 'mesa-justa').perfil, 'juntar');
+  assert.equal(faseDe(5).perfil, 'juntar');
+  for (let N = 1; N <= 60; N++) assert.equal(faseDe(N, N % 3).regras.juntar, true, `fase ${N}: o jogo sem o juntar`);
   assert.ok(curvaSoPiso('juntar') && !curvaSoPiso('hoje'));
 });
 
@@ -183,8 +186,8 @@ test('curva gradual: o jogador casual segue alvoCasual e o ritmo, nos dois perfi
  * do nivel 1, se a carta nova foi jogada numa coluna e se houve cascata (um
  * degrau >= 2) ou salto de nivel (o x4 no 8 faz o 32 e sobe dois).
  */
-function entrada(m) {
-  const f = faseDe(faseGlobal(m, 1));
+function entrada(m, perfil) {
+  const f = faseDe(faseGlobal(m, 1), 0, perfil);
   let e = criarPartida({}, f, f.semente);
   const nova = MUNDOS[m - 1].novidades[0].tipo;
   const naFrente = e.fila.slice(0, 2).some((k) => k.tipo === nova);
@@ -202,12 +205,13 @@ function entrada(m) {
 }
 
 test('entrada dos mundos 2 e 3: a carta nova chega a frente e faz o 16 em cascata', () => {
-  for (const m of [2, 3]) {
-    const r = entrada(m);
-    assert.ok(r.naFrente, `mundo ${m}: a carta nova nao esta nas 2 primeiras da fila`);
-    assert.ok(r.jogouNova, `mundo ${m}: a mao nao joga a carta nova numa coluna`);
-    assert.ok(r.nivel >= 2 && r.jogadas <= 3, `mundo ${m}: ${r.jogadas} jogadas, nivel ${r.nivel}`);
-    assert.ok(r.grande, `mundo ${m}: sem cascata nem salto de nivel`);
+  for (const m of [2, 3]) for (const perfil of PERFIS) {
+    const r = entrada(m, perfil);
+    assert.ok(r.naFrente, `${perfil} mundo ${m}: a carta nova nao esta nas 2 primeiras da fila`);
+    // no juntar o 16 sai juntando os topos, e a carta nova fica para a mao guiada da novidade
+    if (perfil === 'hoje') assert.ok(r.jogouNova, `mundo ${m}: a mao nao joga a carta nova numa coluna`);
+    assert.ok(r.nivel >= 2 && r.jogadas <= 3, `${perfil} mundo ${m}: ${r.jogadas} jogadas, nivel ${r.nivel}`);
+    assert.ok(r.grande, `${perfil} mundo ${m}: sem cascata nem salto de nivel`);
     // o recomeco do nivel 1 nao repete o roteiro
     assert.equal(faseDe(faseGlobal(m, 1), 1).fila, undefined);
     assert.equal(faseDe(faseGlobal(m, 2)).fila, undefined);

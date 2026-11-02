@@ -1,8 +1,8 @@
 // Cena: canvas de tela cheia com o cenario do mundo (camada parada em cache),
 // a mesa com a linha do tempo, particulas (as explosoes de cada mundo saem de
 // efeitos.js e do tema), mao de ajuda, a festa da subida de nivel por cima
-// do jogo, entrada de mundo e a transicao de fim de mundo. Nao conhece a
-// Poki nem o DOM alem do canvas.
+// do jogo, entrada de mundo e a transicao de fim de mundo. Nao conhece o
+// portal nem o DOM alem do canvas.
 // Um relogio so: o `agora` do main.js (ms) move a linha e os efeitos.
 import { calcularLayout } from './layout.js';
 import { desenharMesa, desenharMao, desenharGuia, CICLO_GUIA } from './mesa.js';

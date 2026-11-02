@@ -8,7 +8,7 @@
 // rajadas e ganha um contorno vermelho pulsando; no "fio" (a carta da frente
 // nao cabe e o descarte tem 1 lugar), o lugar do descarte tambem. O tremor e
 // funcao pura do tempo (o ?quadro= dos prints continua valendo).
-// Juntar (teste A/B da 0.6.0): a carta do topo arrastada sai da coluna e
+// Juntar (a regra do jogo): a carta do topo arrastada sai da coluna e
 // segue o ponteiro, do tamanho das cartas da mesa, por cima de tudo.
 import { desenharCarta } from './cartas.js';
 import { TINTA, FONTE, rr, texto, proibido } from './desenho.js';

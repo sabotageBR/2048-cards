@@ -19,11 +19,43 @@ test('sem console.log/info/debug no jogo', () => {
   for (const p of src) assert.ok(!/console\.(log|info|debug)\s*\(/.test(ler(p)), rel(p));
 });
 
-test('so src/main.js importa o SDK da Poki', () => {
+test('so src/core/portal.js importa o SDK da Poki, e so src/main.js importa o portal', () => {
   for (const p of src) {
-    if (rel(p) === 'src/main.js' || rel(p) === 'src/core/poki.js') continue;
-    assert.ok(!/core\/poki\.js|\.\/poki\.js/.test(ler(p)), rel(p));
+    if (rel(p) !== 'src/core/portal.js' && rel(p) !== 'src/core/poki.js') assert.ok(!/core\/poki\.js|\.\/poki\.js/.test(ler(p)), rel(p));
+    if (rel(p) !== 'src/main.js' && rel(p) !== 'src/core/portal.js') assert.ok(!/core\/portal\.js|\.\/portal\.js/.test(ler(p)), rel(p));
   }
+});
+
+test('a marca da Poki so aparece no wrapper dela: o resto vai para os zips dos portais', () => {
+  for (const p of src) {
+    if (rel(p) === 'src/core/poki.js' || rel(p) === 'src/core/portal.js') continue;
+    assert.ok(!/poki/i.test(ler(p)), rel(p));
+  }
+});
+
+test('src/ nao cita os testes de jogadores de outra plataforma', () => {
+  for (const p of src) {
+    if (rel(p) === 'src/core/poki.js') continue;
+    assert.ok(!/Player Fit|Web Fit/i.test(ler(p)), rel(p));
+  }
+});
+
+test('nada de sorteio de regra: o jogo joga so a REGRA_DO_JOGO', () => {
+  const main = ler(join(raiz, 'src/main.js'));
+  assert.ok(!/variante|V\.regra|Math\.random|'hoje'/.test(main), 'main.js com resto do teste A/B');
+  assert.ok(/faseDe\(n, J\.tentativas, REGRA_DO_JOGO\)/.test(main));
+  for (const p of src) assert.ok(!/variante\.js|escolherVariante/.test(ler(p)), rel(p));
+});
+
+test('main.js le o relogio so por relogio(): performance.now() direto salta a pausa do portal', () => {
+  const linhas = ler(join(raiz, 'src/main.js')).split('\n')
+    .filter((l) => /performance\.now\(\)/.test(l) && !/^\s*(\/\/|\*)/.test(l)).map((l) => l.trim());
+  assert.deepEqual(linhas, [
+    'let ultimo = performance.now();',
+    'function relogio() { return (J.pausado ? J.pausadoEm : performance.now()) - J.desconto; }',
+    'J.pausadoEm = performance.now();',
+    'J.desconto += performance.now() - J.pausadoEm;',
+  ]);
 });
 
 test('so o armazenamento toca o localStorage', () => {

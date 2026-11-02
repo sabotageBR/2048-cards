@@ -12,13 +12,17 @@ const TIPOS = {
   '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8', '.svg': 'image/svg+xml',
 };
 
-/** @param {number} porta @returns {Promise<() => Promise<void>>} fecha o servidor */
-export function servir(porta) {
+/**
+ * @param {number} porta
+ * @param {string} [raiz] o padrao e o repositorio; a prova dos portais serve o zip extraido
+ * @returns {Promise<() => Promise<void>>} fecha o servidor
+ */
+export function servir(porta, raiz = RAIZ) {
   const srv = createServer(async (req, res) => {
     try {
       const caminho = decodeURIComponent(new URL(req.url || '/', 'http://x').pathname);
-      let arq = normalize(join(RAIZ, caminho));
-      if (!arq.startsWith(resolve(RAIZ))) throw new Error('fora');
+      let arq = normalize(join(raiz, caminho));
+      if (!arq.startsWith(resolve(raiz))) throw new Error('fora');
       if ((await stat(arq)).isDirectory()) arq = join(arq, 'index.html');
       const corpo = await readFile(arq);
       res.writeHead(200, { 'content-type': TIPOS[extname(arq)] || 'application/octet-stream', 'cache-control': 'no-store' });

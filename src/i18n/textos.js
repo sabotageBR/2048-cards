@@ -1,5 +1,5 @@
 // Textos do jogo. Quase tudo e icone; o que sobra cabe aqui (rotulos e
-// premios, nenhum texto explica regra). Ingles e o padrao (Poki e global);
+// premios, nenhum texto explica regra). Ingles e o padrao (o portal e global);
 // PT e ES pelo idioma do navegador.
 
 const TEXTOS = {

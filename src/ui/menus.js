@@ -7,14 +7,18 @@ import { POR_MUNDO, alvoDoNivel } from '../jogo/fases.js';
 export function criarMenus({ T, $, acoes }) {
   const menu = $('menu'), fim = $('fim');
   let aberto = false;
-  $('menuTitulo').textContent = T.pausa;
-  $('bContinuar').textContent = T.continuar;
-  $('bRecomecar').textContent = T.recomecarNivel;
-  $('missoesTitulo').textContent = T.missoes;
-  $('fimTitulo').textContent = T.semJogadas;
-  $('bFimContinuar').textContent = `${T.continuar} · ${T.gratis}`;
-  $('txtFimVideo').textContent = T.continuarVideo;
-  $('bFimDeNovo').textContent = T.recomecarNivel;
+  /** Os rotulos fixos (de novo quando o idioma do portal chega). */
+  function rotular() {
+    $('menuTitulo').textContent = T.pausa;
+    $('bContinuar').textContent = T.continuar;
+    $('bRecomecar').textContent = T.recomecarNivel;
+    $('missoesTitulo').textContent = T.missoes;
+    $('fimTitulo').textContent = T.semJogadas;
+    $('bFimContinuar').textContent = `${T.continuar} · ${T.gratis}`;
+    $('txtFimVideo').textContent = T.continuarVideo;
+    $('bFimDeNovo').textContent = T.recomecarNivel;
+  }
+  rotular();
 
   function somIcone() {
     $('bSom').classList.toggle('mudo', acoes.mudo());
@@ -87,5 +91,5 @@ export function criarMenus({ T, $, acoes }) {
   $('bFimVideo').addEventListener('click', () => acoes.continuarVideo());
   $('bFimDeNovo').addEventListener('click', () => { esconderFim(); acoes.deNovo(); });
 
-  return { abrir, fechar, mostrarFim, esconderFim, get aberto() { return aberto; }, get fimAberto() { return !fim.hidden; } };
+  return { abrir, fechar, mostrarFim, esconderFim, rotular, get aberto() { return aberto; }, get fimAberto() { return !fim.hidden; } };
 }

@@ -34,8 +34,12 @@ export function criarHud({ T, $ }) {
   let festas = [];
   /** depois do pouso: aoPousar(premio) (som e vibracao, no main.js) */
   let aoPousar = () => {};
-  $('pontosTxt').textContent = T.pontos;
-  $('vDescarteTxt').textContent = T.videoEsvaziar;
+  /** Os rotulos fixos do painel (de novo quando o idioma do portal chega). */
+  function rotular() {
+    $('pontosTxt').textContent = T.pontos;
+    $('vDescarteTxt').textContent = T.videoEsvaziar;
+  }
+  rotular();
   /** Liga a missao na mesa (b: no vao dos botoes, em retrato). */
   function mostrarMissao(sim, b = false, pousar = aoPousar) {
     comMissao = sim;
@@ -155,5 +159,5 @@ export function criarHud({ T, $ }) {
     el.hidden = !ligada;
     if (ligada) $('febreTxt').textContent = T.febre;
   }
-  return { atualizar, progresso, febre, mostrarEscada, mostrarMissao, celebrar, animar };
+  return { atualizar, progresso, febre, rotular, mostrarEscada, mostrarMissao, celebrar, animar };
 }

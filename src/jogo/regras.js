@@ -11,7 +11,7 @@
 // quadruplo fica com `esp` e recusa outro ate fundir de novo (ver dobrada em
 // colunas.js). A bomba nao olha a marca.
 //
-// Juntar (regras.juntar, o braço 'juntar' do teste A/B da 0.6.0): a carta do
+// Juntar (regras.juntar, a regra do jogo, REGRA_DO_JOGO em fases.js): a carta do
 // topo de uma coluna vai ate outra coluna cujo topo tem o mesmo valor e funde
 // (com a cascata), como uma carta da mao. So para fundir: cada juntar tira
 // uma carta da mesa, entao nunca entra em laco.

@@ -1,5 +1,5 @@
 // Parametros de teste na URL. So valem em file://, localhost e 127.0.0.1:
-// na Poki nada disso existe. Unico modulo que le a URL.
+// no portal nada disso existe. Unico modulo que le a URL.
 //   ?nivel=12        comeca na fase global 12 (mundo 2, nivel 4), pela mesa pronta do nivel
 //   ?auto=700        joga sozinho (uma acao a cada 700 ms)
 //   ?fixo            sem a animacao de entrada
@@ -13,8 +13,6 @@
 //   ?menu            abre o menu ao carregar
 //   ?visual=descarte,escada,missao   opcoes de visual em teste (prints para o usuario escolher;
 //                    missao: a missao ativa no painel, ate a aprovacao da folha)
-//   ?variante=juntar forca o braço do teste A/B (src/core/variante.js); nao vai para o
-//                    save. Sem ele, em localhost vale o controle (hoje)
 //   ?guia=0.7        congela o gesto guiado nessa fase (0..1: clica, arrasta, solta), para os prints
 //   ?missao=cascata:3:1:coringa   fixa a missao do painel (tipo:alvo:atual:premio), para os prints
 //   ?voo=0.5         congela o voo do premio da missao nessa fase (0..1), para os prints
@@ -22,13 +20,13 @@
 //
 // Fora disso, so o banco de testes de tools/sdkcheck.html liga os ganchos
 // (window.__cards2048Teste = { nivel, fixo }); nesse caso "local" continua
-// falso, para o jogo se comportar como na Poki (sem premio sem SDK).
+// falso, para o jogo se comportar como no portal (sem premio sem SDK).
 
 export function lerDepuracao() {
   const base = {
     local: false, ganchos: false, nivel: 0, auto: 0, fixo: false, semAnuncio: false, lang: '',
     regras: null, semHud: false, menu: false, gesto: '', vitrine: false, visual: '', semAnim: false, guia: -1,
-    variante: [], missao: '', voo: -1,
+    missao: '', voo: -1,
   };
   let local = false;
   try {
@@ -61,7 +59,6 @@ export function lerDepuracao() {
     visual: q.get('visual') || '',
     semAnim: q.has('semanim'),
     guia: q.has('guia') ? Math.max(0, Math.min(0.999, Number(q.get('guia')) || 0)) : -1,
-    variante: (q.get('variante') || '').split(',').filter(Boolean),
     missao: q.get('missao') || '',
     voo: q.has('voo') ? Math.max(0, Math.min(0.999, Number(q.get('voo')) || 0)) : -1,
   });

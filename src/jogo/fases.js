@@ -1,8 +1,8 @@
 // Mundos da Aventura: cada mundo e uma mesa continua de 8 niveis, a escada de
 // valores 16, 32, ... 2048. O nivel sobe quando a fusao cria o valor do nivel;
 // no 2048 a carta sai da mesa e o mundo termina. As novidades entram na ordem
-// dos mundos (o mundo 1 tem duas, cedo: o Player Fit Test da 0.4.1 mostrou que
-// 88% dos jogadores nunca chegavam ao mundo 2), validadas por simulacao em
+// dos mundos (o mundo 1 tem duas, cedo: na 0.4.1, 88% dos jogadores nunca
+// chegavam ao mundo 2), validadas por simulacao em
 // test/fases.test.js (ver docs/curadoria.md).
 //
 //   { id, regras?, inicio: [[fundo..topo], ...], fila?: [valor | especial, ...], especiais: { tipo: { de, p } },
@@ -13,12 +13,12 @@
 // Os 5 mundos curados sao as fases 1..40; depois deles vem o mundo sem fim
 // (mundoDef: 6, 7, ...), que recicla os cenarios com todas as regras.
 //
-// Dois perfis de regra, sorteados no main.js (teste A/B da 0.6.0, depois do
-// Player Fit Test da 0.5.2: a mesa justa da 0.5.0 empatou com a de hoje):
-// 'hoje' e a regra da 0.5.2; 'juntar' deixa arrastar a carta do topo de uma
-// coluna ate um topo igual em outra (regras.juntar). Os baralhos sao os
-// mesmos: a unica diferenca e o verbo. `porPerfil` guarda um ajuste de
-// niveis por perfil, se a curadoria pedir.
+// A regra do jogo e REGRA_DO_JOGO, 'juntar': arrastar a carta do topo de uma
+// coluna ate um topo igual em outra (regras.juntar). O jogo nao sorteia nem
+// escolhe outra. O perfil 'hoje' (a regra da 0.5.2, com os mesmos baralhos)
+// fica so para o simulador comparar, e so por pedido explicito: faseDe sem
+// perfil, ou com um perfil desconhecido, da a regra do jogo. `porPerfil`
+// guarda um ajuste de niveis por perfil, se a curadoria pedir.
 //
 // `fila`: a abertura roteirizada do mundo (as primeiras cartas da fila, so no
 // nivel 1 e na primeira tentativa). Nos mundos 2 e 3 ela traz a carta nova
@@ -48,14 +48,16 @@ const FORMA = [6, 5, 3.5, 2.2, 1.4, 0.9, 0.5, 0.3];
 
 const sem = (id) => 2048 * 31 + id * 9973;
 
-/** Perfis de regra do teste A/B (o main.js sorteia um por jogador; o controle primeiro). */
-export const PERFIS = ['hoje', 'juntar'];
+/** A regra que o jogador joga, em todo aparelho e todo mundo. */
+export const REGRA_DO_JOGO = 'juntar';
+/** Perfis de regra que o simulador compara. */
+export const PERFIS = ['hoje', REGRA_DO_JOGO];
 
 /** Os 5 mundos, na ordem em que as novidades complicam. */
 export const MUNDOS = [
   // 1: a abertura roteirizada (o 16 em 3 jogadas com cascata); o coringa entra
   // no nivel 2 e a bomba no 4. Niveis curtos: cartas do alvo/4 para baixo e
-  // menos 2 no baralho (o Player Fit Test da 0.4.1 perdia 30% por nivel do 128 ao 512).
+  // menos 2 no baralho (a 0.4.1 perdia 30% por nivel do 128 ao 512).
   {
     id: 1, inicio: [[8, 4], [], [2], []],
     especiais: { coringa: { de: 2, p: 0.05 }, bomba: { de: 4, p: 0.06 } },
@@ -184,12 +186,12 @@ export const faseGlobal = (mundo, nivel) => (mundo - 1) * POR_MUNDO + nivel;
 /**
  * Definicao da partida que comeca na fase global N (mundo e nivel), com o
  * kit do nivel. `tentativa` muda a semente a cada recomeco; `perfil` e a
- * regra do teste A/B ('hoje' ou 'juntar': liga regras.juntar em todos os
- * mundos, inclusive o sem fim).
+ * regra: a do jogo (liga regras.juntar em todos os mundos, inclusive o sem
+ * fim) ou, so no simulador, 'hoje'.
  */
-export function faseDe(N, tentativa = 0, perfil = PERFIS[0]) {
+export function faseDe(N, tentativa = 0, perfil = REGRA_DO_JOGO) {
   const id = Math.max(1, N | 0);
-  const p = PERFIS.includes(perfil) ? perfil : PERFIS[0];
+  const p = PERFIS.includes(perfil) ? perfil : REGRA_DO_JOGO;
   const def = mundoDoPerfil(mundoDef(mundoDe(id)), p);
   const nivel = posNoMundo(id);
   const regras = p === 'juntar' ? { ...(def.regras || {}), juntar: true } : def.regras || {};

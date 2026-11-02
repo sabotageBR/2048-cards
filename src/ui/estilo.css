@@ -60,6 +60,8 @@ html, body {
 @keyframes pulsar { 50% { transform: scale(1.12); } }
 button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 body.sem-anuncio .anuncio { display: none !important; }
+/* pausa do portal: as animacoes CSS param com o relogio do jogo */
+body.pausado *, body.pausado *::before, body.pausado *::after { animation-play-state: paused !important; }
 /* prints (?semanim, so local): sem animacao CSS */
 body.sem-animacao *, body.sem-animacao *::before, body.sem-animacao *::after { animation: none !important; transition: none !important; }
 /* rewarded na barra de baixo: pilula roxa com o selo do video */
