@@ -2,10 +2,11 @@
 // extraido, por um nome de host de fora (como no portal: sem os parametros de teste nem o anuncio
 // simulado de localhost) e confere o que so aparece com o jogo rodando: a regra fixa em juntar, os
 // botoes de video sumindo, uma jogada com o mouse de verdade, a pausa parando o relogio inteiro e,
-// na Y8, os anuncios com um SDK falso. Com pasta, grava as telas que a CrazyGames olha.
+// na Y8, os anuncios com um SDK falso (no zip final, com os ids dele). Com pasta, grava as telas que a
+// CrazyGames olha.
 // Uso: node tools/provar-portal.mjs <y8|crazygames> [pasta das telas]
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { RAIZ, servir } from './servir.mjs';
@@ -25,7 +26,7 @@ const SDK_Y8 = 'https://cdn.y8.com/minimal-sdk/2-0/y8.min.js';
 const Y8_FALSO = `(function () {
   window.__y8 = { pedidos: [], modo: 'visto', ms: 900 };
   var sdk = {
-    init: function () { return Promise.resolve(); },
+    init: function (a, b) { __y8.init = [a.appId, b.gameId]; return Promise.resolve(); },
     getPlatformLocale: function () { return Promise.resolve('pt-BR'); },
     showAd: function (c) {
       __y8.pedidos.push(c.type);
@@ -51,6 +52,9 @@ if (!nomeZip) {
   process.stdout.write(`sem zip em ${pastaZip}: rode node tools/empacotar-portal.mjs ${portal}\n`);
   process.exit(1);
 }
+// zip final: os ids reais vao dentro dele, e o SDK real nunca entra (a prova nao fala com a Y8 em nome
+// do jogo, e o SDK real no cache do Chrome tomaria o lugar do falso)
+const comIds = portal === 'y8' && !nomeZip.includes('-sem-ids');
 const build = mkdtempSync(join(tmpdir(), 'c2-prova-'));
 if (spawnSync('unzip', ['-q', join(pastaZip, nomeZip), '-d', build]).status !== 0) throw new Error('nao extraiu o zip');
 const fechar = await servir(porta, build);
@@ -66,6 +70,17 @@ c.ao('Network.requestWillBeSent', (p) => pedidos.push(p.request.url));
 await cmd('Page.enable');
 await cmd('Runtime.enable');
 await cmd('Network.enable');
+
+/** Responde pelo SDK real e, no rascunho, tambem pelos ids. */
+const rotaFalsa = (p) => {
+  const sdk = p.request.url.startsWith(SDK_Y8);
+  const corpo = sdk ? Y8_FALSO : "export const IDS = { appId: 'falso', gameId: '1' };\n";
+  cmd('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: 'content-type', value: 'text/javascript' }, { name: 'access-control-allow-origin', value: '*' }], body: Buffer.from(corpo).toString('base64') });
+};
+if (comIds) {
+  await cmd('Fetch.enable', { patterns: [{ urlPattern: `${SDK_Y8}*` }] });
+  c.ao('Fetch.requestPaused', rotaFalsa);
+}
 
 const foraUrl = `http://${HOST}:${porta}/index.html`;
 const localUrl = `http://127.0.0.1:${porta}/index.html`;
@@ -97,12 +112,16 @@ conferir(/1/.test((await av("document.getElementById('rotulo').textContent")) ||
 conferir(await av('typeof window.__c2') === 'undefined', 'fora de localhost nao ha ganchos de teste');
 const pintou = await av("(() => { const cv = document.getElementById('cena'); const d = cv.getContext('2d').getImageData(cv.width / 2, cv.height / 2, 1, 1).data; return d[3]; })()");
 conferir(pintou === 255, 'a cena foi desenhada');
-conferir(await av("document.body.classList.contains('sem-anuncio')"), 'sem anuncios, o corpo marca sem-anuncio');
-conferir(await av("['vDescarte', 'vCoringa', 'bFimVideo'].every((id) => getComputedStyle(document.getElementById(id)).display === 'none')"), 'os botoes de video somem');
+if (comIds) conferir(!(await av("document.body.classList.contains('sem-anuncio')")), 'com ids, o corpo nao marca sem-anuncio');
+else {
+  conferir(await av("document.body.classList.contains('sem-anuncio')"), 'sem anuncios, o corpo marca sem-anuncio');
+  conferir(await av("['vDescarte', 'vCoringa', 'bFimVideo'].every((id) => getComputedStyle(document.getElementById(id)).display === 'none')"), 'os botoes de video somem');
+}
 const externos = [...new Set(pedidos.filter((u) => /^https?:/.test(u) && !u.includes(`${HOST}:${porta}`)))];
 process.stdout.write(`     pedidos externos: ${externos.join(' ') || 'nenhum'}\n`);
 conferir(!pedidos.some((u) => /poki/i.test(u)), 'nenhum pedido a outro portal');
-if (portal === 'y8') conferir(externos.length === 0, 'a Y8 sem ids nao pede nada de fora');
+if (comIds) conferir(externos.length === 1 && externos[0] === SDK_Y8, 'com ids, so o SDK da Y8 sai para fora, e o falso responde');
+else if (portal === 'y8') conferir(externos.length === 0, 'a Y8 sem ids nao pede nada de fora');
 else conferir(externos.every((u) => /crazygames\.com/.test(u)), 'a CrazyGames so pede o SDK dela');
 
 // ------------------------------------------------- 2. a regra: ninguem cai em hoje
@@ -206,14 +225,17 @@ if (portal === 'crazygames') {
   conferir(await av("document.body.classList.contains('sem-anuncio')"), 'CrazyGames: sem anuncios na Basic Launch, com o SDK de pe');
 } else {
   // os ids e o SDK entram pela rede, sem refazer o zip: e o mesmo adaptador do envio final
-  await cmd('Fetch.enable', { patterns: [{ urlPattern: '*src/core/ids.js*' }, { urlPattern: `${SDK_Y8}*` }] });
-  c.ao('Fetch.requestPaused', (p) => {
-    const sdk = p.request.url.startsWith(SDK_Y8);
-    const corpo = sdk ? Y8_FALSO : "export const IDS = { appId: 'falso', gameId: '1' };\n";
-    cmd('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: 'content-type', value: 'text/javascript' }, { name: 'access-control-allow-origin', value: '*' }], body: Buffer.from(corpo).toString('base64') });
-  });
+  if (!comIds) {
+    await cmd('Fetch.enable', { patterns: [{ urlPattern: '*src/core/ids.js*' }, { urlPattern: `${SDK_Y8}*` }] });
+    c.ao('Fetch.requestPaused', rotaFalsa);
+  }
   await abrir(foraUrl, { teste: { nivel: 5 } });
   await espera(600);
+  if (comIds) {
+    const [, appId, gameId] = readFileSync(join(build, 'src/core/ids.js'), 'utf8').match(/"appId":"([^"]+)","gameId":"([^"]+)"/);
+    const init = await av('JSON.stringify(__y8.init)');
+    conferir(init === JSON.stringify([appId, gameId]), `os ids do zip chegam ao init do SDK: ${init}`);
+  }
   conferir(!(await av("document.body.classList.contains('sem-anuncio')")), 'com ids e SDK, os botoes de video voltam');
   conferir(await av("document.getElementById('pontosTxt').textContent") === 'Pontos', 'o idioma do portal chega depois do init e troca a tela');
   conferir(await av("document.getElementById('bContinuar').textContent") === 'Continuar', 'o idioma do portal troca o menu');
@@ -246,7 +268,7 @@ if (portal === 'crazygames') {
   const p4 = JSON.parse(await agoraJ());
   conferir(p4.estado === 'jogando' && !p4.pausado, 'SDK sem resposta: o jogo volta sozinho no prazo');
   conferir(await av('__c2.portal.sdkPronto') === false && await av("document.body.classList.contains('sem-anuncio')"), 'SDK sem resposta: os anuncios desligam na sessao e os botoes somem');
-  await cmd('Fetch.disable');
+  if (!comIds) await cmd('Fetch.disable');
 }
 conferir(!erros.length, `sem excecao na pagina ${erros.slice(0, 3).join(' | ')}`);
 

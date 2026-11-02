@@ -82,7 +82,7 @@ Paciência de fusão com cartas para a Poki: arraste a carta da frente da fila p
 - **Sem SDK ou sem ids:** os botões de vídeo somem (`body.sem-anuncio`, que já começa ligada fora de localhost) e o jogo segue. Em localhost o anúncio simulado os mantém na tela: por isso a prova e as gravações usam um host de fora (`jogo.portal.test`) e ligam os ganchos por `__cards2048Teste`, sem parâmetro de URL.
 - **Idioma:** o do portal chega depois do init (`portal.ligarIdioma`, `trocarIdioma`), que refaz HUD, menus, cartas e `aria-label`.
 - **CrazyGames:** o zip é o da Basic Launch, sem anúncios. A Full Launch pede os anúncios, o `muteAudio`, o progresso no `SDK.data` e tirar da tela de jogo os botões de vídeo (Esvaziar e ★+1), porque a regra de anúncios proíbe pedido de rewarded na tela de jogo ativa.
-- **Y8:** os ids entram por `Y8_APP_ID` e `Y8_GAME_ID`; sem eles, o zip leva `-sem-ids` no nome e sai sem anúncios. O zip novo apaga o anterior da pasta.
+- **Y8:** os ids entram por `Y8_APP_ID` e `Y8_GAME_ID`; sem eles, o zip leva `-sem-ids` no nome e sai sem anúncios. O zip novo apaga o anterior da pasta. Com o zip final, a `provar-portal` usa o SDK falso desde o início, sem nunca carregar o real, e confere que os ids do zip chegam ao `init`.
 - **Portas das ferramentas de portal:** `provar-portal` em 6100 e 9610, `video-portais` em 6102 e 9612 (`PORTAS=n` desloca as duas, para rodar outra cópia) e `capas` em 6103. Se a porta de DevTools já tiver um Chrome, a ferramenta aborta. A 9611 fica de fora: pode haver Chrome esquecido nela.
 
 ## Poki
