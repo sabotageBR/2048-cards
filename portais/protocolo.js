@@ -1,5 +1,5 @@
 /**
- * Protocolo dos portais Y8 e CrazyGames. tools/empacotar-portal.mjs copia este arquivo para
+ * Protocolo dos portais (os adaptadores de portais/). tools/empacotar-portal.mjs copia este arquivo para
  * src/core/protocolo.js e o adaptador do portal para src/core/portal.js. Mesma base do Clock
  * Tinker e do String Cut.
  *

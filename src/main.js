@@ -1095,7 +1095,7 @@ addEventListener('resize', layout);
 // ------------------------------------------------------------- init
 portal.onAdStart = () => audio.mudoParaAnuncio();
 portal.onAdEnd = () => audio.voltarDoAnuncio();
-// os tres ganchos abaixo so existem nos adaptadores da Y8 e da CrazyGames
+// os tres ganchos abaixo so existem nos adaptadores de portais/
 portal.onPausa = pausarJogo;
 portal.aoAnuncios = (ligados) => document.body.classList.toggle('sem-anuncio', !ligados && !dep.local);
 if (portal.ligarIdioma && !dep.lang) portal.ligarIdioma(trocarIdioma);

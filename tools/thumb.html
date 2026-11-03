@@ -21,6 +21,8 @@ html,body{margin:0;overflow:hidden;background:#000}canvas{display:block}
 //   ?opcao=fusao&perto       a thumb de 628 px com os pixels perto do #83FFE7 em magenta (para achar o que reprova)
 //   ?capa&l=1920&a=1080      capa de portal em qualquer proporcao: a cena da cascata com a pilha
 //                            inteira, recomposta, com o titulo. Deixa o PNG exato em #medidas (dataURL)
+//   ?capa&so2048             a capa sem a pilha: so o titulo e a carta 2048 (o numero dela e o do
+//                            titulo). A Wavedash nao aceita outro texto na capa, e o numero da carta conta
 // (A thumb do duelo, opcao h com o Gosmo, esta na master.)
 import { desenharCarta } from '../src/render/cartas.js';
 import { temaDe } from '../src/render/temas/index.js';
@@ -168,8 +170,8 @@ function cenaFusao() {
  * cascata: a pilha da mesa a esquerda; o 2048 sai voando do topo dela para a direita.
  * sobe: quanto a pilha sobe (px virtuais); a capa nao corta a ultima carta na beirada.
  */
-function cenaCascata(sobe = 0) {
-  const pilha = () => [[1024, 292], [512, 340], [256, 388], [128, 436]].forEach(([v, y]) => cartaSombra(v, 30, y - sobe, 150, 0));
+function cenaCascata(sobe = 0, semPilha = false) {
+  const pilha = () => { if (!semPilha) [[1024, 292], [512, 340], [256, 388], [128, 436]].forEach(([v, y]) => cartaSombra(v, 30, y - sobe, 150, 0)); };
   // na capa os numeros da pilha ficam limpos: o rastro passa por tras e as faiscas, por fora
   if (!sobe) pilha();
   // rastro de luz do topo da pilha ate a carta
@@ -335,7 +337,7 @@ function titulo(cx, cy, larg, linhas) {
 }
 
 /** Capa de portal LxA: o fundo da thumb, a cascata recomposta com a pilha inteira e o titulo. */
-function capa(cv, L, Al) {
+function capa(cv, L, Al, so2048 = false) {
   cv.width = L; cv.height = Al;
   ctx = cv.getContext('2d');
   const C = COMPOSICOES.find((c) => L / Al <= c.max);
@@ -343,7 +345,7 @@ function capa(cv, L, Al) {
   ox = L * C.cx - 300 * k;
   oy = Al * C.cy - 300 * k;
   fundoCapa(L, Al, ox + 390 * k, oy + 190 * k);
-  cenaCascata(70);
+  cenaCascata(70, so2048);
   ox = 0; oy = 0;
   const [tx, ty, tl] = C.titulo;
   titulo(L * tx, Al * ty, L * tl, C.linhas);
@@ -431,7 +433,7 @@ const pronto = () => {
     thumb(cv, 628);
     document.getElementById('medidas').textContent = JSON.stringify(medir(cv));
   } else if (q.has('capa')) {
-    capa(cv, parseInt(q.get('l') || '1920', 10), parseInt(q.get('a') || '1080', 10));
+    capa(cv, parseInt(q.get('l') || '1920', 10), parseInt(q.get('a') || '1080', 10), q.has('so2048'));
     document.getElementById('medidas').textContent = cv.toDataURL('image/png');
   } else thumb(cv, S);
   document.title = 'PRONTO';

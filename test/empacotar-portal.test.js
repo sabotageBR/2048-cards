@@ -32,8 +32,8 @@ const comBuild = (/** @type {(d:string) => void} */ mexer, /** @type {RegExp} */
   }
 };
 
-test('a build limpa passa nos dois portais', () => {
-  for (const portal of ['y8', 'crazygames']) {
+test('a build limpa passa nos tres portais', () => {
+  for (const portal of ['y8', 'crazygames', 'wavedash']) {
     const d = montar(portal);
     assert.deepEqual(conferirBuild(d, /** @type {any} */ (portal)), []);
     rmSync(d, { recursive: true, force: true });
@@ -65,3 +65,19 @@ test('reprova build sem index.html', () => comBuild((d) => {
   rmSync(join(d, 'index.html'));
   mkdirSync(join(d, 'vazio'));
 }, /sem index\.html/));
+
+test('Wavedash: reprova qualquer URL externa, ate o SDK de um portal', () => comBuild((d) => writeFileSync(join(d, 'src/core/rng.js'), `export const u = '${URLS.y8}';\n`), /URL externa/, 'wavedash'));
+test('Wavedash: reprova a marca de outro portal no conteudo', () => {
+  for (const marca of ['// feito para a CrazyGames', '// ids da Y8', '// o SDK da GameDistribution']) {
+    comBuild((d) => writeFileSync(join(d, 'src/core/rng.js'), `${marca}\n`), /marca de outro portal em src\/core\/rng\.js/, 'wavedash');
+  }
+});
+test('Wavedash: reprova a marca de outro portal no nome', () => comBuild((d) => writeFileSync(join(d, 'src/core/y8.js'), 'export {};\n'), /no nome/, 'wavedash'));
+test('Wavedash: reprova o build sem a chamada Wavedash.init', () => comBuild((d) => {
+  const p = join(d, 'src/core/portal.js');
+  writeFileSync(p, readFileSync(p, 'utf8').replace(/Wavedash\.init\(/g, 'Wavedash.iniciar('));
+}, /sem a chamada Wavedash\.init/, 'wavedash'));
+test('Wavedash: reprova console.log e build sem index.html', () => {
+  comBuild((d) => writeFileSync(join(d, 'src/core/rng.js'), 'console.log(1);\n'), /console\.log/, 'wavedash');
+  comBuild((d) => rmSync(join(d, 'index.html')), /sem index\.html/, 'wavedash');
+});
