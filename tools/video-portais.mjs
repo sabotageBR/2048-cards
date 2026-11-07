@@ -7,6 +7,9 @@
 //   node tools/video-portais.mjs print <nivel> <jogadas> <cartas> <LxA> <dpr> <saida.png> [calmo|juntar]
 //   node tools/video-portais.mjs video <nivel> <jogadas> <LxA> <dpr> <saida.mp4> [seg=21] [ms=750]
 //   node tools/video-portais.mjs <tudo|prints|videos> [pasta=../distribuicao/2048-cards]   os de PRINTS e VIDEOS
+//   node tools/video-portais.mjs itch [pasta=../distribuicao/2048-cards]   os screenshots da itch.io, do build
+//        dela (dist-portais/itch): os 5 primeiros de PRINTS, no tamanho do embed (960x600, densidade 4/3)
+// PORTA e PORTA_DEV (variaveis de ambiente) trocam as portas do servidor e do DevTools.
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,12 +22,14 @@ const FPS = 30;
 const HOST = 'jogo.portal.test';
 // PORTAS=n desloca as duas, para rodar mais de uma copia ao mesmo tempo (ate 6119 e 9619)
 const desloca = Number(process.env.PORTAS || 0);
-const porta = 6102 + desloca, portaDep = 9612 + desloca;
+const porta = Number(process.env.PORTA) || 6102 + desloca, portaDep = Number(process.env.PORTA_DEV) || 9612 + desloca;
+/** O build servido: o da Y8, ou o da itch.io no modo itch. */
+let build = 'y8';
 /** Passo do guloso na corrida ate o ponto da partida (fora do video). */
 const RAPIDO = 120;
 
 /** Tamanhos: CSS e densidade de cada entrega (a mesa ocupa mais a tela com menos CSS). */
-const TELAS = { standard: ['760x570', 1], wide: ['960x540', 4 / 3], v16x9: ['960x540', 2], v2x3: ['540x810', 2], v4x3: ['640x480', 1.5] };
+const TELAS = { standard: ['760x570', 1], wide: ['960x540', 4 / 3], v16x9: ['960x540', 2], v2x3: ['540x810', 2], v4x3: ['640x480', 1.5], itch: ['960x600', 4 / 3] };
 
 /**
  * Screenshots: [nivel, jogadas, cartas na mesa, modo]. A corrida vai ate as duas contas sem sair do
@@ -83,7 +88,7 @@ const assentar = (c, quadros) => c.av(`(async () => { for (let i = 0; i < ${quad
 const situacao = (c) => c.av("JSON.stringify({ mundo: __c2.J.e.mundo, nivel: __c2.J.e.nivel, jogadas: __c2.J.e.n, estado: __c2.J.estado, perfil: __c2.J.e.perfil, cols: __c2.J.e.colunas.map((k) => k.map((x) => x.v || x.tipo)), fila: __c2.J.e.fila.map((x) => x.v || x.tipo), rotulo: document.getElementById('rotulo').textContent })");
 
 async function comChrome(fn) {
-  const fechar = await servir(porta, join(RAIZ, 'dist-portais/y8'));
+  const fechar = await servir(porta, join(RAIZ, 'dist-portais', build));
   const c = await abrirChrome({ portaDep, argumentos: [`--host-resolver-rules=MAP ${HOST} 127.0.0.1`] });
   try {
     return await fn(c);
@@ -196,7 +201,17 @@ else if (modo === 'print') {
     await comChrome((c) => imprimir(c, nivel, jogadas, cartas, md, TELAS.wide[0], TELAS.wide[1], join(pasta, `y8/screenshot-widescreen-${k + 1}-1280x720.png`)));
   }
   if (modo !== 'prints') for (const [nome, tela, nivel, jogadas] of VIDEOS) await comChrome((c) => gravar(c, nivel, jogadas, TELAS[tela][0], TELAS[tela][1], join(pasta, nome), 21, 750));
+} else if (modo === 'itch') {
+  // um quadro de cada mundo, do build da itch.io (rode antes o empacotador com o alvo itch)
+  build = 'itch';
+  const pasta = resolve(resto[0] || join(RAIZ, '../distribuicao/2048-cards'));
+  const [L, A] = TELAS.itch[0].split('x').map(Number);
+  const nome = `${Math.round(L * TELAS.itch[1])}x${Math.round(A * TELAS.itch[1])}`;
+  for (let k = 0; k < 5; k++) {
+    const [nivel, jogadas, cartas, md] = PRINTS[k];
+    await comChrome((c) => imprimir(c, nivel, jogadas, cartas, md, TELAS.itch[0], TELAS.itch[1], join(pasta, `itch/screenshot-${k + 1}-${nome}.png`)));
+  }
 } else {
-  process.stdout.write('uso: node tools/video-portais.mjs <sondar|print|video|tudo|prints|videos> ...\n');
+  process.stdout.write('uso: node tools/video-portais.mjs <sondar|print|video|tudo|prints|videos|itch> ...\n');
   process.exit(1);
 }

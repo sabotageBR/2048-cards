@@ -1,7 +1,7 @@
-// Capas e promos dos portais (CrazyGames, Y8 e Wavedash), recompostas de tools/thumb.html com o titulo.
+// Capas e promos dos portais (CrazyGames, Y8, Wavedash e itch.io), recompostas de tools/thumb.html com o titulo.
 // Sai o PNG exato do canvas (lido do dataURL do #medidas), sem depender do tamanho da janela.
-// Uso: node tools/capas.mjs [saida=../distribuicao/2048-cards] [--so=<pasta>]
-// --so=wavedash refaz so as pecas dessa pasta (as outras ja entregues ficam como estao).
+// Uso: node tools/capas.mjs [saida=../distribuicao/2048-cards] [--so=<pasta>] [--porta=6103]
+// --so=wavedash (ou itch) refaz so as pecas dessa pasta (as outras ja entregues ficam como estao).
 import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -11,6 +11,7 @@ import { servir, RAIZ } from './servir.mjs';
 const args = process.argv.slice(2);
 const saida = resolve(args.find((a) => !a.startsWith('--')) || join(RAIZ, '../distribuicao/2048-cards'));
 const so = (args.find((a) => a.startsWith('--so=')) || '').slice(5);
+const portaArg = Number((args.find((a) => a.startsWith('--porta=')) || '').slice(8));
 const PECAS = [
   ['crazygames/cover-landscape-1920x1080.png', 1920, 1080],
   ['crazygames/cover-portrait-800x1200.png', 800, 1200],
@@ -21,6 +22,8 @@ const PECAS = [
   ['fontes/capa-1080x1620.png', 1080, 1620], // o primeiro quadro do video retrato da CrazyGames
   // a Wavedash nao aceita texto alem do titulo na capa: sem a pilha 1024, 512, 256, 128
   ['wavedash/cover-1920x1080.png', 1920, 1080, '&so2048'],
+  // a itch.io (315:250, composicao 4:3): tambem so o titulo e a carta 2048
+  ['itch/cover-630x500.png', 630, 500, '&so2048'],
 ];
 
 /** Roda o Chrome e devolve o DOM. */
@@ -34,7 +37,7 @@ function chrome(args, ms) {
   });
 }
 
-const porta = 6103;
+const porta = portaArg || 6103;
 const fechar = await servir(porta);
 for (const [nome, l, a, extra = ''] of PECAS.filter(([n]) => !so || n.startsWith(`${so}/`))) {
   const perfil = mkdtempSync(join(tmpdir(), 'c2-capa-'));

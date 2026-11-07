@@ -32,8 +32,8 @@ const comBuild = (/** @type {(d:string) => void} */ mexer, /** @type {RegExp} */
   }
 };
 
-test('a build limpa passa nos tres portais', () => {
-  for (const portal of ['y8', 'crazygames', 'wavedash']) {
+test('a build limpa passa nos quatro portais', () => {
+  for (const portal of ['y8', 'crazygames', 'wavedash', 'itch']) {
     const d = montar(portal);
     assert.deepEqual(conferirBuild(d, /** @type {any} */ (portal)), []);
     rmSync(d, { recursive: true, force: true });
@@ -80,4 +80,17 @@ test('Wavedash: reprova o build sem a chamada Wavedash.init', () => comBuild((d)
 test('Wavedash: reprova console.log e build sem index.html', () => {
   comBuild((d) => writeFileSync(join(d, 'src/core/rng.js'), 'console.log(1);\n'), /console\.log/, 'wavedash');
   comBuild((d) => rmSync(join(d, 'index.html')), /sem index\.html/, 'wavedash');
+});
+
+test('itch.io: reprova qualquer URL externa e a marca de outro portal, a Wavedash inclusive', () => {
+  comBuild((d) => writeFileSync(join(d, 'src/core/rng.js'), `export const u = '${URLS.crazygames}';\n`), /URL externa/, 'itch');
+  for (const marca of ['// feito para a CrazyGames', '// ids da Y8', '// o init da Wavedash']) {
+    comBuild((d) => writeFileSync(join(d, 'src/core/rng.js'), `${marca}\n`), /marca de outro portal em src\/core\/rng\.js/, 'itch');
+  }
+  comBuild((d) => writeFileSync(join(d, 'src/core/wavedash.js'), 'export {};\n'), /no nome/, 'itch');
+});
+test('itch.io: reprova localStorage.clear(), que apagaria o save dos outros jogos da itch', () => comBuild((d) => writeFileSync(join(d, 'src/core/rng.js'), 'export const zerar = () => localStorage.clear();\n'), /localStorage\.clear/, 'itch'));
+test('itch.io: reprova caminho acima de 240 caracteres e caminho absoluto', () => {
+  comBuild((d) => { mkdirSync(join(d, 'src', 'x'.repeat(240)), { recursive: true }); writeFileSync(join(d, 'src', 'x'.repeat(240), 'a.txt'), 'a'); }, /acima de 240/, 'itch');
+  comBuild((d) => writeFileSync(join(d, 'index.html'), '<script src="/src/main.js"></script>'), /caminho absoluto/, 'itch');
 });
