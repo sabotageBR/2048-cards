@@ -1,9 +1,11 @@
-// Capas e promos dos portais (CrazyGames, Y8, Wavedash e itch.io), recompostas de tools/thumb.html com o titulo.
+// Capas e promos dos portais (CrazyGames, Y8, Wavedash, itch.io e GamePush), recompostas de tools/thumb.html com o titulo.
 // Sai o PNG exato do canvas (lido do dataURL do #medidas), sem depender do tamanho da janela.
 // Uso: node tools/capas.mjs [saida=../distribuicao/2048-cards] [--so=<pasta>] [--porta=6103]
-// --so=wavedash (ou itch) refaz so as pecas dessa pasta (as outras ja entregues ficam como estao).
-import { spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+// --so=wavedash (ou itch, ou gamepush) refaz so as pecas dessa pasta (as outras ja entregues ficam como estao).
+// A GamePush pede o titulo e nenhum outro texto nas capas (como a Wavedash: so a carta 2048), e nenhum
+// texto nos icones nem no fundo: nem numero de carta (?icone e ?cenario em tools/thumb.html).
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { servir, RAIZ } from './servir.mjs';
@@ -24,6 +26,12 @@ const PECAS = [
   ['wavedash/cover-1920x1080.png', 1920, 1080, '&so2048'],
   // a itch.io (315:250, composicao 4:3): tambem so o titulo e a carta 2048
   ['itch/cover-630x500.png', 630, 500, '&so2048'],
+  ['gamepush/cover-1920x1080.png', 1920, 1080, '&so2048'],
+  ['gamepush/cover-portrait-1080x1920.png', 1080, 1920, '&so2048'],
+  ['gamepush/icon-1024x1024.png', 1024, 1024, '&icone'],
+  ['gamepush/icon-512x384.png', 512, 384, '&icone'],
+  ['gamepush/icon-800x1200.png', 800, 1200, '&icone'],
+  ['gamepush/background-1920x1080.png', 1920, 1080, '&cenario=1'],
 ];
 
 /** Roda o Chrome e devolve o DOM. */
@@ -54,6 +62,13 @@ for (const [nome, l, a, extra = ''] of PECAS.filter(([n]) => !so || n.startsWith
   const arq = join(saida, nome);
   mkdirSync(join(arq, '..'), { recursive: true });
   writeFileSync(arq, Buffer.from(b64, 'base64'));
+  // a GamePush recusa fundo transparente: o canvas e opaco, mas o PNG dele tem canal alfa; sai em RGB
+  if (nome.startsWith('gamepush/')) {
+    const rgb = `${arq}.rgb.png`;
+    const r = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', arq, '-pix_fmt', 'rgb24', rgb]);
+    if (r.status !== 0) throw new Error(`ffmpeg: ${nome}`);
+    renameSync(rgb, arq);
+  }
   process.stdout.write(`${arq} (${l}x${a})\n`);
 }
 await fechar();

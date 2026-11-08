@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { conferirBuild, URLS } from '../tools/empacotar-portal.mjs';
+import { conferirBuild, prepararGamePush, URLS } from '../tools/empacotar-portal.mjs';
 
 const raiz = new URL('..', import.meta.url).pathname;
 
@@ -18,6 +18,7 @@ function montar(portal = 'y8') {
   writeFileSync(join(d, 'src/core/ids.js'), 'export const IDS = { appId: \'\', gameId: \'\' };\n');
   const html = readFileSync(join(d, 'index.html'), 'utf8').replace(/<!-- Unico script[^\n]*\n<script src="https:[^\n]*\n/, '');
   writeFileSync(join(d, 'index.html'), html);
+  if (portal === 'gamepush') prepararGamePush(d);
   return d;
 }
 
@@ -32,8 +33,8 @@ const comBuild = (/** @type {(d:string) => void} */ mexer, /** @type {RegExp} */
   }
 };
 
-test('a build limpa passa nos quatro portais', () => {
-  for (const portal of ['y8', 'crazygames', 'wavedash', 'itch']) {
+test('a build limpa passa nos cinco portais', () => {
+  for (const portal of ['y8', 'crazygames', 'wavedash', 'itch', 'gamepush']) {
     const d = montar(portal);
     assert.deepEqual(conferirBuild(d, /** @type {any} */ (portal)), []);
     rmSync(d, { recursive: true, force: true });
@@ -93,4 +94,60 @@ test('itch.io: reprova localStorage.clear(), que apagaria o save dos outros jogo
 test('itch.io: reprova caminho acima de 240 caracteres e caminho absoluto', () => {
   comBuild((d) => { mkdirSync(join(d, 'src', 'x'.repeat(240)), { recursive: true }); writeFileSync(join(d, 'src', 'x'.repeat(240), 'a.txt'), 'a'); }, /acima de 240/, 'itch');
   comBuild((d) => writeFileSync(join(d, 'index.html'), '<script src="/src/main.js"></script>'), /caminho absoluto/, 'itch');
+});
+
+test('GamePush: reprova o carregador com outro projectId ou publicToken, ou sem ele', () => {
+  const trocar = (/** @type {string} */ de, /** @type {string} */ para) => (/** @type {string} */ d) => {
+    const p = join(d, 'index.html');
+    writeFileSync(p, readFileSync(p, 'utf8').split(de).join(para));
+  };
+  comBuild(trocar('projectId=32795', 'projectId=32793'), /projectId 32793/, 'gamepush');
+  comBuild(trocar('publicToken=LYIX', 'publicToken=XXIX'), /publicToken XXIX/, 'gamepush');
+  comBuild(trocar('callback=onGPInit', 'callback=outro'), /sem o carregador oficial/, 'gamepush');
+});
+test('GamePush: reprova o onGPInit depois do carregador e o jogo que nao espera o SDK', () => {
+  comBuild((d) => {
+    const p = join(d, 'index.html');
+    const h = readFileSync(p, 'utf8');
+    const promessa = h.match(/<script>window\.__gp = [^\n]*\n/)[0];
+    writeFileSync(p, h.replace(promessa, '').replace('</body>', `${promessa}</body>`));
+  }, /onGPInit antes do carregador/, 'gamepush');
+  comBuild((d) => {
+    const p = join(d, 'index.html');
+    writeFileSync(p, readFileSync(p, 'utf8').replace('</body>', '<script type="module" src="src/main.js"></script>\n</body>'));
+  }, /sem esperar o SDK/, 'gamepush');
+});
+test('GamePush: reprova URL externa fora dos hosts do SDK, mas aceita os quatro deles', () => {
+  comBuild((d) => writeFileSync(join(d, 'src/core/rng.js'), 'export const u = \'https://exemplo.com/x.js\';\n'), /URL externa/, 'gamepush');
+  const d = montar('gamepush');
+  try {
+    writeFileSync(join(d, 'src/core/rng.js'), `${readFileSync(join(d, 'src/core/rng.js'), 'utf8')}// https://s3-eu.gamepush.com/sdk/game-score.js\n`);
+    assert.deepEqual(conferirBuild(d, 'gamepush'), []);
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+test('GamePush: reprova a marca de outro portal ou plataforma', () => {
+  for (const marca of ['// feito para a CrazyGames', '// ids da Y8', '// o init da Wavedash', '// subpasta da itch', '// LoadingAPI da Yandex']) {
+    comBuild((d) => writeFileSync(join(d, 'src/core/rng.js'), `${marca}\n`), /marca de outro portal em src\/core\/rng\.js/, 'gamepush');
+  }
+  comBuild((d) => writeFileSync(join(d, 'src/core/itch.js'), 'export {};\n'), /no nome/, 'gamepush');
+});
+test('GamePush: reprova localStorage fora do armazenamento, clear(), outro prefixo, janelas do navegador e o save ou compra pelo SDK', () => {
+  comBuild((d) => writeFileSync(join(d, 'src/core/rng.js'), 'export const x = () => localStorage.getItem(\'save\');\n'), /localStorage fora do armazenamento/, 'gamepush');
+  comBuild((d) => writeFileSync(join(d, 'src/core/armazenamento.js'), `${readFileSync(join(d, 'src/core/armazenamento.js'), 'utf8')}\nexport const z = () => localStorage.clear();\n`), /localStorage\.clear/, 'gamepush');
+  comBuild((d) => {
+    const p = join(d, 'src/core/armazenamento.js');
+    writeFileSync(p, readFileSync(p, 'utf8').replace("PREFIXO_PADRAO = 'cards2048.'", "PREFIXO_PADRAO = ''"));
+  }, /prefixo cards2048\./, 'gamepush');
+  for (const js of ['alert(1);', 'window.confirm("x");', 'prompt("x");', 'window.open("x");']) {
+    comBuild((d) => writeFileSync(join(d, 'src/core/rng.js'), `${js}\n`), /janela do navegador/, 'gamepush');
+  }
+  for (const js of ['gp.player.set("x", 1);', 'gp.storage.get("x");', 'gp.payments.purchase({});']) {
+    comBuild((d) => writeFileSync(join(d, 'src/core/rng.js'), `${js}\n`), /progresso ou compra pelo SDK/, 'gamepush');
+  }
+});
+test('GamePush: reprova o build sem o russo ou sem o adaptador', () => {
+  comBuild((d) => rmSync(join(d, 'src/i18n/textos-base.js')), /russo|import quebrado/, 'gamepush');
+  comBuild((d) => cpSync(join(raiz, 'portais/itch.js'), join(d, 'src/core/portal.js')), /adaptador da GamePush/, 'gamepush');
 });

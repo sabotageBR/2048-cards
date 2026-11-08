@@ -1,0 +1,8 @@
+
+Nunito (SIL Open Font License 1.1) - arquivos src/ui/fontes/nunito-cyrillic-*
+------------------------------------------------------------------------------
+Copyright 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito)
+
+So o subconjunto cirilico (pesos 800 e 900, do pacote @fontsource/nunito 5.3.0), para as letras
+russas. This Font Software is licensed under the SIL Open Font License, Version 1.1, the same
+license copied above for Fredoka (also available with a FAQ at http://scripts.sil.org/OFL).

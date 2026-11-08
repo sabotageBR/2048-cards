@@ -23,9 +23,14 @@ html,body{margin:0;overflow:hidden;background:#000}canvas{display:block}
 //                            inteira, recomposta, com o titulo. Deixa o PNG exato em #medidas (dataURL)
 //   ?capa&so2048             a capa sem a pilha: so o titulo e a carta 2048 (o numero dela e o do
 //                            titulo). A Wavedash nao aceita outro texto na capa, e o numero da carta conta
+//   ?icone&l=1024&a=1024     icone sem texto (GamePush): nenhum numero, entao as cartas sao as especiais
+//                            que nao tem letra (o coringa e a bomba, sem o rotulo), sobre o estouro da
+//                            fusao, no fundo da capa. Deixa o PNG em #medidas
+//   ?cenario=1&l=1920&a=1080 o cenario do mundo (1 a 5) como o jogo o pinta, sem mesa, carta nem HUD
 // (A thumb do duelo, opcao h com o Gosmo, esta na master.)
-import { desenharCarta } from '../src/render/cartas.js';
+import { desenharCarta, definirTema } from '../src/render/cartas.js';
 import { temaDe } from '../src/render/temas/index.js';
+import { definirRotulos } from '../src/render/temas/kit.js';
 import { estrela, rr, circulo, TINTA } from '../src/render/desenho.js';
 
 const q = new URLSearchParams(location.search);
@@ -344,11 +349,68 @@ function capa(cv, L, Al, so2048 = false) {
   k = (Math.min(L, Al) / 600) * C.esc;
   ox = L * C.cx - 300 * k;
   oy = Al * C.cy - 300 * k;
+  if (so2048 && L / Al <= 0.62) {
+    // retrato so com a carta 2048 (sem a pilha a esquerda): a carta no meio, maior, abaixo do titulo
+    k = (L / 600) * 1.3;
+    ox = L * 0.5 - 418 * k;
+    oy = Al * 0.65 - 204 * k;
+  }
   fundoCapa(L, Al, ox + 390 * k, oy + 190 * k);
   cenaCascata(70, so2048);
   ox = 0; oy = 0;
   const [tx, ty, tl] = C.titulo;
   titulo(L * tx, Al * ty, L * tl, C.linhas);
+}
+
+/**
+ * Icone LxA sem texto: o estouro da fusao, a bomba (sem o rotulo) atras e o coringa na frente, com o
+ * brilho dourado, no fundo da capa. A cena e o quadrado virtual de 600, centrado.
+ */
+function icone(cv, L, Al) {
+  cv.width = L; cv.height = Al;
+  ctx = cv.getContext('2d');
+  definirRotulos({ bomba: '' });
+  // o grupo (as duas cartas e o brilho) tem ~380 x 350 no quadrado virtual e ocupa 2/3 do lado que apertar
+  k = Math.min((L * 0.68) / 380, (Al * 0.68) / 350);
+  ox = L / 2 - 290 * k;
+  oy = Al / 2 - 295 * k;
+  fundoCapa(L, Al, ox + 300 * k, oy + 300 * k);
+  estouro(300, 300, 168);
+  faiscas(300, 300, 190, 290, 22, 5);
+  especial('bomba', 112, 206, 168, -0.28);
+  especial('coringa', 254, 138, 214, 0.13, true);
+  faiscas(392, 230, 150, 190, 10, 9);
+  ox = 0; oy = 0;
+}
+
+/** Uma carta especial (sem texto) com sombra macia e, se brilho, o halo dourado do 2048. */
+function especial(tipo, x, y, w, rot, brilho = false) {
+  const h = w / 0.72;
+  ctx.save(); esc();
+  ctx.translate(x + w / 2, y + h / 2 + (brilho ? 0 : 10)); ctx.rotate(rot);
+  if (brilho) {
+    ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = 70;
+    rr(ctx, -w / 2 - 8, -h / 2 - 8, w + 16, h + 16, 28); ctx.fillStyle = 'rgba(255,216,74,0.55)'; ctx.fill();
+  } else {
+    ctx.shadowColor = 'rgba(8,2,20,0.55)'; ctx.shadowBlur = 26; ctx.shadowOffsetY = 10;
+    rr(ctx, -w / 2 + 6, -h / 2 + 6, w - 12, h - 12, 18); ctx.fillStyle = 'rgba(8,2,20,0.5)'; ctx.fill();
+  }
+  ctx.restore();
+  ctx.save(); esc();
+  desenharCarta(ctx, { id: tipo, tipo, v: 0 }, { x, y, w, h, rot, dpr: k, t: 0.4 });
+  ctx.restore();
+}
+
+/** O cenario do mundo m em LxA: o parado e o vivo do tema, com o horizonte no alto da tela. */
+function cenarioMundo(cv, L, Al, m) {
+  cv.width = L; cv.height = Al;
+  ctx = cv.getContext('2d');
+  const tema = temaDe(m);
+  definirTema(tema);
+  // o horizonte do jogo fica acima da mesa: aqui, sem mesa, um pouco acima do meio
+  const lay = { mesa: { y: Al * 0.56 }, retrato: Al > L };
+  tema.parado(ctx, L, Al, lay);
+  tema.vivo(ctx, L, Al, 3.2, lay);
 }
 
 // ------------------------------------------------------------ medidas
@@ -432,6 +494,12 @@ const pronto = () => {
   } else if (q.has('medir')) {
     thumb(cv, 628);
     document.getElementById('medidas').textContent = JSON.stringify(medir(cv));
+  } else if (q.has('icone')) {
+    icone(cv, parseInt(q.get('l') || '1024', 10), parseInt(q.get('a') || '1024', 10));
+    document.getElementById('medidas').textContent = cv.toDataURL('image/png');
+  } else if (q.has('cenario')) {
+    cenarioMundo(cv, parseInt(q.get('l') || '1920', 10), parseInt(q.get('a') || '1080', 10), parseInt(q.get('cenario') || '1', 10) || 1);
+    document.getElementById('medidas').textContent = cv.toDataURL('image/png');
   } else if (q.has('capa')) {
     capa(cv, parseInt(q.get('l') || '1920', 10), parseInt(q.get('a') || '1080', 10), q.has('so2048'));
     document.getElementById('medidas').textContent = cv.toDataURL('image/png');

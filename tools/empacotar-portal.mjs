@@ -5,13 +5,20 @@
 // portal e a chamada Wavedash.init tem de estar no build. Na itch.io, as mesmas guardas da Wavedash
 // (com a Wavedash entre as marcas), sem o init, sem localStorage.clear() (a origem e dividida com
 // todos os jogos HTML da itch) e dentro dos limites dela (1.000 arquivos, 240 caracteres de caminho).
-// Uso: [Y8_APP_ID=.. Y8_GAME_ID=..] node tools/empacotar-portal.mjs <y8|crazygames|wavedash|itch> [pasta do zip]
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+// Na GamePush (prepararGamePush e conferirGamePush), o index.html de portais/gamepush-pagina.mjs (o
+// carregador oficial com os ids do jogo, o onGPInit antes dele e o jogo que espera o SDK por 8 s), o
+// russo, a fonte com cirilico e o adaptador; reprova URL externa fora dos quatro hosts do SDK, marca
+// de outro portal, localStorage fora do armazenamento ou do prefixo, localStorage.clear(), alert,
+// confirm, prompt, window.open, progresso ou compra pelo SDK, zip sem index.html na raiz ou acima de
+// 200 MB e pasta extraida diferente do zip.
+// Uso: [Y8_APP_ID=.. Y8_GAME_ID=..] node tools/empacotar-portal.mjs <y8|crazygames|wavedash|itch|gamepush> [pasta do zip]
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { RAIZ } from './servir.mjs';
+import { GAMEPUSH, HOSTS_SDK, blocoGamePush, carregadorOficial, paginaGamePush } from '../portais/gamepush-pagina.mjs';
 
 // a Wavedash injeta o SDK dela na pagina, e a itch.io nao tem SDK: o build nao pede URL nenhuma
 export const URLS = {
@@ -19,6 +26,8 @@ export const URLS = {
   crazygames: 'https://sdk.crazygames.com/crazygames-sdk-v3.js',
   wavedash: '',
   itch: '',
+  // o carregador oficial pede o SDK por endereco em base64 (HOSTS_SDK): nenhuma URL literal
+  gamepush: '',
 };
 const OUTRO = { y8: 'crazygames.com', crazygames: 'y8.com' };
 // na Wavedash, a marca de qualquer outro portal reprova: em qualquer arquivo os nomes longos e, nos
@@ -27,7 +36,14 @@ const MARCAS = /crazy ?games|gamedistribution|y8\.com/i;
 const MARCA_Y8 = /\by8\b/i;
 // na itch.io vale a mesma lista, e a Wavedash tambem e outro portal
 const MARCAS_ITCH = /crazy ?games|gamedistribution|y8\.com|wavedash/i;
-const SEM_SDK = ['wavedash', 'itch'];
+// na GamePush, nenhum outro portal nem plataforma em que ela publica pode ser citado
+const MARCAS_GAMEPUSH = /crazy ?games|gamedistribution|y8\.com|wavedash|itch\.io|itch\.zone|yandex|gamemonetize|gamepix|kongregate|coolmath|newgrounds|armor ?games/i;
+const MARCA_ITCH = /\bitch\b/i;
+const SEM_SDK = ['wavedash', 'itch', 'gamepush'];
+/** O limite do arquivo da Game Hosting da GamePush. */
+const MAX_ZIP_GAMEPUSH = 200 * 1024 * 1024;
+/** O prefixo das chaves do save (src/core/armazenamento.js). */
+const PREFIXO = 'cards2048.';
 const MAX_ARQUIVOS_ITCH = 1000;
 const MAX_CAMINHO_ITCH = 240;
 const TAG = '<!-- Unico script externo permitido pela Poki. -->\n<script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"></script>\n';
@@ -68,8 +84,9 @@ export function conferirBuild(dist, portal) {
   const falhas = [];
   const arquivos = listar(dist);
   const semSdk = SEM_SDK.includes(portal);
-  const marcas = portal === 'itch' ? MARCAS_ITCH : MARCAS;
-  const nomes = portal === 'itch' ? /y8|crazy|gamedistribution|wavedash/i : /y8|crazy|gamedistribution/i;
+  const marcas = portal === 'gamepush' ? MARCAS_GAMEPUSH : portal === 'itch' ? MARCAS_ITCH : MARCAS;
+  const nomes = portal === 'gamepush' ? /y8|crazy|gamedistribution|wavedash|itch|yandex/i
+    : portal === 'itch' ? /y8|crazy|gamedistribution|wavedash/i : /y8|crazy|gamedistribution/i;
   for (const p of arquivos) {
     const r = relative(dist, p);
     const ext = extname(p);
@@ -79,14 +96,15 @@ export function conferirBuild(dist, portal) {
     if (OUTRO[portal] && bruto.includes(OUTRO[portal])) falhas.push(`SDK do outro portal em ${r}`);
     if (semSdk && marcas.test(bruto)) falhas.push(`marca de outro portal em ${r}: ${(bruto.match(new RegExp(`.{0,40}(${marcas.source}).{0,40}`, 'i')) || [''])[0]}`);
     if (semSdk && /\.(html|js|css|txt|json)$/.test(p) && MARCA_Y8.test(bruto)) falhas.push(`marca de outro portal em ${r}: ${(bruto.match(/.{0,40}\by8\b.{0,40}/i) || [''])[0]}`);
+    if (portal === 'gamepush' && /\.(html|js|css|txt|json)$/.test(p) && MARCA_ITCH.test(bruto)) falhas.push(`marca de outro portal em ${r}: ${(bruto.match(/.{0,40}\bitch\b.{0,40}/i) || [''])[0]}`);
     if (portal === 'itch' && r.length > MAX_CAMINHO_ITCH) falhas.push(`caminho acima de ${MAX_CAMINHO_ITCH} caracteres: ${r}`);
     if (!/\.(html|js|css)$/.test(p)) continue;
     const t = readFileSync(p, 'utf8');
-    for (const u of t.match(/https?:\/\/[^\s"'`)<>]+/g) || []) if (u !== URLS[portal]) falhas.push(`URL externa em ${r}: ${u}`);
+    for (const u of t.match(/https?:\/\/[^\s"'`)<>]+/g) || []) if (u !== URLS[portal] && !(portal === 'gamepush' && doSdkGamePush(u))) falhas.push(`URL externa em ${r}: ${u}`);
     for (const m of t.matchAll(/["'(]\/\/[a-z0-9-]+\.[a-z0-9.-]+/gi)) falhas.push(`URL externa em ${r}: ${m[0].slice(1)}`);
     if (/console\.(log|info|debug)\s*\(/.test(t)) falhas.push(`console.log em ${r}`);
     // o localStorage da itch e de todos os jogos HTML dela: apagar tudo apagaria o save dos outros
-    if (portal === 'itch' && /localStorage\s*\.\s*clear\b/.test(t)) falhas.push(`localStorage.clear() em ${r}`);
+    if ((portal === 'itch' || portal === 'gamepush') && /localStorage\s*\.\s*clear\b/.test(t)) falhas.push(`localStorage.clear() em ${r}`);
     for (const u of pedidos(t, ext)) {
       // a CrazyGames nao aceita caminho absoluto: ele falha no iframe dela
       if (u.startsWith('/')) falhas.push(`caminho absoluto em ${r}: ${u}`);
@@ -110,6 +128,90 @@ export function conferirBuild(dist, portal) {
   }
   const fases = join(dist, 'src/jogo/fases.js');
   if (existsSync(fases) && !/export const REGRA_DO_JOGO = 'juntar';/.test(readFileSync(fases, 'utf8'))) falhas.push('a regra do jogo nao e o juntar');
+  if (portal === 'gamepush') falhas.push(...conferirGamePush(dist, arquivos));
+  return falhas;
+}
+
+/** Uma URL num dos quatro hosts do SDK da GamePush. @param {string} u */
+function doSdkGamePush(u) {
+  try {
+    return HOSTS_SDK.includes(new URL(u).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * O que so o build da GamePush tem de ter (ou nao pode ter).
+ * @param {string} dist
+ * @param {string[]} arquivos
+ * @param {{projectId:string, publicToken:string}} [ids]
+ * @returns {string[]}
+ */
+export function conferirGamePush(dist, arquivos, ids = GAMEPUSH) {
+  const falhas = [];
+  const pagina = join(dist, 'index.html');
+  if (existsSync(pagina)) {
+    const html = readFileSync(pagina, 'utf8');
+    const carregador = html.indexOf(carregadorOficial(ids));
+    if (carregador < 0) falhas.push('index.html sem o carregador oficial da GamePush com o projectId e o publicToken do jogo');
+    for (const m of html.matchAll(/projectId=([^&"'\s]*)/g)) if (m[1] !== ids.projectId) falhas.push(`projectId ${m[1]} no index.html; o do jogo e ${ids.projectId}`);
+    for (const m of html.matchAll(/publicToken=([^&"'\s]*)/g)) if (m[1] !== ids.publicToken) falhas.push(`publicToken ${m[1]} no index.html; o do jogo e ${ids.publicToken}`);
+    const callback = html.indexOf('window.onGPInit =');
+    if (callback < 0 || (carregador >= 0 && callback > carregador)) falhas.push('index.html sem o window.onGPInit antes do carregador oficial');
+    if (!html.includes(blocoGamePush(ids))) falhas.push('index.html sem o comeco do jogo que espera o SDK (portais/gamepush-pagina.mjs)');
+    if (/<script[^>]*\bsrc="src\/main\.js"/.test(html)) falhas.push('index.html carrega o jogo sem esperar o SDK');
+    if (!html.includes('<div id="carregando"')) falhas.push('index.html sem a tela de carregamento');
+    if (!/<title>2048 Cards<\/title>/.test(html)) falhas.push('o <title> nao e o titulo do jogo em ingles');
+  }
+  for (const p of arquivos) {
+    const r = relative(dist, p);
+    if (!/\.(html|js|css)$/.test(p)) continue;
+    const t = readFileSync(p, 'utf8');
+    // o save e so do armazenamento, com o prefixo do jogo
+    if (/localStorage/.test(t) && r !== 'src/core/armazenamento.js') falhas.push(`localStorage fora do armazenamento: ${r}`);
+    if (/\b(?:window\.open|alert|confirm|prompt)\s*\(/.test(t)) falhas.push(`janela do navegador (window.open, alert, confirm ou prompt) em ${r}`);
+    if (/\bgp\.(?:player|storage|payments)\b/.test(t)) falhas.push(`progresso ou compra pelo SDK (gp.player, gp.storage, gp.payments) em ${r}`);
+  }
+  const arm = join(dist, 'src/core/armazenamento.js');
+  if (!existsSync(arm) || !readFileSync(arm, 'utf8').includes(`export const PREFIXO_PADRAO = '${PREFIXO}';`)) falhas.push(`o save nao usa o prefixo ${PREFIXO}`);
+  const portalJs = join(dist, 'src/core/portal.js');
+  if (!existsSync(portalJs) || !/export const INTERVALO_MS = 180000;/.test(readFileSync(portalJs, 'utf8'))) falhas.push('src/core/portal.js nao e o adaptador da GamePush (INTERVALO_MS de 180 s)');
+  const txt = join(dist, 'src/i18n/textos.js');
+  if (!existsSync(join(dist, 'src/i18n/textos-base.js')) || !existsSync(txt) || !/export const RU = \{/.test(readFileSync(txt, 'utf8'))) falhas.push('o build nao tem o russo (src/i18n/textos.js com o RU sobre textos-base.js)');
+  return falhas;
+}
+
+/**
+ * O que so o build da GamePush leva, sobre a copia do jogo ja com o adaptador: o russo (o textos.js
+ * original vira textos-base.js), a fonte com cirilico e a licenca dela, o plataforma.css e o
+ * index.html da GamePush.
+ * @param {string} dist
+ * @param {{projectId:string, publicToken:string}} [ids]
+ */
+export function prepararGamePush(dist, ids = GAMEPUSH) {
+  const gp = join(RAIZ, 'portais/gamepush');
+  renameSync(join(dist, 'src/i18n/textos.js'), join(dist, 'src/i18n/textos-base.js'));
+  cpSync(join(gp, 'textos.js'), join(dist, 'src/i18n/textos.js'));
+  cpSync(join(gp, 'plataforma.css'), join(dist, 'src/ui/plataforma.css'));
+  for (const f of readdirSync(join(gp, 'fontes'))) cpSync(join(gp, 'fontes', f), join(dist, 'src/ui/fontes', f));
+  const lic = join(dist, 'LICENCAS.txt');
+  writeFileSync(lic, readFileSync(lic, 'utf8') + readFileSync(join(gp, 'LICENCAS.txt'), 'utf8'));
+  const pagina = join(dist, 'index.html');
+  writeFileSync(pagina, paginaGamePush(readFileSync(pagina, 'utf8'), ids));
+}
+
+/**
+ * A pasta extraida e igual a build: os mesmos arquivos, com o mesmo sha256.
+ * @param {string} a @param {string} b
+ * @returns {string[]}
+ */
+export function compararPastas(a, b) {
+  const mapa = (/** @type {string} */ d) => new Map(listar(d).map((p) => [relative(d, p), createHash('sha256').update(readFileSync(p)).digest('hex')]));
+  const ma = mapa(a), mb = mapa(b);
+  const falhas = [];
+  for (const [k, h] of ma) if (mb.get(k) !== h) falhas.push(mb.has(k) ? `difere: ${k}` : `falta: ${k}`);
+  for (const k of mb.keys()) if (!ma.has(k)) falhas.push(`sobra: ${k}`);
   return falhas;
 }
 
@@ -132,6 +234,7 @@ function montar(portal, ids) {
   const html = readFileSync(pagina, 'utf8');
   if (html.split(TAG).length !== 2) throw new Error('a tag do SDK da Poki mudou no index.html');
   writeFileSync(pagina, html.replace(TAG, ''));
+  if (portal === 'gamepush') prepararGamePush(dist);
   return dist;
 }
 
@@ -151,7 +254,7 @@ function zipar(dist, portal, saidaZip, nomeBase, semIds) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const portal = /** @type {'y8'|'crazygames'|'wavedash'|'itch'} */ (process.argv[2]);
   if (!Object.hasOwn(URLS, portal)) {
-    process.stdout.write('uso: node tools/empacotar-portal.mjs <y8|crazygames|wavedash|itch> [pasta do zip]\n');
+    process.stdout.write('uso: node tools/empacotar-portal.mjs <y8|crazygames|wavedash|itch|gamepush> [pasta do zip]\n');
     process.exit(1);
   }
   const saidaZip = resolve(process.argv[3] || join(RAIZ, '../distribuicao/2048-cards', portal));
@@ -168,10 +271,18 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const zip = zipar(dist, portal, saidaZip, nomeBase, semIds);
   // a CrazyGames e a Wavedash recebem a pasta: o zip extraido fica ao lado, com o mesmo nome (na
   // itch.io, a pasta e a conferencia do que vai no zip)
-  if (portal === 'crazygames' || portal === 'wavedash' || portal === 'itch') {
+  if (portal === 'crazygames' || portal === 'wavedash' || portal === 'itch' || portal === 'gamepush') {
     const pasta = join(saidaZip, nomeBase);
     rmSync(pasta, { recursive: true, force: true });
     if (spawnSync('unzip', ['-q', zip, '-d', pasta]).status !== 0) throw new Error('nao extraiu o zip');
+    if (portal === 'gamepush') {
+      const depois = [...compararPastas(dist, pasta)];
+      if (statSync(zip).size > MAX_ZIP_GAMEPUSH) depois.push(`zip acima de 200 MB (${statSync(zip).size} bytes)`);
+      if (depois.length) {
+        process.stdout.write('FALHOU:\n  ' + depois.join('\n  ') + '\n');
+        process.exit(1);
+      }
+    }
   }
   const sha = createHash('sha256').update(readFileSync(zip)).digest('hex');
   process.stdout.write(`${zip}: ${listar(dist).length} arquivos, ${(statSync(zip).size / 1024).toFixed(0)} KB, sha256 ${sha}\n`);

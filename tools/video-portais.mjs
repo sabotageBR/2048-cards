@@ -9,7 +9,13 @@
 //   node tools/video-portais.mjs <tudo|prints|videos> [pasta=../distribuicao/2048-cards]   os de PRINTS e VIDEOS
 //   node tools/video-portais.mjs itch [pasta=../distribuicao/2048-cards]   os screenshots da itch.io, do build
 //        dela (dist-portais/itch): os 5 primeiros de PRINTS, no tamanho do embed (960x600, densidade 4/3)
-// PORTA e PORTA_DEV (variaveis de ambiente) trocam as portas do servidor e do DevTools.
+//   node tools/video-portais.mjs gamepush [pasta=../distribuicao/2048-cards]   os screenshots da GamePush, do
+//        build dela (dist-portais/gamepush): os 5 primeiros de PRINTS em 1280x720 e 720x1280, em ingles e, em
+//        gamepush/ru/, em russo (o idioma do navegador); sem o SDK, entao sem botao de video
+//   node tools/video-portais.mjs gamepush-videos [pasta]   o video retrato da GamePush (1080x1920, do build
+//        dela, em fontes/jogo-9x16.mp4) e os dois videos da loja, de ate 20 s e sem audio
+// PORTA e PORTA_DEV (variaveis de ambiente) trocam as portas do servidor e do DevTools; BUILD troca o build
+// dos modos print e video (padrao y8) e IDIOMA (en, pt, es, ru) o idioma do navegador.
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -23,13 +29,20 @@ const HOST = 'jogo.portal.test';
 // PORTAS=n desloca as duas, para rodar mais de uma copia ao mesmo tempo (ate 6119 e 9619)
 const desloca = Number(process.env.PORTAS || 0);
 const porta = Number(process.env.PORTA) || 6102 + desloca, portaDep = Number(process.env.PORTA_DEV) || 9612 + desloca;
-/** O build servido: o da Y8, ou o da itch.io no modo itch. */
-let build = 'y8';
+/** O build servido: o da Y8, ou o da itch.io no modo itch (BUILD troca nos modos print e video). */
+let build = process.env.BUILD || 'y8';
+/** O idioma do navegador (o jogo sem SDK fica nele): IDIOMA ou o modo gamepush. */
+let idioma = process.env.IDIOMA || '';
+/** Os hosts do SDK da GamePush: mortos aqui, o build dela abre sem SDK (e sem rede de fora). */
+const SDK_MORTO = ['gs.eponesh.com', 's3.gamepush.com', 's3-eu.gamepush.com', 'gamepush.com'].map((h) => `MAP ${h} ~NOTFOUND`);
 /** Passo do guloso na corrida ate o ponto da partida (fora do video). */
 const RAPIDO = 120;
 
 /** Tamanhos: CSS e densidade de cada entrega (a mesa ocupa mais a tela com menos CSS). */
-const TELAS = { standard: ['760x570', 1], wide: ['960x540', 4 / 3], v16x9: ['960x540', 2], v2x3: ['540x810', 2], v4x3: ['640x480', 1.5], itch: ['960x600', 4 / 3] };
+const TELAS = {
+  standard: ['760x570', 1], wide: ['960x540', 4 / 3], v16x9: ['960x540', 2], v2x3: ['540x810', 2], v4x3: ['640x480', 1.5], itch: ['960x600', 4 / 3],
+  gpPaisagem: ['960x540', 4 / 3], gpRetrato: ['540x960', 4 / 3], v9x16: ['540x960', 2],
+};
 
 /**
  * Screenshots: [nivel, jogadas, cartas na mesa, modo]. A corrida vai ate as duas contas sem sair do
@@ -58,7 +71,9 @@ async function abrirJogo(c, nivel, L, A, dpr) {
   await c.cmd('Page.enable');
   await c.cmd('Runtime.enable');
   await c.cmd('Emulation.setDeviceMetricsOverride', { width: L, height: A, deviceScaleFactor: dpr, mobile: false });
-  await c.cmd('Page.addScriptToEvaluateOnNewDocument', { source: `${fonteRelogio({ fps: FPS })}window.__cards2048Teste = { nivel: ${nivel} };` });
+  // o idioma do navegador: o jogo sem SDK abre nele
+  const lingua = idioma ? `Object.defineProperty(navigator, 'languages', { get: () => ['${idioma}'] }); Object.defineProperty(navigator, 'language', { get: () => '${idioma}' });` : '';
+  await c.cmd('Page.addScriptToEvaluateOnNewDocument', { source: `${fonteRelogio({ fps: FPS })}${lingua}window.__cards2048Teste = { nivel: ${nivel} };` });
   await c.cmd('Page.navigate', { url: `http://${HOST}:${porta}/index.html` });
   for (let k = 0; k < 200 && !(await c.av('!!(window.__c2 && window.__c2.J.e)')); k++) await espera(50);
   if (!(await c.av('!!window.__c2'))) throw new Error('o jogo nao abriu');
@@ -89,7 +104,7 @@ const situacao = (c) => c.av("JSON.stringify({ mundo: __c2.J.e.mundo, nivel: __c
 
 async function comChrome(fn) {
   const fechar = await servir(porta, join(RAIZ, 'dist-portais', build));
-  const c = await abrirChrome({ portaDep, argumentos: [`--host-resolver-rules=MAP ${HOST} 127.0.0.1`] });
+  const c = await abrirChrome({ portaDep, argumentos: [`--host-resolver-rules=MAP ${HOST} 127.0.0.1, ${SDK_MORTO.join(', ')}`] });
   try {
     return await fn(c);
   } finally {
@@ -211,7 +226,38 @@ else if (modo === 'print') {
     const [nivel, jogadas, cartas, md] = PRINTS[k];
     await comChrome((c) => imprimir(c, nivel, jogadas, cartas, md, TELAS.itch[0], TELAS.itch[1], join(pasta, `itch/screenshot-${k + 1}-${nome}.png`)));
   }
+} else if (modo === 'gamepush') {
+  // um quadro de cada mundo, do build da GamePush (rode antes o empacotador com o alvo gamepush), em
+  // paisagem e retrato, em ingles e em russo
+  build = 'gamepush';
+  const pasta = resolve(resto[0] || join(RAIZ, '../distribuicao/2048-cards'));
+  for (const lingua of ['en', 'ru']) {
+    idioma = lingua;
+    const sub = lingua === 'en' ? 'gamepush' : 'gamepush/ru';
+    for (const [tela, nome] of [['gpPaisagem', 'landscape'], ['gpRetrato', 'portrait']]) {
+      const [L, A] = TELAS[tela][0].split('x').map(Number);
+      const tam = `${Math.round(L * TELAS[tela][1])}x${Math.round(A * TELAS[tela][1])}`;
+      for (let k = 0; k < 5; k++) {
+        const [nivel, jogadas, cartas, md] = PRINTS[k];
+        await comChrome((c) => imprimir(c, nivel, jogadas, cartas, md, TELAS[tela][0], TELAS[tela][1], join(pasta, `${sub}/screenshot-${nome}-${k + 1}-${tam}.png`)));
+      }
+    }
+  }
+} else if (modo === 'gamepush-videos') {
+  // o retrato sai do build da GamePush (o fim do mundo 3 e a entrada do 4, como o 2x3); a paisagem e a
+  // gravacao 16x9 que ja esta em fontes/ (o build da Y8, em ingles: a tela e a mesma). A loja aceita ate
+  // 20 s, sem audio: os dois sao cortados em 19,9 s, sem recodificar
+  build = 'gamepush';
+  idioma = 'en';
+  const pasta = resolve(resto[0] || join(RAIZ, '../distribuicao/2048-cards'));
+  await comChrome((c) => gravar(c, 21, 62, TELAS.v9x16[0], TELAS.v9x16[1], join(pasta, 'fontes/jogo-9x16.mp4'), 21, 750));
+  for (const [de, para] of [['fontes/jogo-16x9.mp4', 'gamepush/video-landscape-1920x1080.mp4'], ['fontes/jogo-9x16.mp4', 'gamepush/video-portrait-1080x1920.mp4']]) {
+    mkdirSync(dirname(join(pasta, para)), { recursive: true });
+    const r = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', join(pasta, de), '-t', '19.9', '-an', '-c:v', 'copy', '-movflags', '+faststart', join(pasta, para)]);
+    if (r.status !== 0) throw new Error(`ffmpeg: ${para}`);
+    process.stdout.write(`${join(pasta, para)}\n`);
+  }
 } else {
-  process.stdout.write('uso: node tools/video-portais.mjs <sondar|print|video|tudo|prints|videos|itch> ...\n');
+  process.stdout.write('uso: node tools/video-portais.mjs <sondar|print|video|tudo|prints|videos|itch|gamepush|gamepush-videos> ...\n');
   process.exit(1);
 }
