@@ -5,7 +5,7 @@
 // Chrome sem GPU seja, e a corrida ate o ponto certo da partida fica fora do video.
 //   node tools/video-portais.mjs sondar <nivel>                  jogadas em cada subida de nivel
 //   node tools/video-portais.mjs print <nivel> <jogadas> <cartas> <LxA> <dpr> <saida.png> [calmo|juntar]
-//   node tools/video-portais.mjs video <nivel> <jogadas> <LxA> <dpr> <saida.mp4> [seg=21] [ms=750]
+//   node tools/video-portais.mjs video <nivel> <jogadas> <LxA> <dpr> <saida.mp4> [seg=21] [ms=450]
 //   node tools/video-portais.mjs <tudo|prints|videos> [pasta=../distribuicao/2048-cards]   os de PRINTS e VIDEOS
 //   node tools/video-portais.mjs itch [pasta=../distribuicao/2048-cards]   os screenshots da itch.io, do build
 //        dela (dist-portais/itch): os 5 primeiros de PRINTS, no tamanho do embed (960x600, densidade 4/3)
@@ -37,6 +37,12 @@ let idioma = process.env.IDIOMA || '';
 const SDK_MORTO = ['gs.eponesh.com', 's3.gamepush.com', 's3-eu.gamepush.com', 'gamepush.com'].map((h) => `MAP ${h} ~NOTFOUND`);
 /** Passo do guloso na corrida ate o ponto da partida (fora do video). */
 const RAPIDO = 120;
+/**
+ * Passo do guloso no video: a jogada assenta em ~0,32 s, e com 750 ms a mesa ficava 0,43 s parada entre
+ * uma e outra, sem nada se mexer. A Y8 recusa video com "sudden stops/pauses" (o do Clock Tinker, em
+ * 2026-11-12); com 450 ms nenhum trecho de 5 quadros fica igual.
+ */
+const PASSO_VIDEO = 450;
 
 /** Tamanhos: CSS e densidade de cada entrega (a mesa ocupa mais a tela com menos CSS). */
 const TELAS = {
@@ -207,7 +213,7 @@ else if (modo === 'print') {
   await comChrome((c) => imprimir(c, Number(nivel), Number(jogadas), Number(cartas), md || '', tam, Number(dpr), saida));
 } else if (modo === 'video') {
   const [nivel, jogadas, tam, dpr, saida, seg, ms] = resto;
-  await comChrome((c) => gravar(c, Number(nivel), Number(jogadas), tam, Number(dpr), saida, Number(seg || 21), Number(ms || 750)));
+  await comChrome((c) => gravar(c, Number(nivel), Number(jogadas), tam, Number(dpr), saida, Number(seg || 21), Number(ms || PASSO_VIDEO)));
 } else if (modo === 'tudo' || modo === 'prints' || modo === 'videos') {
   const pasta = resolve(resto[0] || join(RAIZ, '../distribuicao/2048-cards'));
   for (let k = 0; k < PRINTS.length && modo !== 'videos'; k++) {
@@ -215,7 +221,7 @@ else if (modo === 'print') {
     await comChrome((c) => imprimir(c, nivel, jogadas, cartas, md, TELAS.standard[0], TELAS.standard[1], join(pasta, `y8/screenshot-standard-${k + 1}-760x570.png`)));
     await comChrome((c) => imprimir(c, nivel, jogadas, cartas, md, TELAS.wide[0], TELAS.wide[1], join(pasta, `y8/screenshot-widescreen-${k + 1}-1280x720.png`)));
   }
-  if (modo !== 'prints') for (const [nome, tela, nivel, jogadas] of VIDEOS) await comChrome((c) => gravar(c, nivel, jogadas, TELAS[tela][0], TELAS[tela][1], join(pasta, nome), 21, 750));
+  if (modo !== 'prints') for (const [nome, tela, nivel, jogadas] of VIDEOS) await comChrome((c) => gravar(c, nivel, jogadas, TELAS[tela][0], TELAS[tela][1], join(pasta, nome), 21, PASSO_VIDEO));
 } else if (modo === 'itch') {
   // um quadro de cada mundo, do build da itch.io (rode antes o empacotador com o alvo itch)
   build = 'itch';
@@ -250,7 +256,7 @@ else if (modo === 'print') {
   build = 'gamepush';
   idioma = 'en';
   const pasta = resolve(resto[0] || join(RAIZ, '../distribuicao/2048-cards'));
-  await comChrome((c) => gravar(c, 21, 62, TELAS.v9x16[0], TELAS.v9x16[1], join(pasta, 'fontes/jogo-9x16.mp4'), 21, 750));
+  await comChrome((c) => gravar(c, 21, 62, TELAS.v9x16[0], TELAS.v9x16[1], join(pasta, 'fontes/jogo-9x16.mp4'), 21, PASSO_VIDEO));
   for (const [de, para] of [['fontes/jogo-16x9.mp4', 'gamepush/video-landscape-1920x1080.mp4'], ['fontes/jogo-9x16.mp4', 'gamepush/video-portrait-1080x1920.mp4']]) {
     mkdirSync(dirname(join(pasta, para)), { recursive: true });
     const r = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', join(pasta, de), '-t', '19.9', '-an', '-c:v', 'copy', '-movflags', '+faststart', join(pasta, para)]);
